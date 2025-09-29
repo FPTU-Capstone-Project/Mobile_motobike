@@ -1,0 +1,315 @@
+{
+  "presetLocations": [
+    {
+      "id": 1,
+      "name": "Trường Đại học FPT",
+      "address": "Lô E2a-7, Đường D1, Khu Công nghệ cao, Quận 9, TP.HCM",
+      "type": "university",
+      "icon": "school",
+      "coordinates": { "lat": 10.8411, "lng": 106.8098 }
+    },
+    {
+      "id": 2,
+      "name": "Nhà Văn hóa Sinh viên",
+      "address": "01 Phạm Ngọc Thạch, Quận 3, TP.HCM",
+      "type": "cultural",
+      "icon": "account-balance",
+      "coordinates": { "lat": 10.7769, "lng": 106.6955 }
+    },
+    {
+      "id": 3,
+      "name": "Nhà của tôi",
+      "address": "Địa chỉ nhà riêng",
+      "type": "home",
+      "icon": "home",
+      "coordinates": { "lat": 10.7626, "lng": 106.6826 },
+      "isPersonal": true
+    },
+    {
+      "id": 4,
+      "name": "Phòng trọ",
+      "address": "Địa chỉ phòng trọ",
+      "type": "accommodation",
+      "icon": "apartment",
+      "coordinates": { "lat": 10.8230, "lng": 106.6296 },
+      "isPersonal": true
+    },
+    {
+      "id": 5,
+      "name": "Chợ Bến Thành",
+      "address": "Lê Lợi, Quận 1, TP.HCM",
+      "type": "market",
+      "icon": "store",
+      "coordinates": { "lat": 10.7720, "lng": 106.6988 }
+    },
+    {
+      "id": 6,
+      "name": "Vincom Center",
+      "address": "70-72 Lê Thánh Tôn, Quận 1, TP.HCM",
+      "type": "shopping",
+      "icon": "shopping-bag",
+      "coordinates": { "lat": 10.7796, "lng": 106.7015 }
+    }
+  ],
+  "users": [
+    {
+      "id": 1,
+      "studentId": "SE123456",
+      "name": "Nguyen Van A",
+      "email": "nguyenvana@university.edu.vn",
+      "phone": "0987654321",
+      "role": "student",
+      "isVerified": true,
+      "avatar": "https://via.placeholder.com/100",
+      "mode": "auto",
+      "favoriteLocations": [1, 3, 4],
+      "emergencyContacts": [
+        { "name": "Mẹ", "phone": "0987654320" },
+        { "name": "Bố", "phone": "0987654319" }
+      ]
+    },
+    {
+      "id": 2,
+      "studentId": "SE123457",
+      "name": "Tran Thi B",
+      "email": "tranthib@university.edu.vn",
+      "phone": "0987654322",
+      "role": "driver",
+      "isVerified": true,
+      "avatar": "https://via.placeholder.com/100",
+      "rating": 4.8,
+      "totalRides": 150,
+      "mode": "manual",
+      "vehicleInfo": {
+        "type": "motorbike",
+        "brand": "Honda",
+        "model": "Wave",
+        "licensePlate": "59A1-12345",
+        "color": "Đen"
+      },
+      "earnings": {
+        "total": 2500000,
+        "thisMonth": 450000,
+        "commission": 0.15
+      }
+    }
+  ],
+  "rides":[
+    {
+      "id": 101,
+      "pickupLocation": "Nhà của tôi",
+      "dropoffLocation": "Trường Đại học FPT",
+      "status": "completed",
+      "date": "2025-09-10T07:45:00Z",
+      "duration": 22,
+      "distance": 6.1,
+      "fare": 15000
+    },
+    {
+      "id": 102,
+      "pickupLocation": "Trường Đại học FPT",
+      "dropoffLocation": "Chợ Bến Thành",
+      "status": "completed",
+      "date": "2025-09-09T17:30:00Z",
+      "duration": 35,
+      "distance": 8.7,
+      "fare": 25000
+    },
+    {
+      "id": 103,
+      "pickupLocation": "Phòng trọ",
+      "dropoffLocation": "Trường Đại học FPT",
+      "status": "completed",
+      "date": "2025-09-08T07:50:00Z",
+      "duration": 26,
+      "distance": 7.3,
+      "fare": 18000
+    },
+    {
+      "id": 104,
+      "pickupLocation": "Vincom Center",
+      "dropoffLocation": "Nhà Văn hóa Sinh viên",
+      "status": "cancelled",
+      "date": "2025-09-07T19:05:00Z",
+      "duration": 0,
+      "distance": 0,
+      "fare": 0
+    },
+    {
+      "id": 105,
+      "pickupLocation": "Nhà Văn hóa Sinh viên",
+      "dropoffLocation": "Trường Đại học FPT",
+      "status": "completed",
+      "date": "2025-09-06T08:05:00Z",
+      "duration": 28,
+      "distance": 9.1,
+      "fare": 22000
+    },
+    {
+      "id": 106,
+      "pickupLocation": "Nhà của tôi",
+      "dropoffLocation": "Vincom Center",
+      "status": "completed",
+      "date": "2025-09-05T18:40:00Z",
+      "duration": 30,
+      "distance": 7.9,
+      "fare": 23000
+    },
+    {
+      "id": 107,
+      "pickupLocation": "Chợ Bến Thành",
+      "dropoffLocation": "Nhà của tôi",
+      "status": "completed",
+      "date": "2025-09-04T21:10:00Z",
+      "duration": 18,
+      "distance": 4.5,
+      "fare": 14000
+    },
+    {
+      "id": 108,
+      "pickupLocation": "Phòng trọ",
+      "dropoffLocation": "Nhà Văn hóa Sinh viên",
+      "status": "completed",
+      "date": "2025-09-03T16:25:00Z",
+      "duration": 24,
+      "distance": 6.8,
+      "fare": 17000
+    },
+    {
+      "id": 109,
+      "pickupLocation": "Nhà Văn hóa Sinh viên",
+      "dropoffLocation": "Phòng trọ",
+      "status": "completed",
+      "date": "2025-09-02T20:15:00Z",
+      "duration": 27,
+      "distance": 7.2,
+      "fare": 19000
+    },
+    {
+      "id": 110,
+      "pickupLocation": "Trường Đại học FPT",
+      "dropoffLocation": "Nhà của tôi",
+      "status": "completed",
+      "date": "2025-09-01T11:35:00Z",
+      "duration": 21,
+      "distance": 5.9,
+      "fare": 15000
+    },
+    {
+      "id": 111,
+      "pickupLocation": "Vincom Center",
+      "dropoffLocation": "Chợ Bến Thành",
+      "status": "completed",
+      "date": "2025-08-31T14:10:00Z",
+      "duration": 12,
+      "distance": 2.6,
+      "fare": 10000
+    },
+    {
+      "id": 112,
+      "pickupLocation": "Nhà của tôi",
+      "dropoffLocation": "Trường Đại học FPT",
+      "status": "ongoing",
+      "date": "2025-09-16T02:50:00Z",
+      "duration": 5,
+      "distance": 1.1,
+      "fare": 0
+    }
+  ],
+  "wallet": {
+    "balance": 150000,
+    "transactions": [
+      {
+        "id": 1,
+        "type": "topup",
+        "method": "qr_code",
+        "amount": 200000,
+        "description": "Nạp tiền qua QR Banking",
+        "date": "2024-01-10T10:00:00Z",
+        "status": "completed"
+      },
+      {
+        "id": 2,
+        "type": "payment",
+        "amount": -15000,
+        "description": "Thanh toán chuyến đi #1",
+        "date": "2024-01-15T08:20:00Z",
+        "status": "completed"
+      },
+      {
+        "id": 3,
+        "type": "withdrawal_request",
+        "amount": -50000,
+        "description": "Yêu cầu rút tiền",
+        "date": "2024-01-16T09:00:00Z",
+        "status": "pending_approval"
+      }
+    ]
+  },
+  "availableDrivers": [
+    {
+      "id": 2,
+      "name": "Tran Thi B",
+      "rating": 4.8,
+      "distance": 0.8,
+      "estimatedTime": 3,
+      "currentLocationId": 4,
+      "destinationId": 1,
+      "isSharing": true,
+      "availableSeats": 1,
+      "mode": "manual"
+    },
+    {
+      "id": 3,
+      "name": "Le Van C",
+      "rating": 4.5,
+      "distance": 1.2,
+      "estimatedTime": 5,
+      "currentLocationId": 3,
+      "destinationId": 1,
+      "isSharing": false,
+      "availableSeats": 1,
+      "mode": "auto"
+    }
+  ],
+  "promotions": [
+    {
+      "id": 1,
+      "title": "Giảm 15% chuyến đi đầu tiên",
+      "description": "Dành cho sinh viên mới đăng ký",
+      "discount": 0.15,
+      "maxDiscount": 20000,
+      "validUntil": "2024-12-31T23:59:59Z",
+      "code": "WELCOME15",
+      "isActive": true
+    },
+    {
+      "id": 2,
+      "title": "Miễn phí chuyến về trường",
+      "description": "Áp dụng từ 7:00-9:00 sáng",
+      "discount": 1.0,
+      "maxDiscount": 30000,
+      "validUntil": "2024-06-30T23:59:59Z",
+      "code": "MORNING",
+      "isActive": true
+    }
+  ],
+  "notifications": [
+    {
+      "id": 1,
+      "title": "Chuyến đi hoàn thành",
+      "message": "Bạn đã hoàn thành chuyến đi đến Trường Đại học FPT",
+      "date": "2024-01-15T08:20:00Z",
+      "isRead": false,
+      "type": "ride_completed"
+    },
+    {
+      "id": 2,
+      "title": "Yêu cầu rút tiền đang được xử lý",
+      "message": "Yêu cầu rút 50,000 VNĐ đang chờ admin phê duyệt",
+      "date": "2024-01-16T09:00:00Z",
+      "isRead": false,
+      "type": "withdrawal_pending"
+    }
+  ]
+}

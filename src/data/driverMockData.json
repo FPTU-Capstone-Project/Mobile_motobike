@@ -1,0 +1,243 @@
+{
+  "driver": {
+    "id": 2,
+    "studentId": "SE123457",
+    "name": "Trần Thị B",
+    "email": "tranthib@university.edu.vn",
+    "phone": "0987654322",
+    "role": "driver",
+    "isVerified": true,
+    "avatar": "https://via.placeholder.com/100",
+    "rating": 4.8,
+    "totalRides": 150,
+    "joinDate": "2023-09-01",
+    "vehicleInfo": {
+      "type": "motorcycle",
+      "brand": "Honda",
+      "model": "Winner X",
+      "licensePlate": "59-H1 123.45",
+      "color": "Đỏ",
+      "year": 2022
+    },
+    "bankAccount": {
+      "bankName": "Vietcombank",
+      "accountNumber": "1234567890",
+      "accountName": "TRAN THI B"
+    }
+  },
+  "earnings": {
+    "today": {
+      "totalEarnings": 125000,
+      "totalRides": 8,
+      "onlineHours": 6.5,
+      "averageFarePerRide": 15625
+    },
+    "thisWeek": {
+      "totalEarnings": 850000,
+      "totalRides": 45,
+      "onlineHours": 32,
+      "averageFarePerRide": 18889
+    },
+    "thisMonth": {
+      "totalEarnings": 3200000,
+      "totalRides": 180,
+      "onlineHours": 120,
+      "averageFarePerRide": 17778
+    },
+    "weeklyEarnings": [
+      {"day": "T2", "earnings": 120000, "rides": 6},
+      {"day": "T3", "earnings": 150000, "rides": 8},
+      {"day": "T4", "earnings": 95000, "rides": 5},
+      {"day": "T5", "earnings": 180000, "rides": 10},
+      {"day": "T6", "earnings": 210000, "rides": 12},
+      {"day": "T7", "earnings": 95000, "rides": 4},
+      {"day": "CN", "earnings": 0, "rides": 0}
+    ]
+  },
+  "ratings": {
+    "overall": 4.8,
+    "totalReviews": 142,
+    "breakdown": {
+      "5": 89,
+      "4": 38,
+      "3": 12,
+      "2": 2,
+      "1": 1
+    },
+    "recentReviews": [
+      {
+        "id": 1,
+        "riderId": 1,
+        "riderName": "Nguyễn Văn A",
+        "rating": 5,
+        "comment": "Tài xế lái xe rất an toàn, thân thiện và đúng giờ. Sẽ đặt lại lần sau!",
+        "date": "2024-01-15T08:30:00Z",
+        "rideId": 1
+      },
+      {
+        "id": 2,
+        "riderId": 3,
+        "riderName": "Lê Thị C",
+        "rating": 5,
+        "comment": "Xe sạch sẽ, tài xế nhiệt tình. Đi đúng tuyến đường và không phát sinh thêm chi phí.",
+        "date": "2024-01-14T17:45:00Z",
+        "rideId": 2
+      },
+      {
+        "id": 3,
+        "riderId": 4,
+        "riderName": "Phạm Văn D",
+        "rating": 4,
+        "comment": "Tốt, nhưng có thể cải thiện thêm về tốc độ di chuyển.",
+        "date": "2024-01-13T12:15:00Z",
+        "rideId": 3
+      },
+      {
+        "id": 4,
+        "riderId": 5,
+        "riderName": "Hoàng Thị E",
+        "rating": 5,
+        "comment": "Rất hài lòng! Tài xế lịch sự và chuyên nghiệp.",
+        "date": "2024-01-12T09:20:00Z",
+        "rideId": 4
+      }
+    ]
+  },
+  "rideHistory": [
+    {
+      "id": 1,
+      "riderId": 1,
+      "riderName": "Nguyễn Văn A",
+      "pickupLocation": "Ký túc xá A",
+      "dropoffLocation": "Trường Đại học FPT",
+      "status": "completed",
+      "fare": 15000,
+      "distance": 5.2,
+      "duration": 20,
+      "date": "2024-01-15T08:00:00Z",
+      "rating": 5,
+      "paymentMethod": "wallet"
+    },
+    {
+      "id": 2,
+      "riderId": 3,
+      "riderName": "Lê Thị C",
+      "pickupLocation": "Trường Đại học FPT",
+      "dropoffLocation": "Chợ Bến Thành",
+      "status": "completed",
+      "fare": 25000,
+      "distance": 8.7,
+      "duration": 35,
+      "date": "2024-01-14T17:30:00Z",
+      "rating": 5,
+      "paymentMethod": "cash"
+    },
+    {
+      "id": 3,
+      "riderId": 4,
+      "riderName": "Phạm Văn D",
+      "pickupLocation": "Sân bay Tân Sơn Nhất",
+      "dropoffLocation": "Quận 1",
+      "status": "completed",
+      "fare": 45000,
+      "distance": 12.3,
+      "duration": 45,
+      "date": "2024-01-13T12:00:00Z",
+      "rating": 4,
+      "paymentMethod": "wallet"
+    }
+  ],
+  "sosContacts": [
+    {
+      "id": 1,
+      "name": "Cảnh sát giao thông",
+      "phone": "113",
+      "type": "emergency"
+    },
+    {
+      "id": 2,
+      "name": "Cấp cứu 115",
+      "phone": "115",
+      "type": "emergency"
+    },
+    {
+      "id": 3,
+      "name": "Hotline hỗ trợ",
+      "phone": "1900123456",
+      "type": "support"
+    },
+    {
+      "id": 4,
+      "name": "Bảo vệ trường",
+      "phone": "0283123456",
+      "type": "security"
+    }
+  ],
+  "notifications": [
+    {
+      "id": 1,
+      "title": "Chuyến đi hoàn thành",
+      "message": "Bạn đã hoàn thành chuyến đi và nhận được 15,000 VNĐ",
+      "type": "ride_completed",
+      "date": "2024-01-15T08:20:00Z",
+      "isRead": false
+    },
+    {
+      "id": 2,
+      "title": "Đánh giá mới",
+      "message": "Bạn đã nhận được đánh giá 5 sao từ khách hàng",
+      "type": "rating",
+      "date": "2024-01-15T08:25:00Z",
+      "isRead": false
+    },
+    {
+      "id": 3,
+      "title": "Thưởng tuần",
+      "message": "Chúc mừng! Bạn đã đạt mục tiêu 40 chuyến trong tuần",
+      "type": "bonus",
+      "date": "2024-01-14T23:59:00Z",
+      "isRead": true
+    }
+  ],
+  "statistics": {
+    "totalDistance": 1250.5,
+    "totalOnlineHours": 320,
+    "averageRating": 4.8,
+    "completionRate": 98.5,
+    "acceptanceRate": 92.3,
+    "cancellationRate": 1.5,
+    "peakHours": ["07:00-09:00", "17:00-19:00", "21:00-23:00"],
+    "favoriteRoutes": [
+      "Ký túc xá A - Trường Đại học FPT",
+      "Trường Đại học FPT - Chợ Bến Thành",
+      "Sân bay Tân Sơn Nhất - Quận 1"
+    ]
+  },
+  "achievements": [
+    {
+      "id": 1,
+      "title": "Tài xế 5 sao",
+      "description": "Duy trì rating 4.8+ trong 30 ngày",
+      "icon": "star",
+      "earned": true,
+      "earnedDate": "2024-01-01"
+    },
+    {
+      "id": 2,
+      "title": "Chuyên nghiệp",
+      "description": "Hoàn thành 100 chuyến đi",
+      "icon": "verified",
+      "earned": true,
+      "earnedDate": "2023-12-15"
+    },
+    {
+      "id": 3,
+      "title": "Siêu tài xế",
+      "description": "Hoàn thành 500 chuyến đi",
+      "icon": "emoji-events",
+      "earned": false,
+      "progress": 150,
+      "target": 500
+    }
+  ]
+}
