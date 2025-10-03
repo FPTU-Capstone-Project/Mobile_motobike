@@ -24,13 +24,58 @@ const RegisterScreen = ({ navigation }) => {
     password: '',
     confirmPassword: ''
   });
-  const [role, setRole] = useState('rider'); // 'rider' | 'driver'
+  // All users register as riders by default, can upgrade to driver later
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [passwordStrength, setPasswordStrength] = useState(0);
+  const [passwordChecks, setPasswordChecks] = useState({
+    length: false,
+    lowercase: false,
+    uppercase: false,
+    number: false,
+    special: false
+  });
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    
+    // Check password strength if password field is being updated
+    if (field === 'password') {
+      checkPasswordStrength(value);
+    }
+  };
+
+  const checkPasswordStrength = (password) => {
+    const checks = {
+      length: password.length >= 8,
+      lowercase: /[a-z]/.test(password),
+      uppercase: /[A-Z]/.test(password),
+      number: /\d/.test(password),
+      special: /[!@#$%^&*(),.?":{}|<>]/.test(password)
+    };
+    
+    setPasswordChecks(checks);
+    
+    // Calculate strength (0-5)
+    const strength = Object.values(checks).filter(Boolean).length;
+    setPasswordStrength(strength);
+  };
+
+  const getPasswordStrengthColor = () => {
+    if (passwordStrength <= 1) return '#F44336'; // Red
+    if (passwordStrength <= 2) return '#FF9800'; // Orange
+    if (passwordStrength <= 3) return '#FFEB3B'; // Yellow
+    if (passwordStrength <= 4) return '#8BC34A'; // Light Green
+    return '#4CAF50'; // Green
+  };
+
+  const getPasswordStrengthText = () => {
+    if (passwordStrength <= 1) return 'Rất yếu';
+    if (passwordStrength <= 2) return 'Yếu';
+    if (passwordStrength <= 3) return 'Trung bình';
+    if (passwordStrength <= 4) return 'Mạnh';
+    return 'Rất mạnh';
   };
 
   const validate = () => {
@@ -47,8 +92,15 @@ const RegisterScreen = ({ navigation }) => {
       Alert.alert('Lỗi', 'Mật khẩu xác nhận không khớp');
       return false;
     }
-    if (password.length < 6) {
-      Alert.alert('Lỗi', 'Mật khẩu phải có ít nhất 6 ký tự');
+    
+    // Enhanced password validation
+    if (password.length < 8) {
+      Alert.alert('Lỗi', 'Mật khẩu phải có ít nhất 8 ký tự');
+      return false;
+    }
+    
+    if (passwordStrength < 4) {
+      Alert.alert('Lỗi', 'Mật khẩu chưa đủ mạnh. Vui lòng đáp ứng tất cả các yêu cầu bảo mật.');
       return false;
     }
     // check email đơn giản
@@ -70,20 +122,19 @@ const RegisterScreen = ({ navigation }) => {
     try {
       setLoading(true);
 
-      // Map sang body API
+      // Map sang body API - All users register as riders
       const payload = {
         fullName: formData.name,
         email: formData.email,
         phone: formData.phone,
         password: formData.password,
-        // Nếu backend cần, thêm: studentId: formData.studentId,
       };
 
       const res = await authService.register(payload);
 
       Alert.alert(
-        'Thành công',
-        res?.message || 'Đăng ký thành công! Vui lòng đăng nhập.',
+        'Đăng ký thành công!',
+        'Tài khoản của bạn đã được tạo. Bạn có thể đăng nhập và xác minh thông tin sinh viên để sử dụng đầy đủ dịch vụ.',
         [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
       );
     } catch (err) {
@@ -159,6 +210,85 @@ const RegisterScreen = ({ navigation }) => {
               </TouchableOpacity>
             </View>
 
+            {/* Password Strength Indicator */}
+            {formData.password.length > 0 && (
+              <View style={styles.passwordStrengthContainer}>
+                <View style={styles.strengthBarContainer}>
+                  <View 
+                    style={[
+                      styles.strengthBar, 
+                      { 
+                        width: `${(passwordStrength / 5) * 100}%`,
+                        backgroundColor: getPasswordStrengthColor()
+                      }
+                    ]} 
+                  />
+                </View>
+                <Text style={[styles.strengthText, { color: getPasswordStrengthColor() }]}>
+                  {getPasswordStrengthText()}
+                </Text>
+              </View>
+            )}
+
+            {/* Password Requirements */}
+            {formData.password.length > 0 && (
+              <View style={styles.passwordRequirements}>
+                <Text style={styles.requirementsTitle}>Yêu cầu mật khẩu:</Text>
+                <View style={styles.requirementsList}>
+                  <View style={styles.requirementItem}>
+                    <Icon 
+                      name={passwordChecks.length ? 'check-circle' : 'radio-button-unchecked'} 
+                      size={16} 
+                      color={passwordChecks.length ? '#4CAF50' : '#ccc'} 
+                    />
+                    <Text style={[styles.requirementText, { color: passwordChecks.length ? '#4CAF50' : '#666' }]}>
+                      Ít nhất 8 ký tự
+                    </Text>
+                  </View>
+                  <View style={styles.requirementItem}>
+                    <Icon 
+                      name={passwordChecks.lowercase ? 'check-circle' : 'radio-button-unchecked'} 
+                      size={16} 
+                      color={passwordChecks.lowercase ? '#4CAF50' : '#ccc'} 
+                    />
+                    <Text style={[styles.requirementText, { color: passwordChecks.lowercase ? '#4CAF50' : '#666' }]}>
+                      Chữ cái thường (a-z)
+                    </Text>
+                  </View>
+                  <View style={styles.requirementItem}>
+                    <Icon 
+                      name={passwordChecks.uppercase ? 'check-circle' : 'radio-button-unchecked'} 
+                      size={16} 
+                      color={passwordChecks.uppercase ? '#4CAF50' : '#ccc'} 
+                    />
+                    <Text style={[styles.requirementText, { color: passwordChecks.uppercase ? '#4CAF50' : '#666' }]}>
+                      Chữ cái in hoa (A-Z)
+                    </Text>
+                  </View>
+                  <View style={styles.requirementItem}>
+                    <Icon 
+                      name={passwordChecks.number ? 'check-circle' : 'radio-button-unchecked'} 
+                      size={16} 
+                      color={passwordChecks.number ? '#4CAF50' : '#ccc'} 
+                    />
+                    <Text style={[styles.requirementText, { color: passwordChecks.number ? '#4CAF50' : '#666' }]}>
+                      Số (0-9)
+                    </Text>
+                  </View>
+                  <View style={styles.requirementItem}>
+                    <Icon 
+                      name={passwordChecks.special ? 'check-circle' : 'radio-button-unchecked'} 
+                      size={16} 
+                      color={passwordChecks.special ? '#4CAF50' : '#ccc'} 
+                    />
+                    <Text style={[styles.requirementText, { color: passwordChecks.special ? '#4CAF50' : '#666' }]}>
+                      Ký tự đặc biệt (!@#$%...)
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            )}
+
             <View style={styles.inputContainer}>
               <Icon name="lock" size={20} color="#666" style={styles.inputIcon} />
               <TextInput
@@ -230,6 +360,56 @@ const styles = StyleSheet.create({
   footer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 20 },
   footerText: { color: '#666', fontSize: 14 },
   loginLink: { color: '#000', fontSize: 14, fontWeight: 'bold' },
+  
+  // Password Strength Styles
+  passwordStrengthContainer: {
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  strengthBarContainer: {
+    height: 4,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 2,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  strengthBar: {
+    height: '100%',
+    borderRadius: 2,
+    transition: 'width 0.3s ease',
+  },
+  strengthText: {
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'right',
+  },
+  
+  // Password Requirements Styles
+  passwordRequirements: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 8,
+    marginBottom: 15,
+  },
+  requirementsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  requirementsList: {
+    gap: 6,
+  },
+  requirementItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  requirementText: {
+    fontSize: 12,
+    flex: 1,
+  },
 });
 
 export default RegisterScreen;

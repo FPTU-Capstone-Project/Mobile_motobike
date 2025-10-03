@@ -14,7 +14,12 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app needs access to camera to take photos for verification documents.",
+        "NSPhotoLibraryUsageDescription": "This app needs access to photo library to select images for verification documents.",
+        "NSMicrophoneUsageDescription": "This app needs access to microphone for video recording."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -26,7 +31,11 @@
         "ACCESS_COARSE_LOCATION",
         "ACCESS_BACKGROUND_LOCATION",
         "CALL_PHONE",
-        "READ_CONTACTS"
+        "READ_CONTACTS",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "READ_MEDIA_IMAGES"
       ]
     },
     "web": {

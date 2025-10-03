@@ -18,6 +18,7 @@ import * as Animatable from 'react-native-animatable';
 
 import ModernButton from '../../components/ModernButton.jsx';
 import authService from '../../services/authService';
+import verificationService from '../../services/verificationService';
 import { ApiError } from '../../services/api';
 
 const DriverVerificationScreen = ({ navigation }) => {
@@ -52,10 +53,8 @@ const DriverVerificationScreen = ({ navigation }) => {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.8,
+        quality: 0.9,
+        allowsEditing: false,
       });
 
       if (!result.canceled && result.assets[0]) {
@@ -80,9 +79,8 @@ const DriverVerificationScreen = ({ navigation }) => {
       }
 
       const result = await ImagePicker.launchCameraAsync({
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.8,
+        quality: 0.9,
+        allowsEditing: false,
       });
 
       if (!result.canceled && result.assets[0]) {
@@ -143,29 +141,52 @@ const DriverVerificationScreen = ({ navigation }) => {
     setUploading(true);
 
     try {
-      const submissionData = new FormData();
-      
-      // Add form data
-      Object.keys(formData).forEach(key => {
-        submissionData.append(key, formData[key]);
-      });
-
-      // Add documents
+      // Validate documents first
       Object.keys(documents).forEach(key => {
         if (documents[key]) {
-          submissionData.append(key, {
-            uri: documents[key].uri,
-            type: 'image/jpeg',
-            name: `${key}.jpg`,
-          });
+          verificationService.validateDocumentFile(documents[key]);
         }
       });
 
-      await authService.submitDriverVerification(submissionData);
+      const submissionData = new FormData();
+      
+      // Add form data with correct field names matching backend
+      submissionData.append('licenseNumber', formData.licenseNumber);
+      submissionData.append('vehicleModel', `${formData.vehicleBrand} ${formData.vehicleModel}`);
+      submissionData.append('plateNumber', formData.licensePlate);
+      submissionData.append('year', formData.vehicleYear);
+      submissionData.append('color', formData.vehicleColor);
+
+      // Add documents with correct field names and proper file format
+      if (documents.driverLicense) {
+        submissionData.append('driverLicense', {
+          uri: documents.driverLicense.uri,
+          type: documents.driverLicense.mimeType || 'image/jpeg',
+          name: documents.driverLicense.fileName || `driver_license_${Date.now()}.jpg`,
+        });
+      }
+
+      if (documents.vehicleRegistration) {
+        submissionData.append('vehicleRegistration', {
+          uri: documents.vehicleRegistration.uri,
+          type: documents.vehicleRegistration.mimeType || 'image/jpeg',
+          name: documents.vehicleRegistration.fileName || `vehicle_registration_${Date.now()}.jpg`,
+        });
+      }
+
+      if (documents.vehicleInsurance) {
+        submissionData.append('vehicleInsurance', {
+          uri: documents.vehicleInsurance.uri,
+          type: documents.vehicleInsurance.mimeType || 'image/jpeg',
+          name: documents.vehicleInsurance.fileName || `vehicle_insurance_${Date.now()}.jpg`,
+        });
+      }
+
+      const result = await verificationService.submitDriverVerification(submissionData);
 
       Alert.alert(
         'Gửi thành công!',
-        'Hồ sơ tài xế đã được gửi để xác minh. Admin sẽ duyệt trong 2-3 ngày làm việc.',
+        result.message || 'Hồ sơ tài xế đã được gửi để xác minh. Admin sẽ duyệt trong 2-3 ngày làm việc.',
         [
           { text: 'OK', onPress: () => navigation.goBack() }
         ]
@@ -174,17 +195,10 @@ const DriverVerificationScreen = ({ navigation }) => {
       console.error('Driver verification error:', error);
       
       let errorMessage = 'Không thể gửi hồ sơ tài xế';
-      if (error instanceof ApiError) {
-        switch (error.status) {
-          case 409:
-            errorMessage = 'Bạn đã gửi hồ sơ tài xế rồi';
-            break;
-          case 400:
-            errorMessage = 'Thông tin hoặc giấy tờ không hợp lệ';
-            break;
-          default:
-            errorMessage = error.message || errorMessage;
-        }
+      if (error.message) {
+        errorMessage = error.message;
+      } else if (error.data?.message) {
+        errorMessage = error.data.message;
       }
       
       Alert.alert('Lỗi', errorMessage);

@@ -85,10 +85,10 @@ const EditProfileScreen = ({ navigation }) => {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 0.8,
+        quality: 0.5, // Lower quality for avatar to reduce file size
+        exif: false,
       });
 
       if (!result.canceled && result.assets[0]) {
@@ -112,7 +112,8 @@ const EditProfileScreen = ({ navigation }) => {
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 0.8,
+        quality: 0.5, // Lower quality for avatar to reduce file size
+        exif: false,
       });
 
       if (!result.canceled && result.assets[0]) {
@@ -266,6 +267,7 @@ const EditProfileScreen = ({ navigation }) => {
     );
   }
 
+  console.log('User:', user.user?.profile_photo_url);
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>

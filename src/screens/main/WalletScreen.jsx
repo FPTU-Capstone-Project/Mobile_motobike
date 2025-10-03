@@ -30,6 +30,13 @@ const WalletScreen = ({ navigation }) => {
   const [showTopUpModal, setShowTopUpModal] = useState(false);
   const [topUpAmount, setTopUpAmount] = useState('');
   const [loadingTransactions, setLoadingTransactions] = useState(false);
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [withdrawData, setWithdrawData] = useState({
+    amount: '',
+    bankName: '',
+    bankAccountNumber: '',
+    accountHolderName: ''
+  });
 
   const quickTopUpAmounts = [50000, 100000, 200000, 500000, 1000000];
 
@@ -40,20 +47,14 @@ const WalletScreen = ({ navigation }) => {
   const loadWalletData = async () => {
     try {
       const currentUser = authService.getCurrentUser();
-      if (!currentUser?.user?.user_id) {
-        Alert.alert('Lỗi', 'Không thể xác định thông tin người dùng');
-        return;
-      }
-
       setUser(currentUser);
       
-      // Load wallet info from user profile (cached data)
-      if (currentUser.wallet) {
-        setWalletData(currentUser.wallet);
-      }
+      // Load fresh wallet data from API (new API uses authentication)
+      const walletResponse = await paymentService.getWalletInfo();
+      setWalletData(walletResponse);
 
-      // Load transaction history
-      await loadTransactions(currentUser.user.user_id);
+      // Load transaction history (new API uses authentication)
+      await loadTransactions();
       
     } catch (error) {
       console.error('Error loading wallet data:', error);
@@ -63,11 +64,12 @@ const WalletScreen = ({ navigation }) => {
     }
   };
 
-  const loadTransactions = async (user_id, showLoading = false) => {
+  const loadTransactions = async (showLoading = false) => {
     if (showLoading) setLoadingTransactions(true);
     
     try {
-      const response = await paymentService.getTransactionHistory(user_id, 0, 10);
+      // New API uses authentication, no user_id needed
+      const response = await paymentService.getTransactionHistory(0, 10);
       if (response && response.content) {
         setTransactions(response.content);
       }
@@ -112,6 +114,96 @@ const WalletScreen = ({ navigation }) => {
     } catch (error) {
       Alert.alert('Lỗi', error.message);
     }
+  };
+
+  const handleWithdraw = async () => {
+    const { amount, bankName, bankAccountNumber, accountHolderName } = withdrawData;
+    
+    // Validation
+    if (!amount || !bankName || !bankAccountNumber || !accountHolderName) {
+      Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ thông tin');
+      return;
+    }
+
+    const withdrawAmount = parseInt(amount);
+    if (!withdrawAmount || withdrawAmount <= 0) {
+      Alert.alert('Lỗi', 'Vui lòng nhập số tiền hợp lệ');
+      return;
+    }
+
+    if (withdrawAmount < 50000) {
+      Alert.alert('Lỗi', 'Số tiền rút tối thiểu là 50.000 VNĐ');
+      return;
+    }
+
+    if (withdrawAmount > (walletData?.availableBalance || 0)) {
+      Alert.alert('Lỗi', 'Số dư không đủ để thực hiện giao dịch');
+      return;
+    }
+
+    // Validate bank account number
+    if (!/^\d{9,16}$/.test(bankAccountNumber)) {
+      Alert.alert('Lỗi', 'Số tài khoản ngân hàng không hợp lệ (9-16 chữ số)');
+      return;
+    }
+
+    // Validate account holder name
+    if (accountHolderName.length < 2) {
+      Alert.alert('Lỗi', 'Tên chủ tài khoản phải có ít nhất 2 ký tự');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const result = await paymentService.initiatePayout(
+        withdrawAmount,
+        bankName,
+        bankAccountNumber,
+        accountHolderName
+      );
+
+      if (result.success) {
+        Alert.alert(
+          'Thành công', 
+          result.message || 'Đã gửi yêu cầu rút tiền. Giao dịch sẽ được xử lý trong 1-3 ngày làm việc.',
+          [{ text: 'OK', onPress: () => {
+            setShowWithdrawModal(false);
+            setWithdrawData({
+              amount: '',
+              bankName: '',
+              bankAccountNumber: '',
+              accountHolderName: ''
+            });
+            loadWalletData(); // Refresh wallet data
+          }}]
+        );
+      }
+    } catch (error) {
+      console.error('Withdraw error:', error);
+      let errorMessage = 'Không thể thực hiện giao dịch rút tiền';
+      if (error instanceof ApiError) {
+        switch (error.status) {
+          case 400:
+            errorMessage = 'Thông tin không hợp lệ';
+            break;
+          case 403:
+            errorMessage = 'Chỉ tài xế mới có thể rút tiền';
+            break;
+          case 401:
+            errorMessage = 'Phiên đăng nhập đã hết hạn';
+            break;
+          default:
+            errorMessage = error.message || errorMessage;
+        }
+      }
+      Alert.alert('Lỗi', errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleWithdrawInputChange = (field, value) => {
+    setWithdrawData(prev => ({ ...prev, [field]: value }));
   };
 
   const getTransactionIcon = (type, direction) => {
@@ -199,7 +291,7 @@ const WalletScreen = ({ navigation }) => {
               <View style={styles.balanceInfo}>
                 <Text style={styles.balanceLabel}>Số dư khả dụng</Text>
                 <Text style={styles.balanceAmount}>
-                  {paymentService.formatCurrency(walletData?.cachedBalance || walletData?.cached_balance || 0)}
+                  {paymentService.formatCurrency(walletData?.availableBalance)}
                 </Text>
               </View>
             </View>
@@ -224,7 +316,7 @@ const WalletScreen = ({ navigation }) => {
               
               <TouchableOpacity 
                 style={styles.actionButton}
-                onPress={() => Alert.alert('Thông báo', 'Chức năng rút tiền đang phát triển')}
+                onPress={() => setShowWithdrawModal(true)}
               >
                 <Icon name="send" size={20} color="#1a1a1a" />
                 <Text style={styles.actionButtonText}>Rút tiền</Text>
@@ -259,7 +351,7 @@ const WalletScreen = ({ navigation }) => {
               <View style={styles.statItem}>
                 <Icon name="trending-up" size={24} color="#4CAF50" />
                 <Text style={styles.statValue}>
-                  {paymentService.formatCurrency(walletData?.totalToppedUp || walletData?.total_topped_up || 0)}
+                  {paymentService.formatCurrency(walletData?.total_topped_up || 0)}
                 </Text>
                 <Text style={styles.statLabel}>Tổng nạp</Text>
               </View>
@@ -423,6 +515,124 @@ const WalletScreen = ({ navigation }) => {
                 onPress={handleCustomTopUp}
                 icon="payment"
                 size="large"
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Withdraw Modal */}
+      <Modal
+        visible={showWithdrawModal}
+        transparent={true}
+        animationType="slide"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Rút tiền từ ví</Text>
+              <TouchableOpacity onPress={() => setShowWithdrawModal(false)}>
+                <Icon name="close" size={24} color="#000" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.withdrawModalBody} keyboardShouldPersistTaps="handled">
+              {/* Available Balance Info */}
+              <View style={styles.balanceInfo}>
+                <Text style={styles.balanceInfoLabel}>Số dư khả dụng</Text>
+                <Text style={styles.balanceInfoAmount}>
+                  {paymentService.formatCurrency(walletData?.availableBalance || 0)}
+                </Text>
+              </View>
+
+              {/* Amount Input */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Số tiền rút</Text>
+                <View style={styles.amountInputContainer}>
+                  <TextInput
+                    style={styles.amountInput}
+                    placeholder="0"
+                    value={withdrawData.amount}
+                    onChangeText={(value) => handleWithdrawInputChange('amount', value)}
+                    keyboardType="numeric"
+                  />
+                  <Text style={styles.currencyText}>VNĐ</Text>
+                </View>
+                <Text style={styles.inputHelper}>
+                  Tối thiểu: 50,000 VNĐ - Tối đa: {paymentService.formatCurrency(walletData?.availableBalance || 0)}
+                </Text>
+              </View>
+
+              {/* Bank Information */}
+              <Text style={styles.sectionTitle}>Thông tin ngân hàng</Text>
+              
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Tên ngân hàng *</Text>
+                <View style={styles.textInputContainer}>
+                  <Icon name="account-balance" size={20} color="#666" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="VD: Vietcombank, Techcombank, BIDV..."
+                    value={withdrawData.bankName}
+                    onChangeText={(value) => handleWithdrawInputChange('bankName', value)}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Số tài khoản *</Text>
+                <View style={styles.textInputContainer}>
+                  <Icon name="credit-card" size={20} color="#666" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Nhập số tài khoản (9-16 chữ số)"
+                    value={withdrawData.bankAccountNumber}
+                    onChangeText={(value) => handleWithdrawInputChange('bankAccountNumber', value)}
+                    keyboardType="numeric"
+                    maxLength={16}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Tên chủ tài khoản *</Text>
+                <View style={styles.textInputContainer}>
+                  <Icon name="person" size={20} color="#666" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="VD: NGUYEN VAN A"
+                    value={withdrawData.accountHolderName}
+                    onChangeText={(value) => handleWithdrawInputChange('accountHolderName', value.toUpperCase())}
+                    autoCapitalize="characters"
+                  />
+                </View>
+                <Text style={styles.inputHelper}>
+                  Tên phải khớp với tên trên tài khoản ngân hàng
+                </Text>
+              </View>
+
+              {/* Warning */}
+              <View style={styles.warningBox}>
+                <Icon name="warning" size={20} color="#FF9800" />
+                <View style={styles.warningContent}>
+                  <Text style={styles.warningTitle}>Lưu ý quan trọng</Text>
+                  <Text style={styles.warningText}>
+                    • Giao dịch rút tiền sẽ được xử lý trong 1-3 ngày làm việc{'\n'}
+                    • Vui lòng kiểm tra kỹ thông tin ngân hàng trước khi xác nhận{'\n'}
+                    • Chỉ tài xế mới có thể thực hiện rút tiền{'\n'}
+                    • Phí rút tiền có thể được áp dụng
+                  </Text>
+                </View>
+              </View>
+            </ScrollView>
+            
+            <View style={styles.modalFooter}>
+              <ModernButton
+                title="Xác nhận rút tiền"
+                onPress={handleWithdraw}
+                icon="send"
+                size="large"
+                disabled={loading}
               />
             </View>
           </View>
@@ -805,6 +1015,73 @@ const styles = StyleSheet.create({
   },
   modalFooter: {
     padding: 20,
+  },
+  
+  // Withdraw Modal Styles
+  withdrawModalBody: {
+    maxHeight: '70%',
+  },
+  balanceInfo: {
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+    alignItems: 'center',
+  },
+  balanceInfoLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 4,
+  },
+  balanceInfoAmount: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  textInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    marginBottom: 8,
+    backgroundColor: '#fff',
+  },
+  inputIcon: {
+    marginRight: 12,
+  },
+  textInput: {
+    flex: 1,
+    fontSize: 16,
+    paddingVertical: 16,
+    color: '#1a1a1a',
+  },
+  warningBox: {
+    flexDirection: 'row',
+    backgroundColor: '#FFF3E0',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+    borderLeftWidth: 4,
+    borderLeftColor: '#FF9800',
+  },
+  warningContent: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  warningTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#E65100',
+    marginBottom: 8,
+  },
+  warningText: {
+    fontSize: 14,
+    color: '#BF360C',
+    lineHeight: 20,
   },
 });
 

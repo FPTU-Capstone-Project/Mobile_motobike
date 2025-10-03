@@ -6,57 +6,73 @@ class PaymentService {
     this.apiService = apiService;
   }
 
-  // Create PayOS top-up payment link
-  async createTopUpPaymentLink(user_id, amount, description = 'Nạp tiền ví MSSUS') {
+  // Initiate wallet top-up (New API)
+  async initiateTopUp(amount, paymentMethod = 'PAYOS', returnUrl = null, cancelUrl = null) {
     try {
-      const params = new URLSearchParams({
-        userId: user_id.toString(),
-        amount: amount.toString(),
-        description: description
-      });
+      // For mobile app, we can use deep links or custom schemes
+      const mobileReturnUrl = returnUrl || 'mssus://payment/success';
+      const mobileCancelUrl = cancelUrl || 'mssus://payment/cancel';
+
+      const requestBody = {
+        amount: amount,
+        paymentMethod: paymentMethod,
+        returnUrl: mobileReturnUrl,
+        cancelUrl: mobileCancelUrl
+      };
 
       const response = await this.apiService.post(
-        `${ENDPOINTS.PAYOS.CREATE_TOPUP_LINK}?${params}`
+        ENDPOINTS.WALLET.TOPUP_INIT,
+        requestBody
+      );
+
+      console.log('response', response);
+
+      return {
+        success: true,
+        data: response,
+        paymentUrl: response.checkoutUrl || response.paymentUrl,
+        qrCode: response.qrCode,
+        orderCode: response.orderCode,
+        amount: response.amount,
+        status: response.status,
+        message: response.message || 'Đã tạo link thanh toán thành công'
+      };
+    } catch (error) {
+      console.error('Error initiating top-up:', error);
+      throw error;
+    }
+  }
+
+  // Initiate payout/withdrawal (Driver only)
+  async initiatePayout(amount, bankName, bankAccountNumber, accountHolderName) {
+    try {
+      const requestBody = {
+        amount: amount,
+        bankName: bankName,
+        bankAccountNumber: bankAccountNumber,
+        accountHolderName: accountHolderName
+      };
+
+      const response = await this.apiService.post(
+        ENDPOINTS.WALLET.PAYOUT_INIT,
+        requestBody
       );
 
       return {
         success: true,
         data: response,
-        paymentUrl: response.checkoutUrl,
-        qrCode: response.qrCode,
-        orderCode: response.orderCode,  
-        amount: response.amount,
-        status: response.status
+        message: response.message || 'Đã tạo yêu cầu rút tiền thành công'
       };
     } catch (error) {
-      console.error('Create payment link error:', error);
+      console.error('Error initiating payout:', error);
       throw error;
     }
   }
 
-  // Test PayOS payment (for development)
-  async testPayment() {
+  // Get wallet balance (Updated API - no userId needed, uses authentication)
+  async getWalletInfo() {
     try {
-      const response = await this.apiService.post(ENDPOINTS.PAYOS.TEST_PAYMENT);
-      
-      return {
-        success: true,
-        data: response,
-        paymentUrl: response.checkoutUrl,
-        qrCode: response.qrCode,
-        orderCode: response.orderCode,
-        amount: response.amount
-      };
-    } catch (error) {
-      console.error('Test payment error:', error);
-      throw error;
-    }
-  }
-
-  // Get wallet balance and transactions
-  async getWalletInfo(user_id) {
-    try {
-      const response = await this.apiService.get(`${ENDPOINTS.WALLET.BALANCE}?userId=${user_id}`);
+      const response = await this.apiService.get(ENDPOINTS.WALLET.BALANCE);
       console.log('response', response);
       return response;
     } catch (error) {
@@ -65,22 +81,35 @@ class PaymentService {
     }
   }
 
-  // Get transaction history
-  async getTransactionHistory(user_id, page = 0, size = 20) {
+  // Get transaction history (Updated API - uses authentication)
+  async getTransactionHistory(page = 0, size = 20, type = null, status = null) {
     try {
       const params = new URLSearchParams({
-        userId: user_id.toString(),
         page: page.toString(),
         size: size.toString()
       });
 
+      if (type) params.append('type', type);
+      if (status) params.append('status', status);
+
       const response = await this.apiService.get(
         `${ENDPOINTS.WALLET.TRANSACTIONS}?${params.toString()}`
       );
-      
+
       return response;
     } catch (error) {
       console.error('Get transaction history error:', error);
+      throw error;
+    }
+  }
+
+  // Get driver earnings (Driver only)
+  async getDriverEarnings() {
+    try {
+      const response = await this.apiService.get(ENDPOINTS.WALLET.EARNINGS);
+      return response;
+    } catch (error) {
+      console.error('Get driver earnings error:', error);
       throw error;
     }
   }

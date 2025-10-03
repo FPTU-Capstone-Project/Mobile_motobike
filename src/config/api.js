@@ -3,7 +3,7 @@ export const API_CONFIG = {
   // Development - Use your computer's IP address instead of localhost
   // To find your IP: Windows: ipconfig | Mac/Linux: ifconfig
   DEV: {
-    BASE_URL: 'http://192.168.2.15:8080/api/v1', // Android emulator
+    BASE_URL: 'http://10.87.60.230:8080/api/v1', // Android emulator
     // Alternative IPs to try:
     // BASE_URL: 'http://192.168.1.XXX:8081/api/v1', // Replace XXX with your IP
     // BASE_URL: 'http://172.20.10.2:8081/api/v1', // iOS simulator
@@ -114,10 +114,32 @@ export const ENDPOINTS = {
     ALL_USERS: '/users/all',
   },
   
-  // Verification
+  // Verification - User Endpoints
   VERIFICATION: {
-    STUDENT: '/users/me/student-verifications',
-    DRIVER: '/users/me/driver-verifications',
+    STUDENT: '/me/student-verifications',
+    DRIVER: '/me/driver-verifications',
+    // Fallback endpoints if above don't work
+    DRIVER_ALT: '/verification/driver',
+    STUDENT_ALT: '/verification/student',
+  },
+  
+  // Verification - Admin Endpoints  
+  VERIFICATION_ADMIN: {
+    STUDENTS_PENDING: '/verification/students/pending',
+    STUDENTS_HISTORY: '/verification/students/history',
+    STUDENT_DETAILS: '/verification/students',
+    STUDENT_APPROVE: '/verification/students/{id}/approve',
+    STUDENT_REJECT: '/verification/students/{id}/reject',
+    STUDENTS_BULK_APPROVE: '/verification/students/bulk-approve',
+    
+    DRIVERS_PENDING: '/verification/drivers/pending',
+    DRIVER_KYC: '/verification/drivers/{id}/kyc',
+    DRIVER_APPROVE_DOCS: '/verification/drivers/{id}/approve-docs',
+    DRIVER_APPROVE_LICENSE: '/verification/drivers/{id}/approve-license',
+    DRIVER_APPROVE_VEHICLE: '/verification/drivers/{id}/approve-vehicle',
+    DRIVER_REJECT: '/verification/drivers/{id}/reject',
+    DRIVER_BACKGROUND_CHECK: '/verification/drivers/{id}/background-check',
+    DRIVER_STATS: '/verification/drivers/stats',
   },
   
   // OTP
@@ -126,19 +148,18 @@ export const ENDPOINTS = {
     VERIFY: '/otp',
   },
   
-  // PayOS Payment Integration
-  PAYOS: {
-    CREATE_TOPUP_LINK: '/payos/create-topup-link',
-    TEST_PAYMENT: '/payos/test',
-    WEBHOOK: '/payos/webhook',
-  },
-  
-  // Wallet & Transactions
+  // Wallet & Transactions (Updated API)
   WALLET: {
     BALANCE: '/wallet/balance',
-    TRANSACTIONS: '/transactions',
-    TOPUP: '/wallet/topup',
-    WITHDRAW: '/wallet/withdraw',
+    TRANSACTIONS: '/wallet/transactions',
+    TOPUP_INIT: '/wallet/topup/init',
+    PAYOUT_INIT: '/wallet/payout/init',
+    EARNINGS: '/wallet/earnings',
+  },
+
+  // PayOS Payment Integration (Keep webhook for backend)
+  PAYOS: {
+    WEBHOOK: '/payos/webhook',
   },
   
   // Future endpoints for rides, etc.

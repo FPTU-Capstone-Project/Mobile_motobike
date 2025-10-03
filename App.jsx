@@ -10,6 +10,8 @@ import authService from './src/services/authService';
 // Screens
 import LoginScreen from './src/screens/auth/LoginScreen.jsx';
 import RegisterScreen from './src/screens/auth/RegisterScreen.jsx';
+import OTPVerificationScreen from './src/screens/auth/OTPVerificationScreen.jsx';
+import ResetPasswordScreen from './src/screens/auth/ResetPasswordScreen.jsx';
 import HomeScreen from './src/screens/main/HomeScreen.jsx';
 import ProfileScreen from './src/screens/main/ProfileScreen.jsx';
 import WalletScreen from './src/screens/main/WalletScreen.jsx';
@@ -25,7 +27,7 @@ import DriverVerificationScreen from './src/screens/verification/DriverVerificat
 // Profile Screens
 import EditProfileScreen from './src/screens/profile/EditProfileScreen.jsx';
 import ChangePasswordScreen from './src/screens/profile/ChangePasswordScreen.jsx';
-import ResetPasswordScreen from './src/screens/profile/ResetPasswordScreen.jsx';
+// import ResetPasswordScreen from './src/screens/profile/ResetPasswordScreen.jsx';
 
 // Driver Screens
 import DriverHomeScreen from './src/screens/driver/DriverHomeScreen.jsx';
@@ -111,11 +113,21 @@ export default function App() {
             component={LoginScreen} 
             options={{ headerShown: false }}
           />
-          <Stack.Screen 
-            name="Register" 
-            component={RegisterScreen} 
-            options={{ headerShown: false }}
-          />
+              <Stack.Screen 
+                name="Register" 
+                component={RegisterScreen} 
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen 
+                name="OTPVerification" 
+                component={OTPVerificationScreen} 
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen 
+                name="ResetPassword" 
+                component={ResetPasswordScreen} 
+                options={{ headerShown: false }}
+              />
           <Stack.Screen 
             name="Main" 
             component={MainTabs} 
@@ -189,11 +201,6 @@ export default function App() {
           <Stack.Screen 
             name="ChangePassword" 
             component={ChangePasswordScreen} 
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen 
-            name="ResetPassword" 
-            component={ResetPasswordScreen} 
             options={{ headerShown: false }}
           />
         </Stack.Navigator>

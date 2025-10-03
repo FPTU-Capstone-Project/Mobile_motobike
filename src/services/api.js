@@ -15,18 +15,51 @@ class ApiService {
     this.token = null;
   }
 
-  // Initialize token from storage
+  // Initialize tokens from storage
   async init() {
     try {
       this.token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      const refreshToken = await AsyncStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
+      
+      if (refreshToken) {
+        this.setRefreshToken(refreshToken);
+      }
     } catch (error) {
-      console.error('Error loading token from storage:', error);
+      console.error('Error loading tokens from storage:', error);
     }
   }
 
   // Set authorization token
   setToken(token) {
     this.token = token;
+    if (token) {
+      AsyncStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, token);
+    }
+  }
+
+  // Set refresh token
+  setRefreshToken(refreshToken) {
+    if (refreshToken) {
+      AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
+    }
+  }
+
+  // Get refresh token
+  async getRefreshToken() {
+    try {
+      return await AsyncStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
+    } catch (error) {
+      console.error('Failed to get refresh token:', error);
+      return null;
+    }
+  }
+
+  // Clear tokens
+  clearTokens() {
+    this.token = null;
+    AsyncStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
+    AsyncStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
+    AsyncStorage.removeItem(STORAGE_KEYS.USER_DATA);
   }
 
   // Get authorization headers
@@ -43,10 +76,55 @@ class ApiService {
     return headers;
   }
 
-  // Generic API request method
+  // Refresh access token
+  async refreshAccessToken() {
+    try {
+      const refreshToken = await this.getRefreshToken();
+      if (!refreshToken) {
+        throw new Error('No refresh token available');
+      }
+
+      console.log('Refreshing access token...');
+      
+      const response = await fetch(`${this.baseURL}/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to refresh token');
+      }
+
+      const data = await response.json();
+      const newAccessToken = data.access_token || data.token;
+      const newRefreshToken = data.refresh_token;
+
+      if (newAccessToken) {
+        this.setToken(newAccessToken);
+        if (newRefreshToken) {
+          this.setRefreshToken(newRefreshToken);
+        }
+        console.log('Token refreshed successfully');
+        return newAccessToken;
+      } else {
+        throw new Error('No access token in refresh response');
+      }
+    } catch (error) {
+      console.error('Token refresh failed:', error);
+      // Clear invalid tokens
+      this.clearTokens();
+      throw error;
+    }
+  }
+
+  // Generic API request method with auto token refresh
   async request(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`;
-    const config = {
+    let config = {
       headers: this.getAuthHeaders(),
       ...options,
     };
@@ -54,8 +132,35 @@ class ApiService {
     try {
       console.log(`API Request: ${config.method || 'GET'} ${url}`);
       
-      const response = await fetch(url, config);
-      const data = await response.json();
+      let response = await fetch(url, config);
+      let data = await response.json();
+
+      // Check if token expired (401 Unauthorized)
+      if (response.status === 401 && this.token) {
+        console.log('Token expired, attempting refresh...');
+        
+        try {
+          // Try to refresh the token
+          await this.refreshAccessToken();
+          
+          // Retry the original request with new token
+          config.headers = this.getAuthHeaders();
+          response = await fetch(url, config);
+          data = await response.json();
+          
+          if (!response.ok) {
+            console.error('API Request Error after refresh:', data);
+            throw new ApiError(data.message || 'API request failed', response.status, data);
+          }
+          
+          console.log('Request successful after token refresh');
+          return data;
+        } catch (refreshError) {
+          console.error('Token refresh failed, redirecting to login');
+          // Token refresh failed, user needs to login again
+          throw new ApiError('Session expired. Please login again.', 401, { requiresLogin: true });
+        }
+      }
 
       if (!response.ok) {
         throw new ApiError(data.message || 'API request failed', response.status, data);

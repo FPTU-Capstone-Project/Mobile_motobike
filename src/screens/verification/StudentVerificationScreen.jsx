@@ -17,6 +17,7 @@ import * as Animatable from 'react-native-animatable';
 
 import ModernButton from '../../components/ModernButton.jsx';
 import authService from '../../services/authService';
+import verificationService from '../../services/verificationService';
 import { ApiError } from '../../services/api';
 
 const StudentVerificationScreen = ({ navigation }) => {
@@ -33,10 +34,8 @@ const StudentVerificationScreen = ({ navigation }) => {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.8,
+        quality: 0.9,
+        allowsEditing: false,
       });
 
       if (!result.canceled && result.assets[0]) {
@@ -58,9 +57,8 @@ const StudentVerificationScreen = ({ navigation }) => {
       }
 
       const result = await ImagePicker.launchCameraAsync({
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.8,
+        quality: 0.9,
+        allowsEditing: false,
       });
 
       if (!result.canceled && result.assets[0]) {
@@ -93,40 +91,29 @@ const StudentVerificationScreen = ({ navigation }) => {
     setUploading(true);
 
     try {
-      const formData = new FormData();
-      formData.append('document', {
-        uri: selectedImage.uri,
-        type: 'image/jpeg',
-        name: 'student_id.jpg',
-      });
+      // Validate file first
+      verificationService.validateDocumentFile(selectedImage);
 
-      await authService.submitStudentVerification(formData);
+      // Create document file object
+      const documentFile = {
+        uri: selectedImage.uri,
+        mimeType: selectedImage.mimeType || 'image/jpeg',
+        fileName: selectedImage.fileName || 'student_id.jpg',
+        fileSize: selectedImage.fileSize,
+      };
+
+      const result = await verificationService.submitStudentVerification(documentFile);
 
       Alert.alert(
         'Gửi thành công!',
-        'Thẻ sinh viên đã được gửi để xác minh. Admin sẽ duyệt trong 1-2 ngày làm việc.',
+        result.message || 'Thẻ sinh viên đã được gửi để xác minh. Admin sẽ duyệt trong 1-2 ngày làm việc.',
         [
           { text: 'OK', onPress: () => navigation.goBack() }
         ]
       );
     } catch (error) {
       console.error('Student verification error:', error);
-      
-      let errorMessage = 'Không thể gửi thẻ sinh viên';
-      if (error instanceof ApiError) {
-        switch (error.status) {
-          case 409:
-            errorMessage = 'Bạn đã gửi thẻ sinh viên rồi';
-            break;
-          case 400:
-            errorMessage = 'Ảnh không hợp lệ hoặc không đúng định dạng';
-            break;
-          default:
-            errorMessage = error.message || errorMessage;
-        }
-      }
-      
-      Alert.alert('Lỗi', errorMessage);
+      Alert.alert('Lỗi', error.message || 'Không thể gửi thẻ sinh viên');
     } finally {
       setUploading(false);
     }

@@ -13,6 +13,7 @@ import {
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import authService from '../../services/authService';
 import { ApiError } from '../../services/api';
+import { runImagePickerTests } from '../../utils/imagePickerTest';
 
 const ProfileScreen = ({ navigation }) => {
   const [user, setUser] = useState(null);
@@ -68,6 +69,7 @@ const ProfileScreen = ({ navigation }) => {
     { icon: 'edit', title: 'Chỉnh sửa thông tin', onPress: () => navigation.navigate('EditProfile') },
     { icon: 'security', title: 'Đổi mật khẩu', onPress: () => navigation.navigate('ChangePassword') },
     { icon: 'verified', title: 'Xác minh tài khoản', onPress: () => navigation.navigate('ProfileSwitch') },
+    { icon: 'camera-alt', title: '🧪 Test Camera & Gallery', onPress: runImagePickerTests, testOnly: true },
     { icon: 'help', title: 'Trợ giúp & Hỗ trợ', onPress: () => Alert.alert('Thông báo', 'Chức năng đang phát triển') },
     { icon: 'policy', title: 'Điều khoản sử dụng', onPress: () => Alert.alert('Thông báo', 'Chức năng đang phát triển') },
     { icon: 'info', title: 'Về chúng tôi', onPress: () => Alert.alert('Thông báo', 'Chức năng đang phát triển') },
@@ -170,12 +172,26 @@ const ProfileScreen = ({ navigation }) => {
           {menuItems.map((item, index) => (
             <TouchableOpacity 
               key={index} 
-              style={styles.menuItem}
+              style={[
+                styles.menuItem,
+                item.testOnly && __DEV__ && styles.testMenuItem
+              ]}
               onPress={item.onPress}
             >
               <View style={styles.menuItemLeft}>
-                <Icon name={item.icon} size={24} color="#666" />
-                <Text style={styles.menuItemText}>{item.title}</Text>
+                <Icon 
+                  name={item.icon} 
+                  size={24} 
+                  color={item.testOnly && __DEV__ ? "#FF9800" : "#666"} 
+                />
+                <Text 
+                  style={[
+                    styles.menuItemText,
+                    item.testOnly && __DEV__ && styles.testMenuItemText
+                  ]}
+                >
+                  {item.title}
+                </Text>
               </View>
               <Icon name="chevron-right" size={24} color="#ccc" />
             </TouchableOpacity>
@@ -377,6 +393,15 @@ const styles = StyleSheet.create({
   retryButtonText: {
     color: '#fff',
     fontSize: 16,
+    fontWeight: '600',
+  },
+  testMenuItem: {
+    backgroundColor: '#FFF3E0',
+    borderLeftWidth: 3,
+    borderLeftColor: '#FF9800',
+  },
+  testMenuItemText: {
+    color: '#E65100',
     fontWeight: '600',
   },
 });

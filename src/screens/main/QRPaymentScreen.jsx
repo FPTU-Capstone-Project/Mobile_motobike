@@ -62,10 +62,6 @@ const QRPaymentScreen = ({ navigation, route }) => {
   };
 
   const createPaymentLink = async () => {
-    if (!user?.user?.user_id) {
-      Alert.alert('Lỗi', 'Không thể xác định thông tin người dùng');
-      return;
-    }
 
     const finalAmount = isCustomAmount ? customAmount : amount;
     const validAmount = validateAndSetAmount(finalAmount);
@@ -76,10 +72,12 @@ const QRPaymentScreen = ({ navigation, route }) => {
     setPaymentStatus('pending');
 
     try {
-      const result = await paymentService.createTopUpPaymentLink(
-        user.user.user_id,
+      // Use new API - no userId needed, uses authentication
+      const result = await paymentService.initiateTopUp(
         validAmount,
-        `test`
+        'PAYOS',
+        'mssus://payment/success', // Mobile deep link for success
+        'mssus://payment/cancel'   // Mobile deep link for cancel
       );
 
       if (result.success) {

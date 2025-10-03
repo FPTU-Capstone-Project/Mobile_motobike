@@ -49,13 +49,22 @@ class AuthService {
   // Save tokens to storage
   async saveTokens(accessToken, refreshToken) {
     try {
+      if (!accessToken) {
+        throw new Error('Access token is required');
+      }
+      
       await AsyncStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, accessToken);
       if (refreshToken) {
         await AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
+        apiService.setRefreshToken(refreshToken);
       }
+      
+      this.token = accessToken;
       apiService.setToken(accessToken);
+      
     } catch (error) {
       console.error('Error saving tokens:', error);
+      throw error;
     }
   }
 
@@ -67,23 +76,32 @@ class AuthService {
         STORAGE_KEYS.REFRESH_TOKEN,
         STORAGE_KEYS.USER_DATA,
       ]);
+      this.token = null;
       this.currentUser = null;
-      apiService.setToken(null);
+      apiService.clearTokens(); // Use new method to clear both tokens
     } catch (error) {
       console.error('Error clearing storage:', error);
     }
   }
 
   // Login
-  async login(emailOrPhone, password) {
+  async login(email, password, targetProfile = 'rider') {
     try {
       const response = await apiService.post('/auth/login', {
-        emailOrPhone,
+        email,
         password,
+        targetProfile,
       });
 
-      // Save tokens
-      await this.saveTokens(response.token, response.refresh_token);
+      // Save tokens - fix for undefined token
+      const accessToken = response.access_token || response.token;
+      const refreshToken = response.refresh_token;
+      
+      if (!accessToken) {
+        throw new Error('No access token received from server');
+      }
+
+      await this.saveTokens(accessToken, refreshToken);
 
       // Get user profile
       const userProfile = await this.getCurrentUserProfile();
@@ -91,7 +109,7 @@ class AuthService {
       return {
         success: true,
         user: userProfile,
-        token: response.token,
+        token: accessToken,
       };
     } catch (error) {
       console.error('Login error:', error);
@@ -132,7 +150,7 @@ class AuthService {
   // Get current user profile
   async getCurrentUserProfile() {
     try {
-      const response = await apiService.get('/users/me');
+      const response = await apiService.get('/me');
       await this.saveUserToStorage(response);
       return response;
     } catch (error) {
@@ -144,7 +162,7 @@ class AuthService {
   // Update profile
   async updateProfile(profileData) {
     try {
-      const response = await apiService.put('/users/me', profileData);
+      const response = await apiService.put('/me', profileData);
       await this.saveUserToStorage(response);
       return response;
     } catch (error) {
@@ -156,7 +174,7 @@ class AuthService {
   // Update password
   async updatePassword(oldPassword, newPassword) {
     try {
-      const response = await apiService.put('/users/me/update-password', {
+      const response = await apiService.put('/me/update-password', {
         oldPassword,
         newPassword,
       });
@@ -170,7 +188,7 @@ class AuthService {
   // Update avatar
   async updateAvatar(imageFile) {
     try {
-      const response = await apiService.uploadFile('/users/me/update-avatar', imageFile);
+      const response = await apiService.uploadFile('/me/update-avatar', imageFile);
       return response;
     } catch (error) {
       console.error('Update avatar error:', error);
@@ -181,7 +199,7 @@ class AuthService {
   // Switch profile (rider/driver)
   async switchProfile(targetRole) {
     try {
-      const response = await apiService.post('/users/me/switch-profile', {
+      const response = await apiService.post('/me/switch-profile', {
         targetRole,
       });
       
@@ -195,10 +213,12 @@ class AuthService {
     }
   }
 
-  // Submit student verification
+  // Submit student verification - Delegate to verificationService
   async submitStudentVerification(documentFile) {
     try {
-      const response = await apiService.uploadFile('/users/me/student-verifications', documentFile);
+      const verificationService = await import('./verificationService');
+      const response = await verificationService.default.submitStudentVerification(documentFile);
+      await this.getCurrentUserProfile(); // Refresh profile after submission
       return response;
     } catch (error) {
       console.error('Student verification error:', error);
@@ -206,10 +226,12 @@ class AuthService {
     }
   }
 
-  // Submit driver verification
+  // Submit driver verification - Delegate to verificationService
   async submitDriverVerification(verificationData) {
     try {
-      const response = await apiService.uploadFile('/users/me/driver-verifications', null, verificationData);
+      const verificationService = await import('./verificationService');
+      const response = await verificationService.default.submitDriverVerification(verificationData);
+      await this.getCurrentUserProfile(); // Refresh profile after submission
       return response;
     } catch (error) {
       console.error('Driver verification error:', error);
@@ -218,9 +240,13 @@ class AuthService {
   }
 
   // Request OTP
-  async requestOtp(purpose) {
+  async requestOtp(purpose, email = null) {
     try {
-      const response = await apiService.get(`/otp?otpFor=${purpose}`);
+      console.log('Request OTP', purpose, email);
+      const response = await apiService.post( '/otp', {
+        otpFor: purpose,
+        email, // Only send if provided (for forgot password)
+      });
       return response;
     } catch (error) {
       console.error('Request OTP error:', error);
@@ -229,11 +255,12 @@ class AuthService {
   }
 
   // Verify OTP
-  async verifyOtp(otpCode, purpose) {
+  async verifyOtp(code, purpose, email = null) {
     try {
-      const response = await apiService.post('/otp', {
-        otpCode,
+      const response = await apiService.post('/otp/verify', {
+        code,
         otpFor: purpose,
+        email, // Only send if provided (for forgot password)
       });
       return response;
     } catch (error) {
@@ -245,7 +272,7 @@ class AuthService {
   // Forgot password
   async forgotPassword(emailOrPhone) {
     try {
-      const response = await apiService.post('/users/forgot-password', {
+      const response = await apiService.post('/auth/forgot-password', {
         emailOrPhone,
       });
       return response;

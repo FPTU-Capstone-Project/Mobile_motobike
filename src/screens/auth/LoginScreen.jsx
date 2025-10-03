@@ -22,6 +22,7 @@ const LoginScreen = ({ navigation }) => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [targetProfile, setTargetProfile] = useState('rider'); // Default to rider
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -31,25 +32,55 @@ const LoginScreen = ({ navigation }) => {
 
     setLoading(true);
     try {
-      const result = await authService.login(email, password);
+      const result = await authService.login(email, password, targetProfile);
       if (result.success) {
-        const userType =
-          result?.user?.user_type?.toLowerCase() ||
-          result?.user_type?.toLowerCase();
-        navigation.replace(userType === 'driver' ? 'DriverMain' : 'Main');
+        // Navigate based on the selected target profile
+        navigation.replace(targetProfile === 'driver' ? 'DriverMain' : 'Main');
       }
     } catch (error) {
+      console.error('Login error:', error);
+      
+      // Check for email verification pending
+      if (error.message === "Email verification is pending" || 
+          error.data?.error?.id === "auth.unauthorized.email-verification-pending") {
+        Alert.alert(
+          'Cần xác minh email',
+          'Email của bạn chưa được xác minh. Chúng tôi sẽ gửi mã OTP để xác minh.',
+          [
+            { text: 'Hủy', style: 'cancel' },
+            { 
+              text: 'Xác minh ngay', 
+              onPress: () => {
+                navigation.navigate('OTPVerification', {
+                  email: email,
+                  purpose: 'VERIFY_EMAIL'
+                });
+              }
+            }
+          ]
+        );
+        return;
+      }
+      
       let errorMessage = 'Đã có lỗi xảy ra';
       if (error instanceof ApiError) {
-        switch (error.status) {
-          case 401:
-            errorMessage = 'Email hoặc mật khẩu không chính xác'; break;
-          case 400:
-            errorMessage = error.message || 'Thông tin không hợp lệ'; break;
-          case 0:
-            errorMessage = 'Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng.'; break;
-          default:
-            errorMessage = error.message || errorMessage;
+        // Handle session expired from auto token refresh
+        if (error.data?.requiresLogin) {
+          errorMessage = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
+        } else {
+          switch (error.status) {
+            case 401:
+              errorMessage = 'Email hoặc mật khẩu không chính xác'; 
+              break;
+            case 400:
+              errorMessage = error.message || 'Thông tin không hợp lệ'; 
+              break;
+            case 0:
+              errorMessage = 'Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng.'; 
+              break;
+            default:
+              errorMessage = error.message || errorMessage;
+          }
         }
       }
       Alert.alert('Đăng nhập thất bại', errorMessage);
@@ -111,8 +142,56 @@ const LoginScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
 
+          {/* Target Profile Selector */}
+          <View style={styles.profileSelector}>
+            <Text style={styles.profileLabel}>Đăng nhập với tư cách:</Text>
+            <View style={styles.profileButtons}>
+              <TouchableOpacity
+                style={[
+                  styles.profileButton,
+                  targetProfile === 'rider' && styles.profileButtonActive
+                ]}
+                onPress={() => setTargetProfile('rider')}
+              >
+                <Icon 
+                  name="person" 
+                  size={18} 
+                  color={targetProfile === 'rider' ? '#fff' : '#666'} 
+                  style={styles.profileIcon}
+                />
+                <Text style={[
+                  styles.profileButtonText,
+                  targetProfile === 'rider' && styles.profileButtonTextActive
+                ]}>
+                  Rider
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[
+                  styles.profileButton,
+                  targetProfile === 'driver' && styles.profileButtonActive
+                ]}
+                onPress={() => setTargetProfile('driver')}
+              >
+                <Icon 
+                  name="directions-car" 
+                  size={18} 
+                  color={targetProfile === 'driver' ? '#fff' : '#666'} 
+                  style={styles.profileIcon}
+                />
+                <Text style={[
+                  styles.profileButtonText,
+                  targetProfile === 'driver' && styles.profileButtonTextActive
+                ]}>
+                  Driver
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
           {/* Forgot Password */}
-          <TouchableOpacity style={styles.forgotPassword} onPress={() => navigation.navigate('ForgotPassword')}>
+          <TouchableOpacity style={styles.forgotPassword} onPress={() => navigation.navigate('ResetPassword')}>
             <Text style={styles.forgotPasswordText}>Quên mật khẩu?</Text>
           </TouchableOpacity>
 
@@ -260,7 +339,49 @@ const styles = StyleSheet.create({
   // Footer
   footer: { flexDirection: 'row', justifyContent: 'center' },
   footerText: { color: '#666', fontSize: 14 },
-  registerLink: { color: '#000', fontSize: 14, fontWeight: 'bold' }
+  registerLink: { color: '#000', fontSize: 14, fontWeight: 'bold' },
+
+  // Profile Selector Styles
+  profileSelector: {
+    marginBottom: 16,
+  },
+  profileLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 12,
+  },
+  profileButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  profileButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 48,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    gap: 8,
+  },
+  profileButtonActive: {
+    backgroundColor: '#000',
+    borderColor: '#000',
+  },
+  profileIcon: {
+    // No additional styles needed, color is set dynamically
+  },
+  profileButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+  },
+  profileButtonTextActive: {
+    color: '#fff',
+  },
 });
 
 export default LoginScreen;
