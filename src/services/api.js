@@ -231,7 +231,8 @@ class ApiService {
     }
 
     const headers = {
-      'Content-Type': 'multipart/form-data',
+      // Don't set Content-Type for multipart/form-data in React Native
+      // Let the system set it automatically with boundary
       'Accept': 'application/json',
     };
 

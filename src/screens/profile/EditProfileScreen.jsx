@@ -142,16 +142,27 @@ const EditProfileScreen = ({ navigation }) => {
 
     setUploadingAvatar(true);
     try {
-      const imageFile = {
+      const avatarFile = {
         uri: selectedAvatar.uri,
         type: 'image/jpeg',
         name: 'avatar.jpg',
       };
 
-      await authService.updateAvatar(imageFile);
+      await authService.updateAvatar(avatarFile);
       
-      // Refresh profile after upload
-      await loadUserProfile();
+      // Force refresh profile from API after upload
+      const freshProfile = await authService.getCurrentUserProfile();
+      if (freshProfile) {
+        setUser(freshProfile);
+        setFormData({
+          fullName: freshProfile.user?.full_name || '',
+          email: freshProfile.user?.email || '',
+          phone: freshProfile.user?.phone || '',
+          studentId: freshProfile.user?.student_id || '',
+          emergencyContact: freshProfile.rider_profile?.emergency_contact || '',
+        });
+      }
+      
       setSelectedAvatar(null);
       
       Alert.alert('Thành công', 'Ảnh đại diện đã được cập nhật');
@@ -267,7 +278,6 @@ const EditProfileScreen = ({ navigation }) => {
     );
   }
 
-  console.log('User:', user.user?.profile_photo_url);
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -304,7 +314,7 @@ const EditProfileScreen = ({ navigation }) => {
             <View style={styles.avatarContainer}>
               <Image 
                 source={{ 
-                  uri: selectedAvatar?.uri || user.user?.profile_photo_url || 'https://via.placeholder.com/120'
+                  uri: selectedAvatar?.uri || (user.user?.profile_photo_url ? `${user.user.profile_photo_url}?t=${Date.now()}` : 'https://via.placeholder.com/120')
                 }} 
                 style={styles.avatar}
               />

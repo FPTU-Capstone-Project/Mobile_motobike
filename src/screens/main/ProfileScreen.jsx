@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -22,6 +23,25 @@ const ProfileScreen = ({ navigation }) => {
   useEffect(() => {
     loadUserProfile();
   }, []);
+
+  // Refresh profile when screen comes into focus (e.g., returning from EditProfile)
+  useFocusEffect(
+    React.useCallback(() => {
+      // Force refresh from API when screen is focused
+      const refreshProfile = async () => {
+        try {
+          const freshProfile = await authService.getCurrentUserProfile();
+          if (freshProfile) {
+            setUser(freshProfile);
+          }
+        } catch (error) {
+          console.error('Error refreshing profile:', error);
+        }
+      };
+      
+      refreshProfile();
+    }, [])
+  );
 
   const loadUserProfile = async () => {
     try {
@@ -69,7 +89,6 @@ const ProfileScreen = ({ navigation }) => {
     { icon: 'edit', title: 'Chỉnh sửa thông tin', onPress: () => navigation.navigate('EditProfile') },
     { icon: 'security', title: 'Đổi mật khẩu', onPress: () => navigation.navigate('ChangePassword') },
     { icon: 'verified', title: 'Xác minh tài khoản', onPress: () => navigation.navigate('ProfileSwitch') },
-    { icon: 'camera-alt', title: '🧪 Test Camera & Gallery', onPress: runImagePickerTests, testOnly: true },
     { icon: 'help', title: 'Trợ giúp & Hỗ trợ', onPress: () => Alert.alert('Thông báo', 'Chức năng đang phát triển') },
     { icon: 'policy', title: 'Điều khoản sử dụng', onPress: () => Alert.alert('Thông báo', 'Chức năng đang phát triển') },
     { icon: 'info', title: 'Về chúng tôi', onPress: () => Alert.alert('Thông báo', 'Chức năng đang phát triển') },
@@ -113,7 +132,7 @@ const ProfileScreen = ({ navigation }) => {
           <View style={styles.userInfo}>
             <Image 
               source={{ 
-                uri: user.user?.profile_photo_url || 'https://via.placeholder.com/100'
+                uri: user.user?.profile_photo_url ? `${user.user.profile_photo_url}?t=${Date.now()}` : 'https://via.placeholder.com/100'
               }} 
               style={styles.avatar}
             />

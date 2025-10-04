@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import apiService, { ApiError } from './api';
 
 // Storage keys
@@ -186,9 +187,25 @@ class AuthService {
   }
 
   // Update avatar
-  async updateAvatar(imageFile) {
+  async updateAvatar(avatarFile) {
     try {
-      const response = await apiService.uploadFile('/me/update-avatar', imageFile);
+      // Create FormData with correct field name for backend
+      const formData = new FormData();
+      
+      const fileObject = {
+        uri: avatarFile.uri,
+        type: avatarFile.type || 'image/jpeg',
+        name: avatarFile.name || 'avatar.jpg',
+      };
+      
+      // For React Native iOS, we might need to use different format
+      if (Platform.OS === 'ios') {
+        fileObject.uri = avatarFile.uri.replace('file://', '');
+      }
+      
+      formData.append('avatarFile', fileObject);
+      
+      const response = await apiService.uploadFile('/users/avatar', null, formData);
       return response;
     } catch (error) {
       console.error('Update avatar error:', error);
