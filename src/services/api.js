@@ -214,7 +214,6 @@ class ApiService {
       formData = additionalData;
     } else {
       formData = new FormData();
-      
       // Add file if provided
       if (file) {
         formData.append('file', {
@@ -241,7 +240,7 @@ class ApiService {
     }
 
     return this.request(endpoint, {
-      method: 'POST',
+      method: 'PUT',
       headers,
       body: formData,
     });

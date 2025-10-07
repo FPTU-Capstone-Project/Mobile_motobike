@@ -19,6 +19,7 @@ import * as Animatable from 'react-native-animatable';
 import ModernButton from '../../components/ModernButton.jsx';
 import authService from '../../services/authService';
 import { ApiError } from '../../services/api';
+import profileService from '../../services/profileService.js';
 
 const EditProfileScreen = ({ navigation }) => {
   const [user, setUser] = useState(null);
@@ -53,7 +54,7 @@ const EditProfileScreen = ({ navigation }) => {
           emergencyContact: currentUser.rider_profile?.emergency_contact || '',
         });
       } else {
-        const profile = await authService.getCurrentUserProfile();
+        const profile = await profileService.getCurrentUserProfile();
         setUser(profile);
         setFormData({
           fullName: profile.user?.full_name || '',
@@ -148,10 +149,10 @@ const EditProfileScreen = ({ navigation }) => {
         name: 'avatar.jpg',
       };
 
-      await authService.updateAvatar(avatarFile);
+      await profileService.updateAvatar(avatarFile);
       
       // Force refresh profile from API after upload
-      const freshProfile = await authService.getCurrentUserProfile();
+      const freshProfile = await profileService.getCurrentUserProfile();
       if (freshProfile) {
         setUser(freshProfile);
         setFormData({
@@ -222,7 +223,7 @@ const EditProfileScreen = ({ navigation }) => {
         emergencyContact: formData.emergencyContact,
       };
 
-      await authService.updateProfile(updateData);
+      await profileService.updateProfile(updateData);
       
       Alert.alert(
         'Thành công', 
