@@ -123,23 +123,106 @@ const ProfileSwitchScreen = ({ navigation }) => {
     }
   };
 
-  const getVerificationStatus = (profile) => {
-    // Use current verification data if available, otherwise fallback to profile
-    const verificationData = currentStudentVerification || profile;
+  // Get student verification status (only for rider)
+  const getStudentVerificationStatus = () => {
+    if (!currentStudentVerification) return { status: 'not_verified', text: 'Chưa xác minh', color: '#999' };
     
-    if (!verificationData) return { status: 'not_verified', text: 'Chưa xác minh', color: '#999' };
-    
-    // Check verification status based on verification data
-    const status = verificationData.status?.toLowerCase();
+    const status = currentStudentVerification.status?.toLowerCase();
     if (status === 'active' || status === 'verified' || status === 'approved') {
       return { status: 'verified', text: 'Đã xác minh', color: '#4CAF50' };
     } else if (status === 'pending') {
-      return { status: 'pending', text: 'Đang chờ duyệt', color: '#FF9800' };
+      return { status: 'pending', text: 'Đang xác minh', color: '#FF9800' };
     } else if (status === 'rejected' || status === 'suspended') {
       return { status: 'rejected', text: 'Bị từ chối', color: '#F44336' };
     } else {
       return { status: 'not_verified', text: 'Chưa xác minh', color: '#999' };
     }
+  };
+
+  // Get driver verification status (requires rider verification first)
+  const getDriverVerificationStatus = (driverProfile) => {
+    // Check if rider is verified first
+    const riderStatus = getStudentVerificationStatus();
+    if (riderStatus.status !== 'verified') {
+      return { 
+        status: 'locked', 
+        text: 'Cần xác minh rider trước', 
+        color: '#999',
+        disabled: true 
+      };
+    }
+    
+    if (!driverProfile) return { status: 'not_verified', text: 'Chưa xác minh', color: '#999' };
+    
+    // Driver verification is based on driver profile status
+    const status = driverProfile.status?.toLowerCase();
+    if (status === 'active' || status === 'verified' || status === 'approved') {
+      return { status: 'verified', text: 'Đã xác minh', color: '#4CAF50' };
+    } else if (status === 'pending') {
+      return { status: 'pending', text: 'Đang xác minh', color: '#FF9800' };
+    } else if (status === 'rejected' || status === 'suspended') {
+      return { status: 'rejected', text: 'Bị từ chối', color: '#F44336' };
+    } else {
+      return { status: 'not_verified', text: 'Chưa xác minh', color: '#999' };
+    }
+  };
+
+  const handleStudentVerificationPress = () => {
+    // Check if there's a pending verification
+    if (currentStudentVerification?.status?.toLowerCase() === 'pending') {
+      Alert.alert(
+        'Đang xác minh',
+        'Yêu cầu xác minh sinh viên của bạn đang được admin xem xét. Vui lòng chờ kết quả.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    // Check if there's a rejected verification
+    if (currentStudentVerification?.status?.toLowerCase() === 'rejected') {
+      const rejectionReason = currentStudentVerification.rejection_reason || 'Không rõ lý do';
+      Alert.alert(
+        'Giấy tờ bị từ chối',
+        `Giấy tờ sinh viên của bạn đã bị từ chối với lý do: ${rejectionReason}\n\nBạn có thể gửi lại giấy tờ mới.`,
+        [
+          { text: 'Hủy', style: 'cancel' },
+          { text: 'Gửi lại', onPress: () => navigation.navigate('StudentVerification') }
+        ]
+      );
+      return;
+    }
+
+    // If verified, show success message
+    if (currentStudentVerification?.status?.toLowerCase() === 'approved') {
+      Alert.alert(
+        'Đã xác minh',
+        'Tài khoản sinh viên của bạn đã được xác minh thành công.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    // Navigate to verification screen for new submission
+    navigation.navigate('StudentVerification');
+  };
+
+  const handleDriverVerificationPress = () => {
+    // Check if rider is verified first
+    const riderStatus = getStudentVerificationStatus();
+    if (riderStatus.status !== 'verified') {
+      Alert.alert(
+        'Cần xác minh rider trước',
+        'Bạn cần xác minh tài khoản sinh viên trước khi có thể trở thành tài xế.',
+        [
+          { text: 'OK', style: 'cancel' },
+          { text: 'Xác minh rider', onPress: () => handleStudentVerificationPress() }
+        ]
+      );
+      return;
+    }
+
+    // If rider is verified, allow driver verification
+    navigation.navigate('DriverVerification');
   };
 
   if (loading) {
@@ -169,8 +252,8 @@ const ProfileSwitchScreen = ({ navigation }) => {
   }
 
   const currentUserType = user.user?.user_type;
-  const riderStatus = getVerificationStatus(user.rider_profile);
-  const driverStatus = getVerificationStatus(user.driver_profile);
+  const riderStatus = getStudentVerificationStatus(); // Student verification for rider
+  const driverStatus = getDriverVerificationStatus(user.driver_profile); // Driver verification for driver
 
   return (
     <SafeAreaView style={styles.container}>
@@ -341,21 +424,12 @@ const ProfileSwitchScreen = ({ navigation }) => {
               </View>
               <ModernButton
                 title={riderStatus.status === 'verified' ? "Đã xác minh" : 
-                       riderStatus.status === 'pending' ? "Đang chờ duyệt" : "Gửi giấy tờ"}
+                       riderStatus.status === 'pending' ? "Đang xác minh" : 
+                       riderStatus.status === 'rejected' ? "Gửi lại" : "Gửi giấy tờ"}
                 size="small"
                 variant={riderStatus.status === 'verified' ? "outline" : "primary"}
                 disabled={riderStatus.status === 'verified' || riderStatus.status === 'pending'}
-                onPress={() => {
-                  if (riderStatus.status === 'pending') {
-                    Alert.alert(
-                      'Đang chờ duyệt',
-                      'Bạn đã gửi yêu cầu xác minh và đang chờ admin duyệt. Vui lòng chờ kết quả.',
-                      [{ text: 'OK' }]
-                    );
-                  } else {
-                    navigation.navigate('StudentVerification');
-                  }
-                }}
+                onPress={handleStudentVerificationPress}
               />
             </View>
 
@@ -371,7 +445,8 @@ const ProfileSwitchScreen = ({ navigation }) => {
                   <Icon 
                     name={driverStatus.status === 'verified' ? 'check-circle' : 
                           driverStatus.status === 'pending' ? 'schedule' : 
-                          driverStatus.status === 'rejected' ? 'cancel' : 'help'} 
+                          driverStatus.status === 'rejected' ? 'cancel' : 
+                          driverStatus.status === 'locked' ? 'lock' : 'help'} 
                     size={16} 
                     color={driverStatus.color} 
                   />
@@ -382,11 +457,13 @@ const ProfileSwitchScreen = ({ navigation }) => {
               </View>
               <ModernButton
                 title={driverStatus.status === 'verified' ? "Đã xác minh" : 
-                       driverStatus.status === 'pending' ? "Đang chờ" : "Gửi giấy tờ"}
+                       driverStatus.status === 'pending' ? "Đang chờ" : 
+                       driverStatus.status === 'locked' ? "Bị khóa" : "Gửi giấy tờ"}
                 size="small"
-                variant={driverStatus.status === 'verified' ? "outline" : "primary"}
-                disabled={driverStatus.status === 'verified'}
-                onPress={() => navigation.navigate('DriverVerification')}
+                variant={driverStatus.status === 'verified' ? "outline" : 
+                        driverStatus.status === 'locked' ? "outline" : "primary"}
+                disabled={driverStatus.status === 'verified' || driverStatus.status === 'locked'}
+                onPress={handleDriverVerificationPress}
               />
             </View>
           </View>

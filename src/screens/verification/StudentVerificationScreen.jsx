@@ -57,52 +57,68 @@ const StudentVerificationScreen = ({ navigation }) => {
         );
         return;
       }
+
+      // If user's verification was rejected, just log it (don't show alert again)
+      // The alert was already shown in ProfileSwitchScreen
+      if (verification && verification.status?.toLowerCase() === 'rejected') {
+        console.log('User has rejected verification, allowing resubmission');
+        // Continue with the form to allow resubmission
+        return;
+      }
     } catch (error) {
       console.log('No current verification found or error:', error);
       setCurrentVerification(null);
     }
   };
 
-  // Compress and resize image to reduce file size
+  // Convert and compress image to JPEG format
   const compressImage = async (imageUri) => {
     try {
-      console.log('Compressing image:', imageUri);
+      console.log('Converting and compressing image:', imageUri);
       
-      // More aggressive compression for large files
+      // Convert to JPEG and resize to reduce file size
       const manipResult = await ImageManipulator.manipulateAsync(
         imageUri,
         [
-          { resize: { width: 1200 } }, // Smaller width
-          { resize: { height: 800 } }   // Limit height too
+          { resize: { width: 1200 } }, // Resize to reasonable size
         ],
         { 
-          compress: 0.6, // Lower quality (60%)
-          format: ImageManipulator.SaveFormat.JPEG 
+          compress: 0.7, // Good quality (70%)
+          format: ImageManipulator.SaveFormat.JPEG, // Force JPEG format
+          base64: false // Don't include base64 to reduce memory usage
         }
       );
       
-      console.log('Image compressed:', manipResult);
+      console.log('Image converted to JPEG:', {
+        uri: manipResult.uri,
+        width: manipResult.width,
+        height: manipResult.height,
+        fileSize: manipResult.fileSize
+      });
       
-      // If still too large, compress more
-      if (manipResult.fileSize && manipResult.fileSize > 8 * 1024 * 1024) {
-        console.log('Still too large, compressing more...');
+      // If still too large, compress more aggressively
+      if (manipResult.fileSize && manipResult.fileSize > 5 * 1024 * 1024) { // 5MB limit
+        console.log('Still too large, compressing more aggressively...');
         const secondPass = await ImageManipulator.manipulateAsync(
           manipResult.uri,
           [{ resize: { width: 800 } }],
           { 
-            compress: 0.4, // Even lower quality (40%)
-            format: ImageManipulator.SaveFormat.JPEG 
+            compress: 0.5, // Lower quality (50%)
+            format: ImageManipulator.SaveFormat.JPEG,
+            base64: false
           }
         );
-        console.log('Second compression:', secondPass);
+        console.log('Second compression result:', {
+          uri: secondPass.uri,
+          fileSize: secondPass.fileSize
+        });
         return secondPass;
       }
       
       return manipResult;
     } catch (error) {
-      console.error('Error compressing image:', error);
-      // Return original image if compression fails
-      return { uri: imageUri };
+      console.error('Error converting image to JPEG:', error);
+      throw new Error('Không thể xử lý ảnh. Vui lòng chọn ảnh khác.');
     }
   };
 
@@ -116,37 +132,52 @@ const StudentVerificationScreen = ({ navigation }) => {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        quality: 1, // Use full quality first, we'll compress later
+        mediaTypes: ImagePicker.MediaTypeOptions.Images, // Only images
         allowsEditing: false,
+        quality: 1, // Use full quality first, we'll convert to JPEG later
+        exif: false, // Don't include EXIF data to reduce file size
       });
 
       if (!result.canceled && result.assets[0]) {
         const originalImage = result.assets[0];
-        console.log('Original image size:', originalImage.fileSize);
+        console.log('Original image info:', {
+          uri: originalImage.uri,
+          type: originalImage.type,
+          fileSize: originalImage.fileSize,
+          width: originalImage.width,
+          height: originalImage.height
+        });
         
-        let processedImage = originalImage;
-        
-        // Always compress to ensure file size is under 10MB limit
-        console.log('Compressing image to ensure under 10MB limit...');
-        const compressedImage = await compressImage(originalImage.uri);
-        
-        processedImage = {
-          ...originalImage,
-          uri: compressedImage.uri,
-          fileSize: compressedImage.fileSize || originalImage.fileSize,
-        };
-        
-        console.log('Final image size:', processedImage.fileSize);
-        
-        if (side === 'front') {
-          setFrontImage(processedImage);
-        } else {
-          setBackImage(processedImage);
+        try {
+          // Convert to JPEG format (handles HEIC, PNG, etc.)
+          console.log('Converting image to JPEG format...');
+          const compressedImage = await compressImage(originalImage.uri);
+          
+          const processedImage = {
+            uri: compressedImage.uri,
+            type: 'image/jpeg', // Force JPEG type
+            fileName: `student_id_${side}_${Date.now()}.jpg`,
+            fileSize: compressedImage.fileSize,
+            width: compressedImage.width,
+            height: compressedImage.height,
+          };
+          
+          console.log('Processed image info:', processedImage);
+          
+          if (side === 'front') {
+            setFrontImage(processedImage);
+          } else {
+            setBackImage(processedImage);
+          }
+          
+        } catch (compressError) {
+          console.error('Error converting image:', compressError);
+          Alert.alert('Lỗi', compressError.message || 'Không thể xử lý ảnh. Vui lòng chọn ảnh khác.');
         }
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      Alert.alert('Lỗi', 'Không thể chọn ảnh');
+      Alert.alert('Lỗi', 'Không thể chọn ảnh từ thư viện');
     }
   };
 
@@ -160,32 +191,47 @@ const StudentVerificationScreen = ({ navigation }) => {
       }
 
       const result = await ImagePicker.launchCameraAsync({
-        quality: 1, // Use full quality first, we'll compress later
+        mediaTypes: ImagePicker.MediaTypeOptions.Images, // Only images
         allowsEditing: false,
+        quality: 1, // Use full quality first, we'll convert to JPEG later
+        exif: false, // Don't include EXIF data to reduce file size
       });
 
       if (!result.canceled && result.assets[0]) {
         const originalImage = result.assets[0];
-        console.log('Original photo size:', originalImage.fileSize);
+        console.log('Original photo info:', {
+          uri: originalImage.uri,
+          type: originalImage.type,
+          fileSize: originalImage.fileSize,
+          width: originalImage.width,
+          height: originalImage.height
+        });
         
-        let processedImage = originalImage;
-        
-        // Always compress to ensure file size is under 10MB limit
-        console.log('Compressing photo to ensure under 10MB limit...');
-        const compressedImage = await compressImage(originalImage.uri);
-        
-        processedImage = {
-          ...originalImage,
-          uri: compressedImage.uri,
-          fileSize: compressedImage.fileSize || originalImage.fileSize,
-        };
-        
-        console.log('Final photo size:', processedImage.fileSize);
-        
-        if (side === 'front') {
-          setFrontImage(processedImage);
-        } else {
-          setBackImage(processedImage);
+        try {
+          // Convert to JPEG format
+          console.log('Converting photo to JPEG format...');
+          const compressedImage = await compressImage(originalImage.uri);
+          
+          const processedImage = {
+            uri: compressedImage.uri,
+            type: 'image/jpeg', // Force JPEG type
+            fileName: `student_id_${side}_${Date.now()}.jpg`,
+            fileSize: compressedImage.fileSize,
+            width: compressedImage.width,
+            height: compressedImage.height,
+          };
+          
+          console.log('Processed photo info:', processedImage);
+          
+          if (side === 'front') {
+            setFrontImage(processedImage);
+          } else {
+            setBackImage(processedImage);
+          }
+          
+        } catch (compressError) {
+          console.error('Error converting photo:', compressError);
+          Alert.alert('Lỗi', compressError.message || 'Không thể xử lý ảnh. Vui lòng chụp lại.');
         }
       }
     } catch (error) {

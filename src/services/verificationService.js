@@ -13,29 +13,42 @@ class VerificationService {
     try {
       console.log('Getting current student verification...');
       
-      // Try to get from API first
-      try {
-        const response = await this.apiService.get('/me/verifications?type=student_id&size=1');
-        console.log('Verification API response:', response);
-        
-        if (response && response.content && response.content.length > 0) {
-          console.log('Found verification:', response.content[0]);
-          return response.content[0];
-        }
-      } catch (apiError) {
-        console.log('API error, falling back to user profile:', apiError);
-      }
-      
-      // Fallback to user profile data
+      // Get current user ID
       const authService = require('./authService').default;
       const currentUser = authService.getCurrentUser();
       
+      if (!currentUser || !currentUser.user?.user_id) {
+        console.log('No current user found');
+        return null;
+      }
+      
+      const userId = currentUser.user.user_id;
+      
+      // Try to get from API first
+      try {
+        const response = await this.apiService.get(`/verification/students/${userId}`);
+        console.log('Verification API response:', response);
+        
+        if (response) {
+          console.log('Found student verification:', response);
+          return response;
+        }
+      } catch (apiError) {
+        console.log('API error (user may not have verification yet):', apiError);
+        // If 404, it means user has no verification - this is normal
+        if (apiError.status === 404) {
+          console.log('No verification found for user - this is normal for new users');
+          return null;
+        }
+      }
+      
+      // Fallback to user profile data
       if (currentUser && currentUser.rider_profile) {
         console.log('Using rider profile data:', currentUser.rider_profile);
         return {
           status: currentUser.rider_profile.status,
-          type: 'student_id',
-          user_id: currentUser.user?.user_id,
+          type: 'STUDENT_ID',
+          user_id: userId,
           created_at: currentUser.rider_profile.created_at,
           verified_at: currentUser.rider_profile.verified_at
         };
@@ -45,6 +58,60 @@ class VerificationService {
       return null;
     } catch (error) {
       console.error('Get current student verification error:', error);
+      return null;
+    }
+  }
+
+  // Get current driver verification status
+  async getCurrentDriverVerification() {
+    try {
+      console.log('Getting current driver verification...');
+      
+      // Get current user ID
+      const authService = require('./authService').default;
+      const currentUser = authService.getCurrentUser();
+      
+      if (!currentUser || !currentUser.user?.user_id) {
+        console.log('No current user found');
+        return null;
+      }
+      
+      const userId = currentUser.user.user_id;
+      
+      // Try to get from API first
+      try {
+        const response = await this.apiService.get(`/verification/drivers/${userId}/kyc`);
+        console.log('Driver verification API response:', response);
+        
+        if (response) {
+          console.log('Found driver verification:', response);
+          return response;
+        }
+      } catch (apiError) {
+        console.log('API error (user may not have driver verification yet):', apiError);
+        // If 404, it means user has no driver verification - this is normal
+        if (apiError.status === 404) {
+          console.log('No driver verification found for user - this is normal for new users');
+          return null;
+        }
+      }
+      
+      // Fallback to user profile data
+      if (currentUser && currentUser.driver_profile) {
+        console.log('Using driver profile data:', currentUser.driver_profile);
+        return {
+          status: currentUser.driver_profile.status,
+          type: 'DRIVER_VERIFICATION',
+          user_id: userId,
+          created_at: currentUser.driver_profile.created_at,
+          verified_at: currentUser.driver_profile.verified_at
+        };
+      }
+      
+      console.log('No driver verification found');
+      return null;
+    } catch (error) {
+      console.error('Get current driver verification error:', error);
       return null;
     }
   }
@@ -106,46 +173,60 @@ class VerificationService {
   }
 
   // Submit driver verification
-  async submitDriverVerification(verificationData) {
+  async submitDriverVerification(documentFiles) {
     try {
+      console.log('Submitting driver verification with files:', documentFiles);
+      
+      const formData = new FormData();
+      
+      // Handle multiple document files
+      if (Array.isArray(documentFiles)) {
+        documentFiles.forEach((file, index) => {
+          console.log(`Adding driver document ${index + 1}:`, {
+            uri: file.uri,
+            type: file.mimeType || 'image/jpeg',
+            name: file.fileName || `driver_doc_${index + 1}.jpg`,
+            documentType: file.documentType,
+            side: file.side
+          });
+          
+          formData.append('document', {
+            uri: file.uri,
+            type: file.mimeType || 'image/jpeg',
+            name: file.fileName || `driver_doc_${index + 1}.jpg`,
+          });
+        });
+      } else {
+        // Single file (backward compatibility)
+        console.log('Adding single driver file:', {
+          uri: documentFiles.uri,
+          type: documentFiles.mimeType || 'image/jpeg',
+          name: documentFiles.fileName || 'driver_doc.jpg',
+        });
+        
+        formData.append('document', {
+          uri: documentFiles.uri,
+          type: documentFiles.mimeType || 'image/jpeg',
+          name: documentFiles.fileName || 'driver_doc.jpg',
+        });
+      }
+
+      console.log('FormData created, calling API...');
       const response = await this.apiService.uploadFile(
         ENDPOINTS.VERIFICATION.DRIVER, 
         null, 
-        verificationData
+        formData
       );
 
+      console.log('API response:', response);
       return {
         success: true,
         data: response,
-        message: response.message || 'Đã gửi yêu cầu xác minh tài xế thành công'
+        message: 'Đã gửi yêu cầu xác minh tài xế thành công'
       };
     } catch (error) {
-      console.error('Driver verification error:', error);
-      
-      let errorMessage = 'Không thể gửi yêu cầu xác minh tài xế';
-      
-      if (error.data?.message) {
-        errorMessage = error.data.message;
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      // Check for specific error types
-      if (error.status === 400) {
-        errorMessage = 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại thông tin và tài liệu.';
-      } else if (error.status === 401) {
-        errorMessage = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
-      } else if (error.status === 403) {
-        errorMessage = 'Không có quyền truy cập. Vui lòng liên hệ admin.';
-      } else if (error.status === 404) {
-        errorMessage = 'API endpoint không tồn tại. Vui lòng liên hệ admin.';
-      } else if (error.status === 413) {
-        errorMessage = 'File tải lên quá lớn. Vui lòng chọn file nhỏ hơn 5MB.';
-      } else if (error.status === 0) {
-        errorMessage = 'Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng.';
-      }
-      
-      throw new Error(errorMessage);
+      console.error('Submit driver verification error:', error);
+      throw this.handleVerificationError(error, 'Không thể gửi yêu cầu xác minh tài xế');
     }
   }
 
