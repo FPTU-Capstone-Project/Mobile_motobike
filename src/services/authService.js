@@ -321,6 +321,43 @@ class AuthService {
            this.currentUser?.rider_profile !== null;
   }
 
+  // Check if user has active rider profile (verified)
+  isRiderVerified() {
+    return this.currentUser?.rider_profile?.status === 'ACTIVE' ||
+           this.currentUser?.rider_profile?.status === 'active';
+  }
+
+  // Check if user needs rider verification
+  needsRiderVerification() {
+    // User has rider profile but it's not active (needs verification)
+    return this.currentUser?.rider_profile !== null && 
+           !this.isRiderVerified();
+  }
+
+  // Check if user can use rider features
+  canUseRiderFeatures() {
+    return this.isRiderVerified();
+  }
+
+  // Get rider verification status
+  getRiderVerificationStatus() {
+    if (!this.currentUser?.rider_profile) {
+      return 'NO_PROFILE'; // No rider profile created yet
+    }
+    
+    const status = this.currentUser.rider_profile.status;
+    switch (status?.toLowerCase()) {
+      case 'active':
+        return 'VERIFIED';
+      case 'pending':
+        return 'PENDING';
+      case 'suspended':
+        return 'SUSPENDED';
+      default:
+        return 'UNKNOWN';
+    }
+  }
+
   // Check if user is admin
   isAdmin() {
     return this.currentUser?.user?.user_type === 'admin' || 

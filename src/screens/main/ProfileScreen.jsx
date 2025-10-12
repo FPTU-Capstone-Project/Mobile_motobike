@@ -88,7 +88,13 @@ const ProfileScreen = ({ navigation }) => {
     { icon: 'swap-horiz', title: 'Chuyển đổi chế độ', onPress: () => navigation.navigate('ProfileSwitch') },
     { icon: 'edit', title: 'Chỉnh sửa thông tin', onPress: () => navigation.navigate('EditProfile') },
     { icon: 'security', title: 'Đổi mật khẩu', onPress: () => navigation.navigate('ChangePassword') },
-    { icon: 'verified', title: 'Xác minh tài khoản', onPress: () => navigation.navigate('ProfileSwitch') },
+    { 
+      icon: 'verified', 
+      title: 'Xác minh tài khoản', 
+      onPress: () => {
+        navigation.navigate('ProfileSwitch');
+      }
+    },
     { icon: 'help', title: 'Trợ giúp & Hỗ trợ', onPress: () => Alert.alert('Thông báo', 'Chức năng đang phát triển') },
     { icon: 'policy', title: 'Điều khoản sử dụng', onPress: () => Alert.alert('Thông báo', 'Chức năng đang phát triển') },
     { icon: 'info', title: 'Về chúng tôi', onPress: () => Alert.alert('Thông báo', 'Chức năng đang phát triển') },
@@ -142,15 +148,15 @@ const ProfileScreen = ({ navigation }) => {
               <Text style={styles.studentId}>MSSV: {user.user?.student_id || 'Chưa cập nhật'}</Text>
               <View style={styles.verificationStatus}>
                 <Icon 
-                  name={user.user?.email_verified ? 'verified' : 'pending'} 
+                  name={authService.isRiderVerified() ? 'verified' : 'pending'} 
                   size={16} 
-                  color={user.user?.email_verified ? '#4CAF50' : '#FF9800'} 
+                  color={authService.isRiderVerified() ? '#4CAF50' : '#FF9800'} 
                 />
                 <Text style={[
                   styles.verificationText,
-                  { color: user.user?.email_verified ? '#4CAF50' : '#FF9800' }
+                  { color: authService.isRiderVerified() ? '#4CAF50' : '#FF9800' }
                 ]}>
-                  {user.user?.email_verified ? 'Đã xác minh' : 'Chưa xác minh'}
+                  {authService.isRiderVerified() ? 'Đã xác minh' : 'Chưa xác minh'}
                 </Text>
               </View>
             </View>
@@ -193,26 +199,32 @@ const ProfileScreen = ({ navigation }) => {
               key={index} 
               style={[
                 styles.menuItem,
-                item.testOnly && __DEV__ && styles.testMenuItem
+                item.testOnly && __DEV__ && styles.testMenuItem,
+                item.disabled && styles.disabledMenuItem
               ]}
-              onPress={item.onPress}
+              onPress={item.disabled ? null : item.onPress}
+              disabled={item.disabled}
             >
               <View style={styles.menuItemLeft}>
                 <Icon 
                   name={item.icon} 
                   size={24} 
-                  color={item.testOnly && __DEV__ ? "#FF9800" : "#666"} 
+                  color={
+                    item.disabled ? "#ccc" : 
+                    item.testOnly && __DEV__ ? "#FF9800" : "#666"
+                  } 
                 />
                 <Text 
                   style={[
                     styles.menuItemText,
-                    item.testOnly && __DEV__ && styles.testMenuItemText
+                    item.testOnly && __DEV__ && styles.testMenuItemText,
+                    item.disabled && styles.disabledMenuItemText
                   ]}
                 >
                   {item.title}
                 </Text>
               </View>
-              <Icon name="chevron-right" size={24} color="#ccc" />
+              {!item.disabled && <Icon name="chevron-right" size={24} color="#ccc" />}
             </TouchableOpacity>
           ))}
         </View>
@@ -422,6 +434,12 @@ const styles = StyleSheet.create({
   testMenuItemText: {
     color: '#E65100',
     fontWeight: '600',
+  },
+  disabledMenuItem: {
+    opacity: 0.5,
+  },
+  disabledMenuItemText: {
+    color: '#ccc',
   },
 });
 

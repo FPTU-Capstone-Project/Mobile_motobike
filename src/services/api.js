@@ -240,7 +240,7 @@ class ApiService {
     }
 
     return this.request(endpoint, {
-      method: 'PUT',
+      method: 'POST',
       headers,
       body: formData,
     });

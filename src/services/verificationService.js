@@ -8,22 +8,92 @@ class VerificationService {
 
   // ========== USER VERIFICATION ENDPOINTS ==========
 
-  // Submit student verification
-  async submitStudentVerification(documentFile) {
+  // Get current student verification status
+  async getCurrentStudentVerification() {
     try {
-      const formData = new FormData();
-      formData.append('document', {
-        uri: documentFile.uri,
-        type: documentFile.mimeType || 'image/jpeg',
-        name: documentFile.fileName || 'student_id.jpg',
-      });
+      console.log('Getting current student verification...');
+      
+      // Try to get from API first
+      try {
+        const response = await this.apiService.get('/me/verifications?type=student_id&size=1');
+        console.log('Verification API response:', response);
+        
+        if (response && response.content && response.content.length > 0) {
+          console.log('Found verification:', response.content[0]);
+          return response.content[0];
+        }
+      } catch (apiError) {
+        console.log('API error, falling back to user profile:', apiError);
+      }
+      
+      // Fallback to user profile data
+      const authService = require('./authService').default;
+      const currentUser = authService.getCurrentUser();
+      
+      if (currentUser && currentUser.rider_profile) {
+        console.log('Using rider profile data:', currentUser.rider_profile);
+        return {
+          status: currentUser.rider_profile.status,
+          type: 'student_id',
+          user_id: currentUser.user?.user_id,
+          created_at: currentUser.rider_profile.created_at,
+          verified_at: currentUser.rider_profile.verified_at
+        };
+      }
+      
+      console.log('No verification found');
+      return null;
+    } catch (error) {
+      console.error('Get current student verification error:', error);
+      return null;
+    }
+  }
 
+  // Submit student verification
+  async submitStudentVerification(documentFiles) {
+    try {
+      console.log('Submitting student verification with files:', documentFiles);
+      
+      const formData = new FormData();
+      
+      // Handle both single file and multiple files
+      if (Array.isArray(documentFiles)) {
+        documentFiles.forEach((file, index) => {
+          console.log(`Adding file ${index + 1}:`, {
+            uri: file.uri,
+            type: file.mimeType || 'image/jpeg',
+            name: file.fileName || `student_id_${index + 1}.jpg`,
+          });
+          
+          formData.append('document', {
+            uri: file.uri,
+            type: file.mimeType || 'image/jpeg',
+            name: file.fileName || `student_id_${index + 1}.jpg`,
+          });
+        });
+      } else {
+        // Single file (backward compatibility)
+        console.log('Adding single file:', {
+          uri: documentFiles.uri,
+          type: documentFiles.mimeType || 'image/jpeg',
+          name: documentFiles.fileName || 'student_id.jpg',
+        });
+        
+        formData.append('document', {
+          uri: documentFiles.uri,
+          type: documentFiles.mimeType || 'image/jpeg',
+          name: documentFiles.fileName || 'student_id.jpg',
+        });
+      }
+
+      console.log('FormData created, calling API...');
       const response = await this.apiService.uploadFile(
         ENDPOINTS.VERIFICATION.STUDENT, 
         null, 
         formData
       );
 
+      console.log('API response:', response);
       return {
         success: true,
         data: response,
@@ -327,16 +397,16 @@ class VerificationService {
       throw new Error('Vui lòng chọn tài liệu để tải lên');
     }
 
-    // Check file size (max 10MB)
+    // Check file size (max 10MB to match backend limit)
     const maxSize = 10 * 1024 * 1024; // 10MB
     if (file.fileSize && file.fileSize > maxSize) {
-      throw new Error('Kích thước file không được vượt quá 10MB');
+      throw new Error('Kích thước file không được vượt quá 10MB. Vui lòng chọn ảnh nhỏ hơn hoặc nén ảnh.');
     }
 
     // Check file type
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
     if (file.mimeType && !allowedTypes.includes(file.mimeType.toLowerCase())) {
-      throw new Error('Chỉ chấp nhận file JPG, PNG hoặc PDF');
+      throw new Error('Chỉ chấp nhận file JPG hoặc PNG');
     }
 
     return true;

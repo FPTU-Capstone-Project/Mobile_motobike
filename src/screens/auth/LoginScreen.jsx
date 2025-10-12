@@ -34,7 +34,7 @@ const LoginScreen = ({ navigation }) => {
     try {
       const result = await authService.login(email, password, targetProfile);
       if (result.success) {
-        // Navigate based on the selected target profile
+        // Always go to Main screen first, verification check will be done in Main screen
         navigation.replace(targetProfile === 'driver' ? 'DriverMain' : 'Main');
       }
     } catch (error) {

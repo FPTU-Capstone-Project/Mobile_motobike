@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import * as Animatable from 'react-native-animatable';
 
 import ModernButton from '../../components/ModernButton.jsx';
@@ -21,10 +22,91 @@ import verificationService from '../../services/verificationService';
 import { ApiError } from '../../services/api';
 
 const StudentVerificationScreen = ({ navigation }) => {
-  const [selectedImage, setSelectedImage] = useState(null);
+  const [frontImage, setFrontImage] = useState(null);
+  const [backImage, setBackImage] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [currentSide, setCurrentSide] = useState('front'); // 'front' or 'back'
+  const [currentVerification, setCurrentVerification] = useState(null);
 
-  const pickImage = async () => {
+  // Load current verification status
+  useEffect(() => {
+    loadCurrentVerification();
+  }, []);
+
+  const loadCurrentVerification = async () => {
+    try {
+      const verification = await verificationService.getCurrentStudentVerification();
+      setCurrentVerification(verification);
+      
+      // If user already has pending verification, show alert and go back
+      if (verification && verification.status?.toLowerCase() === 'pending') {
+        Alert.alert(
+          'Đang chờ duyệt',
+          'Bạn đã gửi yêu cầu xác minh và đang chờ admin duyệt. Vui lòng chờ kết quả.',
+          [{ text: 'OK', onPress: () => navigation.goBack() }]
+        );
+        return;
+      }
+      
+      // If user already verified, show alert and go back
+      if (verification && (verification.status?.toLowerCase() === 'verified' || verification.status?.toLowerCase() === 'approved' || verification.status?.toLowerCase() === 'active')) {
+        Alert.alert(
+          'Đã xác minh',
+          'Tài khoản của bạn đã được xác minh.',
+          [{ text: 'OK', onPress: () => navigation.goBack() }]
+        );
+        return;
+      }
+    } catch (error) {
+      console.log('No current verification found or error:', error);
+      setCurrentVerification(null);
+    }
+  };
+
+  // Compress and resize image to reduce file size
+  const compressImage = async (imageUri) => {
+    try {
+      console.log('Compressing image:', imageUri);
+      
+      // More aggressive compression for large files
+      const manipResult = await ImageManipulator.manipulateAsync(
+        imageUri,
+        [
+          { resize: { width: 1200 } }, // Smaller width
+          { resize: { height: 800 } }   // Limit height too
+        ],
+        { 
+          compress: 0.6, // Lower quality (60%)
+          format: ImageManipulator.SaveFormat.JPEG 
+        }
+      );
+      
+      console.log('Image compressed:', manipResult);
+      
+      // If still too large, compress more
+      if (manipResult.fileSize && manipResult.fileSize > 8 * 1024 * 1024) {
+        console.log('Still too large, compressing more...');
+        const secondPass = await ImageManipulator.manipulateAsync(
+          manipResult.uri,
+          [{ resize: { width: 800 } }],
+          { 
+            compress: 0.4, // Even lower quality (40%)
+            format: ImageManipulator.SaveFormat.JPEG 
+          }
+        );
+        console.log('Second compression:', secondPass);
+        return secondPass;
+      }
+      
+      return manipResult;
+    } catch (error) {
+      console.error('Error compressing image:', error);
+      // Return original image if compression fails
+      return { uri: imageUri };
+    }
+  };
+
+  const pickImage = async (side) => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       
@@ -34,12 +116,33 @@ const StudentVerificationScreen = ({ navigation }) => {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        quality: 0.9,
+        quality: 1, // Use full quality first, we'll compress later
         allowsEditing: false,
       });
 
       if (!result.canceled && result.assets[0]) {
-        setSelectedImage(result.assets[0]);
+        const originalImage = result.assets[0];
+        console.log('Original image size:', originalImage.fileSize);
+        
+        let processedImage = originalImage;
+        
+        // Always compress to ensure file size is under 10MB limit
+        console.log('Compressing image to ensure under 10MB limit...');
+        const compressedImage = await compressImage(originalImage.uri);
+        
+        processedImage = {
+          ...originalImage,
+          uri: compressedImage.uri,
+          fileSize: compressedImage.fileSize || originalImage.fileSize,
+        };
+        
+        console.log('Final image size:', processedImage.fileSize);
+        
+        if (side === 'front') {
+          setFrontImage(processedImage);
+        } else {
+          setBackImage(processedImage);
+        }
       }
     } catch (error) {
       console.error('Error picking image:', error);
@@ -47,7 +150,7 @@ const StudentVerificationScreen = ({ navigation }) => {
     }
   };
 
-  const takePhoto = async () => {
+  const takePhoto = async (side) => {
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       
@@ -57,12 +160,33 @@ const StudentVerificationScreen = ({ navigation }) => {
       }
 
       const result = await ImagePicker.launchCameraAsync({
-        quality: 0.9,
+        quality: 1, // Use full quality first, we'll compress later
         allowsEditing: false,
       });
 
       if (!result.canceled && result.assets[0]) {
-        setSelectedImage(result.assets[0]);
+        const originalImage = result.assets[0];
+        console.log('Original photo size:', originalImage.fileSize);
+        
+        let processedImage = originalImage;
+        
+        // Always compress to ensure file size is under 10MB limit
+        console.log('Compressing photo to ensure under 10MB limit...');
+        const compressedImage = await compressImage(originalImage.uri);
+        
+        processedImage = {
+          ...originalImage,
+          uri: compressedImage.uri,
+          fileSize: compressedImage.fileSize || originalImage.fileSize,
+        };
+        
+        console.log('Final photo size:', processedImage.fileSize);
+        
+        if (side === 'front') {
+          setFrontImage(processedImage);
+        } else {
+          setBackImage(processedImage);
+        }
       }
     } catch (error) {
       console.error('Error taking photo:', error);
@@ -70,45 +194,70 @@ const StudentVerificationScreen = ({ navigation }) => {
     }
   };
 
-  const showImagePicker = () => {
+  const showImagePicker = (side) => {
+    setCurrentSide(side);
     Alert.alert(
-      'Chọn ảnh',
+      `Chọn ảnh mặt ${side === 'front' ? 'trước' : 'sau'}`,
       'Chọn cách thức để tải ảnh thẻ sinh viên',
       [
         { text: 'Hủy', style: 'cancel' },
-        { text: 'Chụp ảnh', onPress: takePhoto },
-        { text: 'Chọn từ thư viện', onPress: pickImage },
+        { text: 'Chụp ảnh', onPress: () => takePhoto(side) },
+        { text: 'Chọn từ thư viện', onPress: () => pickImage(side) },
       ]
     );
   };
 
   const submitVerification = async () => {
-    if (!selectedImage) {
-      Alert.alert('Lỗi', 'Vui lòng chọn ảnh thẻ sinh viên');
+    if (!frontImage || !backImage) {
+      Alert.alert('Lỗi', 'Vui lòng chụp đầy đủ 2 mặt thẻ sinh viên');
       return;
     }
 
     setUploading(true);
 
     try {
-      // Validate file first
-      verificationService.validateDocumentFile(selectedImage);
+      // Validate files first
+      verificationService.validateDocumentFile(frontImage);
+      verificationService.validateDocumentFile(backImage);
 
-      // Create document file object
-      const documentFile = {
-        uri: selectedImage.uri,
-        mimeType: selectedImage.mimeType || 'image/jpeg',
-        fileName: selectedImage.fileName || 'student_id.jpg',
-        fileSize: selectedImage.fileSize,
-      };
+      // Create document files array
+      const documentFiles = [
+        {
+          uri: frontImage.uri,
+          mimeType: frontImage.mimeType || 'image/jpeg',
+          fileName: frontImage.fileName || 'student_id_front.jpg',
+          fileSize: frontImage.fileSize,
+        },
+        {
+          uri: backImage.uri,
+          mimeType: backImage.mimeType || 'image/jpeg',
+          fileName: backImage.fileName || 'student_id_back.jpg',
+          fileSize: backImage.fileSize,
+        }
+      ];
 
-      const result = await verificationService.submitStudentVerification(documentFile);
+      const result = await verificationService.submitStudentVerification(documentFiles);
+
+      // After successful submission, refresh verification status
+      try {
+        const updatedVerification = await verificationService.getCurrentStudentVerification();
+        setCurrentVerification(updatedVerification);
+        console.log('Updated verification status:', updatedVerification);
+      } catch (error) {
+        console.log('Could not refresh verification status:', error);
+      }
 
       Alert.alert(
         'Gửi thành công!',
         result.message || 'Thẻ sinh viên đã được gửi để xác minh. Admin sẽ duyệt trong 1-2 ngày làm việc.',
         [
-          { text: 'OK', onPress: () => navigation.goBack() }
+          { 
+            text: 'OK', 
+            onPress: () => {
+              // Navigate to Main screen after successful submission
+              navigation.replace('Main');
+            }
+          }
         ]
       );
     } catch (error) {
@@ -130,7 +279,15 @@ const StudentVerificationScreen = ({ navigation }) => {
           <View style={styles.headerContent}>
             <TouchableOpacity 
               style={styles.backButton}
-              onPress={() => navigation.goBack()}
+              onPress={() => {
+                // If user came from login, go to Main screen
+                // Otherwise, go back normally
+                if (navigation.canGoBack()) {
+                  navigation.goBack();
+                } else {
+                  navigation.replace('Main');
+                }
+              }}
             >
               <Icon name="arrow-back" size={24} color="#fff" />
             </TouchableOpacity>
@@ -173,16 +330,16 @@ const StudentVerificationScreen = ({ navigation }) => {
             </View>
           </View>
 
-          {/* Image Upload Section */}
+          {/* Front Image Upload Section */}
           <View style={styles.uploadSection}>
-            <Text style={styles.cardTitle}>Tải ảnh thẻ sinh viên</Text>
+            <Text style={styles.cardTitle}>Mặt trước thẻ sinh viên</Text>
             
-            {selectedImage ? (
+            {frontImage ? (
               <Animatable.View animation="fadeIn" style={styles.selectedImageContainer}>
-                <Image source={{ uri: selectedImage.uri }} style={styles.selectedImage} />
+                <Image source={{ uri: frontImage.uri }} style={styles.selectedImage} />
                 <TouchableOpacity 
                   style={styles.changeImageButton}
-                  onPress={showImagePicker}
+                  onPress={() => showImagePicker('front')}
                 >
                   <Icon name="edit" size={20} color="#4CAF50" />
                   <Text style={styles.changeImageText}>Đổi ảnh</Text>
@@ -191,14 +348,46 @@ const StudentVerificationScreen = ({ navigation }) => {
             ) : (
               <TouchableOpacity 
                 style={styles.uploadButton}
-                onPress={showImagePicker}
+                onPress={() => showImagePicker('front')}
               >
                 <LinearGradient
                   colors={['#2196F3', '#1976D2']}
                   style={styles.uploadButtonGradient}
                 >
-                  <Icon name="cloud-upload" size={48} color="#fff" />
-                  <Text style={styles.uploadButtonText}>Chọn ảnh thẻ sinh viên</Text>
+                  <Icon name="camera-alt" size={48} color="#fff" />
+                  <Text style={styles.uploadButtonText}>Chụp mặt trước</Text>
+                  <Text style={styles.uploadButtonSubtext}>Chụp ảnh hoặc chọn từ thư viện</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Back Image Upload Section */}
+          <View style={styles.uploadSection}>
+            <Text style={styles.cardTitle}>Mặt sau thẻ sinh viên</Text>
+            
+            {backImage ? (
+              <Animatable.View animation="fadeIn" style={styles.selectedImageContainer}>
+                <Image source={{ uri: backImage.uri }} style={styles.selectedImage} />
+                <TouchableOpacity 
+                  style={styles.changeImageButton}
+                  onPress={() => showImagePicker('back')}
+                >
+                  <Icon name="edit" size={20} color="#4CAF50" />
+                  <Text style={styles.changeImageText}>Đổi ảnh</Text>
+                </TouchableOpacity>
+              </Animatable.View>
+            ) : (
+              <TouchableOpacity 
+                style={styles.uploadButton}
+                onPress={() => showImagePicker('back')}
+              >
+                <LinearGradient
+                  colors={['#2196F3', '#1976D2']}
+                  style={styles.uploadButtonGradient}
+                >
+                  <Icon name="camera-alt" size={48} color="#fff" />
+                  <Text style={styles.uploadButtonText}>Chụp mặt sau</Text>
                   <Text style={styles.uploadButtonSubtext}>Chụp ảnh hoặc chọn từ thư viện</Text>
                 </LinearGradient>
               </TouchableOpacity>
@@ -223,10 +412,32 @@ const StudentVerificationScreen = ({ navigation }) => {
           <ModernButton
             title={uploading ? "Đang gửi..." : "Gửi để xác minh"}
             onPress={submitVerification}
-            disabled={!selectedImage || uploading}
+            disabled={!frontImage || !backImage || uploading}
             icon={uploading ? null : "send"}
             style={styles.submitButton}
           />
+
+          {/* Skip Button for Testing */}
+          {__DEV__ && (
+            <TouchableOpacity 
+              style={styles.skipButton}
+              onPress={() => {
+                Alert.alert(
+                  'Bỏ qua xác minh',
+                  'Bạn có chắc chắn muốn bỏ qua xác minh? (Chỉ để test)',
+                  [
+                    { text: 'Hủy', style: 'cancel' },
+                    { 
+                      text: 'Bỏ qua', 
+                      onPress: () => navigation.replace('Main')
+                    }
+                  ]
+                );
+              }}
+            >
+              <Text style={styles.skipButtonText}>Bỏ qua tạm thời (Test)</Text>
+            </TouchableOpacity>
+          )}
 
           {uploading && (
             <View style={styles.uploadingContainer}>
@@ -455,6 +666,19 @@ const styles = StyleSheet.create({
     color: '#E65100',
     marginLeft: 12,
     lineHeight: 20,
+  },
+  skipButton: {
+    backgroundColor: '#FF9800',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  skipButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,8 @@ import mockData from '../../data/mockData.json';
 import ModernButton from '../../components/ModernButton.jsx';
 import LocationCard from '../../components/LocationCard.jsx';
 import ModeSelector from '../../components/ModeSelector.jsx';
+import authService from '../../services/authService';
+import verificationService from '../../services/verificationService';
 
 const HomeScreen = ({ navigation }) => {
   const [selectedPickup, setSelectedPickup] = useState(null);
@@ -28,6 +30,84 @@ const HomeScreen = ({ navigation }) => {
   const presetLocations = mockData.presetLocations;
   const drivers = mockData.availableDrivers;
 
+  // Check verification status when component mounts
+  useEffect(() => {
+    checkVerificationStatus();
+  }, []);
+
+  // Refresh verification status when screen comes into focus
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      checkVerificationStatus();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+
+  const checkVerificationStatus = async () => {
+    try {
+      // Only check for rider verification, not driver
+      if (authService.isRider()) {
+        // Refresh verification status from API
+        const verification = await verificationService.getCurrentStudentVerification();
+        console.log('Current verification status:', verification);
+        
+        // Check if needs verification based on latest data
+        const needsVerification = !verification || 
+          (verification.status?.toLowerCase() !== 'active' && 
+           verification.status?.toLowerCase() !== 'verified' && 
+           verification.status?.toLowerCase() !== 'approved');
+        
+        if (needsVerification) {
+          Alert.alert(
+            'Cần xác minh tài khoản',
+            'Để sử dụng dịch vụ đặt xe, bạn cần xác minh là sinh viên của trường.',
+            [
+              { 
+                text: 'Để sau', 
+                style: 'cancel',
+                onPress: () => {
+                  // User can continue using the app but with limited features
+                  console.log('User chose to verify later');
+                }
+              },
+              { 
+                text: 'Xác minh ngay', 
+                onPress: () => {
+                  navigation.navigate('ProfileSwitch');
+                }
+              }
+            ]
+          );
+        }
+      }
+    } catch (error) {
+      console.log('Could not check verification status:', error);
+      // Fallback to cached data
+      if (authService.isRider() && authService.needsRiderVerification()) {
+        Alert.alert(
+          'Cần xác minh tài khoản',
+          'Để sử dụng dịch vụ đặt xe, bạn cần xác minh là sinh viên của trường.',
+          [
+            { 
+              text: 'Để sau', 
+              style: 'cancel',
+              onPress: () => {
+                console.log('User chose to verify later');
+              }
+            },
+            { 
+              text: 'Xác minh ngay', 
+              onPress: () => {
+                navigation.navigate('ProfileSwitch');
+              }
+            }
+          ]
+        );
+      }
+    }
+  };
+
   const handleLocationSelect = (location, type) => {
     if (type === 'pickup') {
       setSelectedPickup(location);
@@ -36,7 +116,51 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
-  const handleFindRide = () => {
+  const handleFindRide = async () => {
+    // Check if user needs verification before allowing ride booking
+    try {
+      if (authService.isRider()) {
+        // Check verification status from API
+        const verification = await verificationService.getCurrentStudentVerification();
+        const needsVerification = !verification || 
+          (verification.status?.toLowerCase() !== 'active' && 
+           verification.status?.toLowerCase() !== 'verified' && 
+           verification.status?.toLowerCase() !== 'approved');
+        
+        if (needsVerification) {
+          Alert.alert(
+            'Cần xác minh tài khoản',
+            'Bạn cần xác minh là sinh viên để sử dụng dịch vụ đặt xe.',
+            [
+              { text: 'Hủy', style: 'cancel' },
+              { 
+                text: 'Xác minh ngay', 
+                onPress: () => navigation.navigate('ProfileSwitch')
+              }
+            ]
+          );
+          return;
+        }
+      }
+    } catch (error) {
+      console.log('Could not check verification status:', error);
+      // Fallback to cached data
+      if (authService.isRider() && authService.needsRiderVerification()) {
+        Alert.alert(
+          'Cần xác minh tài khoản',
+          'Bạn cần xác minh là sinh viên để sử dụng dịch vụ đặt xe.',
+          [
+            { text: 'Hủy', style: 'cancel' },
+            { 
+              text: 'Xác minh ngay', 
+              onPress: () => navigation.navigate('ProfileSwitch')
+            }
+          ]
+        );
+        return;
+      }
+    }
+
     if (!selectedPickup || !selectedDropoff) {
       Alert.alert('Thiếu thông tin', 'Vui lòng chọn điểm đón và điểm đến');
       return;
@@ -91,6 +215,22 @@ const HomeScreen = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Verification Banner */}
+        {authService.isRider() && authService.needsRiderVerification() && (
+          <Animatable.View animation="fadeInDown" style={styles.verificationBanner}>
+            <View style={styles.bannerContent}>
+              <Icon name="warning" size={20} color="#FF9800" />
+              <Text style={styles.bannerText}>Cần xác minh tài khoản để sử dụng dịch vụ</Text>
+              <TouchableOpacity 
+                style={styles.bannerButton}
+                onPress={() => navigation.navigate('ProfileSwitch')}
+              >
+                <Text style={styles.bannerButtonText}>Xác minh</Text>
+              </TouchableOpacity>
+            </View>
+          </Animatable.View>
+        )}
+
         {/* Header with Gradient */}
         <LinearGradient
           colors={['#4CAF50', '#2E7D32']}
@@ -258,6 +398,37 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',
+  },
+  verificationBanner: {
+    backgroundColor: '#FFF3E0',
+    marginHorizontal: 16,
+    marginTop: 8,
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#FF9800',
+  },
+  bannerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+  },
+  bannerText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#E65100',
+    marginLeft: 8,
+    fontWeight: '500',
+  },
+  bannerButton: {
+    backgroundColor: '#FF9800',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+  },
+  bannerButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   header: {
     paddingTop: 20,
