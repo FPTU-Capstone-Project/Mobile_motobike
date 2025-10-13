@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,12 +8,12 @@ import {
   ScrollView,
   Alert,
   Image,
-  TextInput,
   ActivityIndicator
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import * as Animatable from 'react-native-animatable';
 
 import ModernButton from '../../components/ModernButton.jsx';
@@ -22,28 +22,128 @@ import verificationService from '../../services/verificationService';
 import { ApiError } from '../../services/api';
 
 const DriverVerificationScreen = ({ navigation }) => {
-  const [formData, setFormData] = useState({
-    licenseNumber: '',
-    vehicleBrand: '',
-    vehicleModel: '',
-    vehicleYear: '',
-    vehicleColor: '',
-    licensePlate: '',
-  });
-  
-  const [documents, setDocuments] = useState({
-    driverLicense: null,
-    vehicleRegistration: null,
-    vehicleInsurance: null,
-  });
+  // State for each document type
+  const [licenseFront, setLicenseFront] = useState(null);
+  const [licenseBack, setLicenseBack] = useState(null);
+  const [vehicleRegistrationFront, setVehicleRegistrationFront] = useState(null);
+  const [vehicleRegistrationBack, setVehicleRegistrationBack] = useState(null);
+  const [vehicleAuthorizationFront, setVehicleAuthorizationFront] = useState(null);
+  const [vehicleAuthorizationBack, setVehicleAuthorizationBack] = useState(null);
   
   const [uploading, setUploading] = useState(false);
+  const [currentDocument, setCurrentDocument] = useState('license'); // license, vehicleRegistration, vehicleAuthorization
+  const [currentSide, setCurrentSide] = useState('front'); // front, back
+  const [currentVerification, setCurrentVerification] = useState(null);
 
-  const updateFormData = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  // Load current verification status
+  useEffect(() => {
+    loadCurrentVerification();
+  }, []);
+
+  const loadCurrentVerification = async () => {
+    try {
+      // First check if user has rider verification (required for driver verification)
+      const riderVerification = await verificationService.getCurrentStudentVerification();
+      if (!riderVerification || riderVerification.status?.toLowerCase() !== 'approved') {
+        Alert.alert(
+          'Cần xác minh rider trước',
+          'Bạn cần xác minh tài khoản sinh viên trước khi có thể xác minh tài xế. Vui lòng gửi thẻ sinh viên để admin duyệt.',
+          [
+            { text: 'Hủy', onPress: () => navigation.goBack() },
+            { text: 'Xác minh sinh viên', onPress: () => navigation.navigate('StudentVerification') }
+          ]
+        );
+        return;
+      }
+
+      const verification = await verificationService.getCurrentDriverVerification();
+      setCurrentVerification(verification);
+      
+      // If user already has pending verification, show alert and go back
+      if (verification && verification.status?.toLowerCase() === 'pending') {
+        Alert.alert(
+          'Đang chờ duyệt',
+          'Bạn đã gửi yêu cầu xác minh tài xế và đang chờ admin duyệt. Vui lòng chờ kết quả.',
+          [{ text: 'OK', onPress: () => navigation.goBack() }]
+        );
+        return;
+      }
+      
+      // If user already verified, show alert and go back
+      if (verification && (verification.status?.toLowerCase() === 'verified' || verification.status?.toLowerCase() === 'approved' || verification.status?.toLowerCase() === 'active')) {
+        Alert.alert(
+          'Đã xác minh',
+          'Tài khoản tài xế của bạn đã được xác minh.',
+          [{ text: 'OK', onPress: () => navigation.goBack() }]
+        );
+        return;
+      }
+
+      // If user's verification was rejected, just log it (don't show alert again)
+      // The alert was already shown in ProfileSwitchScreen
+      if (verification && verification.status?.toLowerCase() === 'rejected') {
+        console.log('User has rejected driver verification, allowing resubmission');
+        // Continue with the form to allow resubmission
+        return;
+      }
+    } catch (error) {
+      console.log('No current driver verification found or error:', error);
+      setCurrentVerification(null);
+    }
   };
 
-  const pickDocument = async (documentType) => {
+  // Convert and compress image to JPEG format
+  const compressImage = async (imageUri) => {
+    try {
+      console.log('Converting and compressing image:', imageUri);
+      
+      // Convert to JPEG and resize to reduce file size
+      const manipResult = await ImageManipulator.manipulateAsync(
+        imageUri,
+        [
+          { resize: { width: 1200 } }, // Resize to reasonable size
+        ],
+        { 
+          compress: 0.7, // Good quality (70%)
+          format: ImageManipulator.SaveFormat.JPEG, // Force JPEG format
+          base64: false // Don't include base64 to reduce memory usage
+        }
+      );
+      
+      console.log('Image converted to JPEG:', {
+        uri: manipResult.uri,
+        width: manipResult.width,
+        height: manipResult.height,
+        fileSize: manipResult.fileSize
+      });
+      
+      // If still too large, compress more aggressively
+      if (manipResult.fileSize && manipResult.fileSize > 5 * 1024 * 1024) { // 5MB limit
+        console.log('Still too large, compressing more aggressively...');
+        const secondPass = await ImageManipulator.manipulateAsync(
+          manipResult.uri,
+          [{ resize: { width: 800 } }],
+          { 
+            compress: 0.5, // Lower quality (50%)
+            format: ImageManipulator.SaveFormat.JPEG,
+            base64: false
+          }
+        );
+        console.log('Second compression result:', {
+          uri: secondPass.uri,
+          fileSize: secondPass.fileSize
+        });
+        return secondPass;
+      }
+      
+      return manipResult;
+    } catch (error) {
+      console.error('Error converting image to JPEG:', error);
+      throw new Error('Không thể xử lý ảnh. Vui lòng chọn ảnh khác.');
+    }
+  };
+
+  const pickImage = async (documentType, side) => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       
@@ -53,23 +153,71 @@ const DriverVerificationScreen = ({ navigation }) => {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        quality: 0.9,
+        mediaTypes: ImagePicker.MediaTypeOptions.Images, // Only images
         allowsEditing: false,
+        quality: 1, // Use full quality first, we'll convert to JPEG later
+        exif: false, // Don't include EXIF data to reduce file size
       });
 
       if (!result.canceled && result.assets[0]) {
-        setDocuments(prev => ({
-          ...prev,
-          [documentType]: result.assets[0]
-        }));
+        const originalImage = result.assets[0];
+        console.log('Original image info:', {
+          uri: originalImage.uri,
+          type: originalImage.type,
+          fileSize: originalImage.fileSize,
+          width: originalImage.width,
+          height: originalImage.height
+        });
+        
+        try {
+          // Convert to JPEG format (handles HEIC, PNG, etc.)
+          console.log('Converting image to JPEG format...');
+          const compressedImage = await compressImage(originalImage.uri);
+          
+          const processedImage = {
+            uri: compressedImage.uri,
+            type: 'image/jpeg', // Force JPEG type
+            fileName: `${documentType}_${side}_${Date.now()}.jpg`,
+            fileSize: compressedImage.fileSize,
+            width: compressedImage.width,
+            height: compressedImage.height,
+          };
+          
+          console.log('Processed image info:', processedImage);
+          
+          // Set the appropriate state based on document type and side
+          if (documentType === 'license') {
+            if (side === 'front') {
+              setLicenseFront(processedImage);
+            } else {
+              setLicenseBack(processedImage);
+            }
+          } else if (documentType === 'vehicleRegistration') {
+            if (side === 'front') {
+              setVehicleRegistrationFront(processedImage);
+            } else {
+              setVehicleRegistrationBack(processedImage);
+            }
+          } else if (documentType === 'vehicleAuthorization') {
+            if (side === 'front') {
+              setVehicleAuthorizationFront(processedImage);
+            } else {
+              setVehicleAuthorizationBack(processedImage);
+            }
+          }
+          
+        } catch (compressError) {
+          console.error('Error converting image:', compressError);
+          Alert.alert('Lỗi', compressError.message || 'Không thể xử lý ảnh. Vui lòng chọn ảnh khác.');
+        }
       }
     } catch (error) {
-      console.error('Error picking document:', error);
-      Alert.alert('Lỗi', 'Không thể chọn ảnh');
+      console.error('Error picking image:', error);
+      Alert.alert('Lỗi', 'Không thể chọn ảnh từ thư viện');
     }
   };
 
-  const takePhoto = async (documentType) => {
+  const takePhoto = async (documentType, side) => {
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       
@@ -79,15 +227,63 @@ const DriverVerificationScreen = ({ navigation }) => {
       }
 
       const result = await ImagePicker.launchCameraAsync({
-        quality: 0.9,
+        mediaTypes: ImagePicker.MediaTypeOptions.Images, // Only images
         allowsEditing: false,
+        quality: 1, // Use full quality first, we'll convert to JPEG later
+        exif: false, // Don't include EXIF data to reduce file size
       });
 
       if (!result.canceled && result.assets[0]) {
-        setDocuments(prev => ({
-          ...prev,
-          [documentType]: result.assets[0]
-        }));
+        const originalImage = result.assets[0];
+        console.log('Original photo info:', {
+          uri: originalImage.uri,
+          type: originalImage.type,
+          fileSize: originalImage.fileSize,
+          width: originalImage.width,
+          height: originalImage.height
+        });
+        
+        try {
+          // Convert to JPEG format
+          console.log('Converting photo to JPEG format...');
+          const compressedImage = await compressImage(originalImage.uri);
+          
+          const processedImage = {
+            uri: compressedImage.uri,
+            type: 'image/jpeg', // Force JPEG type
+            fileName: `${documentType}_${side}_${Date.now()}.jpg`,
+            fileSize: compressedImage.fileSize,
+            width: compressedImage.width,
+            height: compressedImage.height,
+          };
+          
+          console.log('Processed photo info:', processedImage);
+          
+          // Set the appropriate state based on document type and side
+          if (documentType === 'license') {
+            if (side === 'front') {
+              setLicenseFront(processedImage);
+            } else {
+              setLicenseBack(processedImage);
+            }
+          } else if (documentType === 'vehicleRegistration') {
+            if (side === 'front') {
+              setVehicleRegistrationFront(processedImage);
+            } else {
+              setVehicleRegistrationBack(processedImage);
+            }
+          } else if (documentType === 'vehicleAuthorization') {
+            if (side === 'front') {
+              setVehicleAuthorizationFront(processedImage);
+            } else {
+              setVehicleAuthorizationBack(processedImage);
+            }
+          }
+          
+        } catch (compressError) {
+          console.error('Error converting photo:', compressError);
+          Alert.alert('Lỗi', compressError.message || 'Không thể xử lý ảnh. Vui lòng chụp lại.');
+        }
       }
     } catch (error) {
       console.error('Error taking photo:', error);
@@ -95,152 +291,168 @@ const DriverVerificationScreen = ({ navigation }) => {
     }
   };
 
-  const showDocumentPicker = (documentType, documentName) => {
+  const showImagePicker = (documentType, side) => {
+    setCurrentDocument(documentType);
+    setCurrentSide(side);
+    
+    const documentNames = {
+      license: 'bằng lái xe',
+      vehicleRegistration: 'giấy chứng nhận đăng ký xe',
+      vehicleAuthorization: 'giấy ủy quyền phương tiện'
+    };
+    
+    const sideNames = {
+      front: 'mặt trước',
+      back: 'mặt sau'
+    };
+    
     Alert.alert(
-      'Chọn ảnh',
-      `Chọn cách thức để tải ảnh ${documentName}`,
+      `Chọn ảnh ${sideNames[side]} ${documentNames[documentType]}`,
+      'Chọn cách thức để tải ảnh',
       [
         { text: 'Hủy', style: 'cancel' },
-        { text: 'Chụp ảnh', onPress: () => takePhoto(documentType) },
-        { text: 'Chọn từ thư viện', onPress: () => pickDocument(documentType) },
+        { text: 'Chọn từ thư viện', onPress: () => pickImage(documentType, side) },
+        { text: 'Chụp ảnh mới', onPress: () => takePhoto(documentType, side) }
       ]
     );
   };
 
-  const validateForm = () => {
-    const requiredFields = ['licenseNumber', 'vehicleBrand', 'vehicleModel', 'vehicleYear', 'vehicleColor', 'licensePlate'];
-    const requiredDocs = ['driverLicense', 'vehicleRegistration'];
-
-    for (const field of requiredFields) {
-      if (!formData[field].trim()) {
-        Alert.alert('Lỗi', 'Vui lòng điền đầy đủ thông tin');
-        return false;
-      }
-    }
-
-    for (const doc of requiredDocs) {
-      if (!documents[doc]) {
-        Alert.alert('Lỗi', 'Vui lòng tải lên đầy đủ giấy tờ bắt buộc');
-        return false;
-      }
-    }
-
-    // Validate license plate format (basic)
-    const licensePlateRegex = /^[0-9]{2}[A-Z]{1,2}-[0-9]{4,5}$/;
-    if (!licensePlateRegex.test(formData.licensePlate)) {
-      Alert.alert('Lỗi', 'Biển số xe không đúng định dạng (VD: 29A-12345)');
-      return false;
-    }
-
-    return true;
-  };
-
   const submitVerification = async () => {
-    if (!validateForm()) return;
+    // Check if all required documents are uploaded
+    if (!licenseFront || !licenseBack || !vehicleRegistrationFront || !vehicleRegistrationBack) {
+      Alert.alert('Thiếu giấy tờ', 'Vui lòng chụp đầy đủ bằng lái xe và giấy chứng nhận đăng ký xe (cả 2 mặt)');
+      return;
+    }
 
     setUploading(true);
 
     try {
-      // Validate documents first
-      Object.keys(documents).forEach(key => {
-        if (documents[key]) {
-          verificationService.validateDocumentFile(documents[key]);
-        }
-      });
+      // Prepare documents grouped by type for separate API calls
+      const documentFiles = {
+        license: [
+          {
+            uri: licenseFront.uri,
+            mimeType: licenseFront.type || 'image/jpeg',
+            fileName: licenseFront.fileName || 'license_front.jpg',
+            fileSize: licenseFront.fileSize,
+          },
+          {
+            uri: licenseBack.uri,
+            mimeType: licenseBack.type || 'image/jpeg',
+            fileName: licenseBack.fileName || 'license_back.jpg',
+            fileSize: licenseBack.fileSize,
+          }
+        ],
+        vehicleRegistration: [
+          {
+            uri: vehicleRegistrationFront.uri,
+            mimeType: vehicleRegistrationFront.type || 'image/jpeg',
+            fileName: vehicleRegistrationFront.fileName || 'vehicle_registration_front.jpg',
+            fileSize: vehicleRegistrationFront.fileSize,
+          },
+          {
+            uri: vehicleRegistrationBack.uri,
+            mimeType: vehicleRegistrationBack.type || 'image/jpeg',
+            fileName: vehicleRegistrationBack.fileName || 'vehicle_registration_back.jpg',
+            fileSize: vehicleRegistrationBack.fileSize,
+          }
+        ]
+      };
 
-      const submissionData = new FormData();
-      
-      // Add form data with correct field names matching backend
-      submissionData.append('licenseNumber', formData.licenseNumber);
-      submissionData.append('vehicleModel', `${formData.vehicleBrand} ${formData.vehicleModel}`);
-      submissionData.append('plateNumber', formData.licensePlate);
-      submissionData.append('year', formData.vehicleYear);
-      submissionData.append('color', formData.vehicleColor);
-
-      // Add documents with correct field names and proper file format
-      if (documents.driverLicense) {
-        submissionData.append('driverLicense', {
-          uri: documents.driverLicense.uri,
-          type: documents.driverLicense.mimeType || 'image/jpeg',
-          name: documents.driverLicense.fileName || `driver_license_${Date.now()}.jpg`,
-        });
+      // Add vehicle authorization if provided
+      if (vehicleAuthorizationFront && vehicleAuthorizationBack) {
+        documentFiles.vehicleAuthorization = [
+          {
+            uri: vehicleAuthorizationFront.uri,
+            mimeType: vehicleAuthorizationFront.type || 'image/jpeg',
+            fileName: vehicleAuthorizationFront.fileName || 'vehicle_authorization_front.jpg',
+            fileSize: vehicleAuthorizationFront.fileSize,
+          },
+          {
+            uri: vehicleAuthorizationBack.uri,
+            mimeType: vehicleAuthorizationBack.type || 'image/jpeg',
+            fileName: vehicleAuthorizationBack.fileName || 'vehicle_authorization_back.jpg',
+            fileSize: vehicleAuthorizationBack.fileSize,
+          }
+        ];
       }
 
-      if (documents.vehicleRegistration) {
-        submissionData.append('vehicleRegistration', {
-          uri: documents.vehicleRegistration.uri,
-          type: documents.vehicleRegistration.mimeType || 'image/jpeg',
-          name: documents.vehicleRegistration.fileName || `vehicle_registration_${Date.now()}.jpg`,
-        });
-      }
+      const result = await verificationService.submitDriverVerification(documentFiles);
 
-      if (documents.vehicleInsurance) {
-        submissionData.append('vehicleInsurance', {
-          uri: documents.vehicleInsurance.uri,
-          type: documents.vehicleInsurance.mimeType || 'image/jpeg',
-          name: documents.vehicleInsurance.fileName || `vehicle_insurance_${Date.now()}.jpg`,
-        });
+      // After successful submission, refresh verification status
+      try {
+        const updatedVerification = await verificationService.getCurrentDriverVerification();
+        setCurrentVerification(updatedVerification);
+        console.log('Updated driver verification status:', updatedVerification);
+      } catch (error) {
+        console.log('Could not refresh driver verification status:', error);
       }
-
-      const result = await verificationService.submitDriverVerification(submissionData);
 
       Alert.alert(
         'Gửi thành công!',
-        result.message || 'Hồ sơ tài xế đã được gửi để xác minh. Admin sẽ duyệt trong 2-3 ngày làm việc.',
+        result.message || 'Giấy tờ tài xế đã được gửi để xác minh. Admin sẽ duyệt trong 1-2 ngày làm việc.',
         [
-          { text: 'OK', onPress: () => navigation.goBack() }
+          { 
+            text: 'OK', 
+            onPress: () => {
+              // Navigate to Main screen after successful submission
+              navigation.replace('Main');
+            }
+          }
         ]
       );
     } catch (error) {
       console.error('Driver verification error:', error);
-      
-      let errorMessage = 'Không thể gửi hồ sơ tài xế';
-      if (error.message) {
-        errorMessage = error.message;
-      } else if (error.data?.message) {
-        errorMessage = error.data.message;
-      }
-      
-      Alert.alert('Lỗi', errorMessage);
+      Alert.alert('Lỗi', error.message || 'Không thể gửi giấy tờ tài xế');
     } finally {
       setUploading(false);
     }
   };
 
-  const DocumentUploadCard = ({ documentType, title, description, required = false }) => {
-    const document = documents[documentType];
-    
+  const renderDocumentSection = (documentType, title, description, frontImage, backImage, setFrontImage, setBackImage) => {
     return (
-      <View style={styles.documentCard}>
-        <View style={styles.documentHeader}>
-          <Text style={styles.documentTitle}>
-            {title}
-            {required && <Text style={styles.requiredAsterisk}> *</Text>}
-          </Text>
+      <Animatable.View animation="fadeInUp" style={styles.documentSection}>
+        <Text style={styles.documentTitle}>{title}</Text>
           <Text style={styles.documentDescription}>{description}</Text>
-        </View>
         
-        {document ? (
-          <View style={styles.selectedDocumentContainer}>
-            <Image source={{ uri: document.uri }} style={styles.selectedDocument} />
+        <View style={styles.imageContainer}>
+          {/* Front Image */}
+          <View style={styles.imageWrapper}>
+            <Text style={styles.imageLabel}>Mặt trước</Text>
             <TouchableOpacity 
-              style={styles.changeDocumentButton}
-              onPress={() => showDocumentPicker(documentType, title)}
+              style={styles.imageButton}
+              onPress={() => showImagePicker(documentType, 'front')}
             >
-              <Icon name="edit" size={16} color="#4CAF50" />
-              <Text style={styles.changeDocumentText}>Đổi ảnh</Text>
+              {frontImage ? (
+                <Image source={{ uri: frontImage.uri }} style={styles.imagePreview} />
+              ) : (
+                <View style={styles.imagePlaceholder}>
+                  <Icon name="add-a-photo" size={40} color="#ccc" />
+                  <Text style={styles.placeholderText}>Chụp mặt trước</Text>
+                </View>
+              )}
             </TouchableOpacity>
           </View>
-        ) : (
+
+          {/* Back Image */}
+          <View style={styles.imageWrapper}>
+            <Text style={styles.imageLabel}>Mặt sau</Text>
           <TouchableOpacity 
-            style={styles.uploadDocumentButton}
-            onPress={() => showDocumentPicker(documentType, title)}
-          >
-            <Icon name="cloud-upload" size={24} color="#666" />
-            <Text style={styles.uploadDocumentText}>Tải lên ảnh</Text>
+              style={styles.imageButton}
+              onPress={() => showImagePicker(documentType, 'back')}
+            >
+              {backImage ? (
+                <Image source={{ uri: backImage.uri }} style={styles.imagePreview} />
+              ) : (
+                <View style={styles.imagePlaceholder}>
+                  <Icon name="add-a-photo" size={40} color="#ccc" />
+                  <Text style={styles.placeholderText}>Chụp mặt sau</Text>
+                </View>
+              )}
           </TouchableOpacity>
-        )}
+          </View>
       </View>
+      </Animatable.View>
     );
   };
 
@@ -267,165 +479,74 @@ const DriverVerificationScreen = ({ navigation }) => {
         <View style={styles.content}>
           {/* Instructions */}
           <Animatable.View animation="fadeInUp" style={styles.instructionsCard}>
-            <Icon name="directions-car" size={48} color="#FF9800" />
-            <Text style={styles.instructionsTitle}>Đăng ký làm tài xế</Text>
+            <Icon name="info" size={24} color="#FF9800" />
+            <View style={styles.instructionsContent}>
+              <Text style={styles.instructionsTitle}>Hướng dẫn gửi giấy tờ</Text>
             <Text style={styles.instructionsText}>
-              Để trở thành tài xế, bạn cần cung cấp thông tin xe và giấy tờ liên quan. 
-              Tất cả thông tin sẽ được bảo mật và chỉ dùng để xác minh.
+                Vui lòng chụp rõ nét các giấy tờ sau để xác minh tài khoản tài xế:
+              </Text>
+              <Text style={styles.instructionsList}>
+                • Bằng lái xe (2 mặt){'\n'}
+                • Giấy chứng nhận đăng ký xe (2 mặt){'\n'}
+                • Giấy ủy quyền phương tiện (2 mặt) - nếu có
             </Text>
+            </View>
           </Animatable.View>
 
-          {/* Personal Information */}
-          <View style={styles.formSection}>
-            <Text style={styles.sectionTitle}>Thông tin bằng lái</Text>
-            
-            <View style={styles.inputContainer}>
-              <Icon name="credit-card" size={20} color="#666" style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Số bằng lái xe *"
-                value={formData.licenseNumber}
-                onChangeText={(value) => updateFormData('licenseNumber', value)}
-                autoCapitalize="characters"
-              />
-            </View>
-          </View>
-
-          {/* Vehicle Information */}
-          <View style={styles.formSection}>
-            <Text style={styles.sectionTitle}>Thông tin xe</Text>
-            
-            <View style={styles.inputContainer}>
-              <Icon name="build" size={20} color="#666" style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Hãng xe (Honda, Yamaha...) *"
-                value={formData.vehicleBrand}
-                onChangeText={(value) => updateFormData('vehicleBrand', value)}
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Icon name="motorcycle" size={20} color="#666" style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Dòng xe (Wave, Exciter...) *"
-                value={formData.vehicleModel}
-                onChangeText={(value) => updateFormData('vehicleModel', value)}
-              />
-            </View>
-
-            <View style={styles.inputRow}>
-              <View style={[styles.inputContainer, styles.inputHalf]}>
-                <Icon name="calendar-today" size={20} color="#666" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Năm sản xuất *"
-                  value={formData.vehicleYear}
-                  onChangeText={(value) => updateFormData('vehicleYear', value)}
-                  keyboardType="numeric"
-                  maxLength={4}
-                />
-              </View>
-
-              <View style={[styles.inputContainer, styles.inputHalf]}>
-                <Icon name="palette" size={20} color="#666" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Màu xe *"
-                  value={formData.vehicleColor}
-                  onChangeText={(value) => updateFormData('vehicleColor', value)}
-                />
-              </View>
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Icon name="confirmation-number" size={20} color="#666" style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Biển số xe (29A-12345) *"
-                value={formData.licensePlate}
-                onChangeText={(value) => updateFormData('licensePlate', value.toUpperCase())}
-                autoCapitalize="characters"
-              />
-            </View>
-          </View>
-
-          {/* Document Upload */}
-          <View style={styles.documentsSection}>
-            <Text style={styles.sectionTitle}>Giấy tờ xe</Text>
-            
-            <DocumentUploadCard
-              documentType="driverLicense"
-              title="Bằng lái xe"
-              description="Ảnh 2 mặt bằng lái xe còn hiệu lực"
-              required={true}
-            />
-
-            <DocumentUploadCard
-              documentType="vehicleRegistration"
-              title="Đăng ký xe"
-              description="Giấy đăng ký xe (cavet xe)"
-              required={true}
-            />
-
-            <DocumentUploadCard
-              documentType="vehicleInsurance"
-              title="Bảo hiểm xe"
-              description="Giấy bảo hiểm xe (không bắt buộc)"
-              required={false}
-            />
-          </View>
-
-          {/* Requirements */}
-          <View style={styles.requirementsCard}>
-            <Text style={styles.cardTitle}>Yêu cầu</Text>
-            <View style={styles.requirementsList}>
-              <View style={styles.requirementItem}>
-                <Icon name="check-circle" size={16} color="#4CAF50" />
-                <Text style={styles.requirementText}>Có bằng lái xe hạng A1 trở lên</Text>
-              </View>
-              <View style={styles.requirementItem}>
-                <Icon name="check-circle" size={16} color="#4CAF50" />
-                <Text style={styles.requirementText}>Xe máy đời 2010 trở lên</Text>
-              </View>
-              <View style={styles.requirementItem}>
-                <Icon name="check-circle" size={16} color="#4CAF50" />
-                <Text style={styles.requirementText}>Giấy tờ xe đầy đủ, hợp lệ</Text>
-              </View>
-              <View style={styles.requirementItem}>
-                <Icon name="check-circle" size={16} color="#4CAF50" />
-                <Text style={styles.requirementText}>Tuân thủ quy định an toàn giao thông</Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Submit Button */}
-          <ModernButton
-            title={uploading ? "Đang gửi..." : "Gửi hồ sơ tài xế"}
-            onPress={submitVerification}
-            disabled={uploading}
-            icon={uploading ? null : "send"}
-            style={styles.submitButton}
-          />
-
-          {uploading && (
-            <View style={styles.uploadingContainer}>
-              <ActivityIndicator size="small" color="#FF9800" />
-              <Text style={styles.uploadingText}>Đang tải lên và xử lý hồ sơ...</Text>
-            </View>
+          {/* License Section */}
+          {renderDocumentSection(
+            'license',
+            'Bằng lái xe',
+            'Chụp ảnh mặt trước và mặt sau của bằng lái xe',
+            licenseFront,
+            licenseBack,
+            setLicenseFront,
+            setLicenseBack
           )}
 
-          {/* Info */}
-          <View style={styles.infoCard}>
-            <Icon name="info" size={20} color="#FF9800" />
-            <Text style={styles.infoText}>
-              Hồ sơ tài xế sẽ được admin xem xét trong 2-3 ngày làm việc. 
-              Sau khi được duyệt, bạn có thể chuyển sang chế độ tài xế để bắt đầu kiếm tiền.
-            </Text>
-          </View>
+          {/* Vehicle Registration Section */}
+          {renderDocumentSection(
+            'vehicleRegistration',
+            'Giấy chứng nhận đăng ký xe',
+            'Chụp ảnh mặt trước và mặt sau của giấy chứng nhận đăng ký xe mô tô, xe gắn máy',
+            vehicleRegistrationFront,
+            vehicleRegistrationBack,
+            setVehicleRegistrationFront,
+            setVehicleRegistrationBack
+          )}
+
+          {/* Vehicle Authorization Section (Optional) */}
+          {renderDocumentSection(
+            'vehicleAuthorization',
+            'Giấy ủy quyền phương tiện (Tùy chọn)',
+            'Nếu bạn không phải chủ xe, vui lòng chụp giấy ủy quyền phương tiện',
+            vehicleAuthorizationFront,
+            vehicleAuthorizationBack,
+            setVehicleAuthorizationFront,
+            setVehicleAuthorizationBack
+          )}
+
+          {/* Submit Button */}
+          <Animatable.View animation="fadeInUp" style={styles.submitContainer}>
+          <ModernButton
+              title="Gửi giấy tờ xác minh"
+            onPress={submitVerification}
+              disabled={uploading || !licenseFront || !licenseBack || !vehicleRegistrationFront || !vehicleRegistrationBack}
+              loading={uploading}
+          />
+          </Animatable.View>
         </View>
       </ScrollView>
+
+      {/* Loading Overlay */}
+          {uploading && (
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingContent}>
+            <ActivityIndicator size="large" color="#FF9800" />
+            <Text style={styles.loadingText}>Đang gửi giấy tờ...</Text>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 };
@@ -433,17 +554,17 @@ const DriverVerificationScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f5f5f5',
   },
   header: {
-    paddingTop: 20,
-    paddingBottom: 24,
+    paddingTop: 10,
+    paddingBottom: 20,
     paddingHorizontal: 20,
   },
   headerContent: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
   backButton: {
     padding: 8,
@@ -457,201 +578,128 @@ const styles = StyleSheet.create({
     width: 40,
   },
   content: {
-    flex: 1,
     padding: 20,
   },
   instructionsCard: {
     backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 24,
-    alignItems: 'center',
+    borderRadius: 12,
+    padding: 16,
     marginBottom: 20,
-    elevation: 2,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  instructionsContent: {
+    flex: 1,
+    marginLeft: 12,
   },
   instructionsTitle: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginTop: 16,
-    marginBottom: 12,
-    textAlign: 'center',
+    color: '#333',
+    marginBottom: 8,
   },
   instructionsText: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#666',
-    textAlign: 'center',
-    lineHeight: 24,
+    marginBottom: 8,
   },
-  formSection: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+  instructionsList: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 16,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    marginBottom: 16,
-    backgroundColor: '#fff',
-  },
-  inputRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  inputHalf: {
-    width: '48%',
-  },
-  inputIcon: {
-    marginRight: 12,
-  },
-  input: {
-    flex: 1,
-    height: 50,
-    fontSize: 16,
-    color: '#1a1a1a',
-  },
-  requiredAsterisk: {
-    color: '#F44336',
-  },
-  documentsSection: {
-    marginBottom: 20,
-  },
-  documentCard: {
+  documentSection: {
     backgroundColor: '#fff',
     borderRadius: 12,
     padding: 16,
-    marginBottom: 12,
-    elevation: 1,
+    marginBottom: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  documentHeader: {
-    marginBottom: 12,
+    shadowRadius: 4,
+    elevation: 3,
   },
   documentTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 4,
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
   },
   documentDescription: {
     fontSize: 14,
     color: '#666',
+    marginBottom: 16,
   },
-  uploadDocumentButton: {
-    borderWidth: 2,
-    borderColor: '#E0E0E0',
-    borderStyle: 'dashed',
-    borderRadius: 8,
-    padding: 20,
-    alignItems: 'center',
-    backgroundColor: '#f9f9f9',
+  imageContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
-  uploadDocumentText: {
+  imageWrapper: {
+    flex: 1,
+    marginHorizontal: 4,
+  },
+  imageLabel: {
     fontSize: 14,
-    color: '#666',
-    marginTop: 8,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+    textAlign: 'center',
   },
-  selectedDocumentContainer: {
-    alignItems: 'center',
+  imageButton: {
+    borderRadius: 8,
+    overflow: 'hidden',
   },
-  selectedDocument: {
+  imagePreview: {
     width: '100%',
     height: 120,
     borderRadius: 8,
-    resizeMode: 'cover',
   },
-  changeDocumentButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-    padding: 4,
-  },
-  changeDocumentText: {
-    fontSize: 14,
-    color: '#4CAF50',
-    marginLeft: 4,
-    fontWeight: '500',
-  },
-  requirementsCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 16,
-  },
-  requirementsList: {
-    gap: 12,
-  },
-  requirementItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  requirementText: {
-    fontSize: 14,
-    color: '#666',
-    marginLeft: 12,
-    flex: 1,
-  },
-  submitButton: {
-    marginBottom: 16,
-  },
-  uploadingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  imagePlaceholder: {
+    width: '100%',
+    height: 120,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#e9ecef',
+    borderStyle: 'dashed',
     justifyContent: 'center',
-    marginBottom: 20,
+    alignItems: 'center',
   },
-  uploadingText: {
-    fontSize: 14,
-    color: '#FF9800',
-    marginLeft: 8,
+  placeholderText: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 8,
+    textAlign: 'center',
   },
-  infoCard: {
-    backgroundColor: '#FFF3E0',
+  submitContainer: {
+    marginTop: 20,
+    marginBottom: 40,
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingContent: {
+    backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 20,
+    padding: 24,
+    alignItems: 'center',
   },
-  infoText: {
-    flex: 1,
-    fontSize: 14,
-    color: '#E65100',
-    marginLeft: 12,
-    lineHeight: 20,
+  loadingText: {
+    fontSize: 16,
+    color: '#333',
+    marginTop: 12,
   },
 });
 

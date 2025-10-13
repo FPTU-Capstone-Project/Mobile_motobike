@@ -214,7 +214,6 @@ class ApiService {
       formData = additionalData;
     } else {
       formData = new FormData();
-      
       // Add file if provided
       if (file) {
         formData.append('file', {

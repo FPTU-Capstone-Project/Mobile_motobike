@@ -8,22 +8,159 @@ class VerificationService {
 
   // ========== USER VERIFICATION ENDPOINTS ==========
 
-  // Submit student verification
-  async submitStudentVerification(documentFile) {
+  // Get current student verification status
+  async getCurrentStudentVerification() {
     try {
-      const formData = new FormData();
-      formData.append('document', {
-        uri: documentFile.uri,
-        type: documentFile.mimeType || 'image/jpeg',
-        name: documentFile.fileName || 'student_id.jpg',
-      });
+      console.log('Getting current student verification...');
+      
+      // Get current user ID
+      const authService = require('./authService').default;
+      const currentUser = authService.getCurrentUser();
+      
+      if (!currentUser || !currentUser.user?.user_id) {
+        console.log('No current user found');
+        return null;
+      }
+      
+      const userId = currentUser.user.user_id;
+      
+      // Try to get from API first
+      try {
+        const response = await this.apiService.get(`/verification/students/${userId}`);
+        console.log('Verification API response:', response);
+        
+        if (response) {
+          console.log('Found student verification:', response);
+          return response;
+        }
+      } catch (apiError) {
+        console.log('API error (user may not have verification yet):', apiError);
+        // If 404, it means user has no verification - this is normal
+        if (apiError.status === 404) {
+          console.log('No verification found for user - this is normal for new users');
+          return null;
+        }
+      }
+      
+      // Fallback to user profile data
+      if (currentUser && currentUser.rider_profile) {
+        console.log('Using rider profile data:', currentUser.rider_profile);
+        return {
+          status: currentUser.rider_profile.status,
+          type: 'STUDENT_ID',
+          user_id: userId,
+          created_at: currentUser.rider_profile.created_at,
+          verified_at: currentUser.rider_profile.verified_at
+        };
+      }
+      
+      console.log('No verification found');
+      return null;
+    } catch (error) {
+      console.error('Get current student verification error:', error);
+      return null;
+    }
+  }
 
+  // Get current driver verification status
+  async getCurrentDriverVerification() {
+    try {
+      console.log('Getting current driver verification...');
+      
+      // Get current user ID
+      const authService = require('./authService').default;
+      const currentUser = authService.getCurrentUser();
+      
+      if (!currentUser || !currentUser.user?.user_id) {
+        console.log('No current user found');
+        return null;
+      }
+      
+      const userId = currentUser.user.user_id;
+      
+      // Try to get from API first
+      try {
+        const response = await this.apiService.get(`/verification/drivers/${userId}/kyc`);
+        console.log('Driver verification API response:', response);
+        
+        if (response) {
+          console.log('Found driver verification:', response);
+          return response;
+        }
+      } catch (apiError) {
+        console.log('API error (user may not have driver verification yet):', apiError);
+        // If 404, it means user has no driver verification - this is normal
+        if (apiError.status === 404) {
+          console.log('No driver verification found for user - this is normal for new users');
+          return null;
+        }
+      }
+      
+      // Fallback to user profile data
+      if (currentUser && currentUser.driver_profile) {
+        console.log('Using driver profile data:', currentUser.driver_profile);
+        return {
+          status: currentUser.driver_profile.status,
+          type: 'DRIVER_VERIFICATION',
+          user_id: userId,
+          created_at: currentUser.driver_profile.created_at,
+          verified_at: currentUser.driver_profile.verified_at
+        };
+      }
+      
+      console.log('No driver verification found');
+      return null;
+    } catch (error) {
+      console.error('Get current driver verification error:', error);
+      return null;
+    }
+  }
+
+  // Submit student verification
+  async submitStudentVerification(documentFiles) {
+    try {
+      console.log('Submitting student verification with files:', documentFiles);
+      
+      const formData = new FormData();
+      
+      // Handle both single file and multiple files
+      if (Array.isArray(documentFiles)) {
+        documentFiles.forEach((file, index) => {
+          console.log(`Adding file ${index + 1}:`, {
+            uri: file.uri,
+            type: file.mimeType || 'image/jpeg',
+            name: file.fileName || `student_id_${index + 1}.jpg`,
+          });
+          
+          formData.append('document', {
+            uri: file.uri,
+            type: file.mimeType || 'image/jpeg',
+            name: file.fileName || `student_id_${index + 1}.jpg`,
+          });
+        });
+      } else {
+        // Single file (backward compatibility)
+        console.log('Adding single file:', {
+          uri: documentFiles.uri,
+          type: documentFiles.mimeType || 'image/jpeg',
+          name: documentFiles.fileName || 'student_id.jpg',
+        });
+        
+        formData.append('document', {
+          uri: documentFiles.uri,
+          type: documentFiles.mimeType || 'image/jpeg',
+          name: documentFiles.fileName || 'student_id.jpg',
+        });
+      }
+
+      console.log('FormData created, calling API...');
       const response = await this.apiService.uploadFile(
         ENDPOINTS.VERIFICATION.STUDENT, 
         null, 
         formData
       );
 
+      console.log('API response:', response);
       return {
         success: true,
         data: response,
@@ -36,46 +173,90 @@ class VerificationService {
   }
 
   // Submit driver verification
-  async submitDriverVerification(verificationData) {
+  async submitDriverVerification(documentFiles) {
     try {
-      const response = await this.apiService.uploadFile(
-        ENDPOINTS.VERIFICATION.DRIVER, 
-        null, 
-        verificationData
-      );
+      console.log('Submitting driver verification with files:', documentFiles);
+      
+      const results = [];
+      
+      // Submit license documents (2 sides)
+      if (documentFiles.license) {
+        const licenseFiles = documentFiles.license.filter(file => file);
+        if (licenseFiles.length > 0) {
+          console.log('Submitting license documents:', licenseFiles);
+          const licenseFormData = new FormData();
+          licenseFiles.forEach(file => {
+            licenseFormData.append('documents', {
+              uri: file.uri,
+              type: file.mimeType || 'image/jpeg',
+              name: file.fileName || 'license.jpg',
+            });
+          });
+          
+          const licenseResponse = await this.apiService.uploadFile(
+            ENDPOINTS.VERIFICATION.DRIVER_LICENSE, 
+            null, 
+            licenseFormData
+          );
+          results.push({ type: 'license', response: licenseResponse });
+        }
+      }
+      
+      // Submit vehicle registration documents (2 sides)
+      if (documentFiles.vehicleRegistration) {
+        const vehicleFiles = documentFiles.vehicleRegistration.filter(file => file);
+        if (vehicleFiles.length > 0) {
+          console.log('Submitting vehicle registration documents:', vehicleFiles);
+          const vehicleFormData = new FormData();
+          vehicleFiles.forEach(file => {
+            vehicleFormData.append('documents', {
+              uri: file.uri,
+              type: file.mimeType || 'image/jpeg',
+              name: file.fileName || 'vehicle_registration.jpg',
+            });
+          });
+          
+          const vehicleResponse = await this.apiService.uploadFile(
+            ENDPOINTS.VERIFICATION.DRIVER_VEHICLE_REGISTRATION, 
+            null, 
+            vehicleFormData
+          );
+          results.push({ type: 'vehicle_registration', response: vehicleResponse });
+        }
+      }
+      
+      // Submit additional documents (optional - authorization letter)
+      if (documentFiles.vehicleAuthorization) {
+        const authFiles = documentFiles.vehicleAuthorization.filter(file => file);
+        if (authFiles.length > 0) {
+          console.log('Submitting authorization documents:', authFiles);
+          const authFormData = new FormData();
+          authFiles.forEach(file => {
+            authFormData.append('documents', {
+              uri: file.uri,
+              type: file.mimeType || 'image/jpeg',
+              name: file.fileName || 'authorization.jpg',
+            });
+          });
+          
+          const authResponse = await this.apiService.uploadFile(
+            ENDPOINTS.VERIFICATION.DRIVER_DOCUMENTS, 
+            null, 
+            authFormData
+          );
+          results.push({ type: 'documents', response: authResponse });
+        }
+      }
 
+      console.log('All driver verification submissions completed:', results);
       return {
         success: true,
-        data: response,
-        message: response.message || 'Đã gửi yêu cầu xác minh tài xế thành công'
+        data: results,
+        message: 'Đã gửi yêu cầu xác minh tài xế thành công'
       };
     } catch (error) {
-      console.error('Driver verification error:', error);
-      
-      let errorMessage = 'Không thể gửi yêu cầu xác minh tài xế';
-      
-      if (error.data?.message) {
-        errorMessage = error.data.message;
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      // Check for specific error types
-      if (error.status === 400) {
-        errorMessage = 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại thông tin và tài liệu.';
-      } else if (error.status === 401) {
-        errorMessage = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
-      } else if (error.status === 403) {
-        errorMessage = 'Không có quyền truy cập. Vui lòng liên hệ admin.';
-      } else if (error.status === 404) {
-        errorMessage = 'API endpoint không tồn tại. Vui lòng liên hệ admin.';
-      } else if (error.status === 413) {
-        errorMessage = 'File tải lên quá lớn. Vui lòng chọn file nhỏ hơn 5MB.';
-      } else if (error.status === 0) {
-        errorMessage = 'Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng.';
-      }
-      
-      throw new Error(errorMessage);
+      console.error('Submit driver verification error:', error);
+      throw this.handleVerificationError(error, 'Không thể gửi yêu cầu xác minh tài xế');
     }
   }
 
@@ -327,16 +508,16 @@ class VerificationService {
       throw new Error('Vui lòng chọn tài liệu để tải lên');
     }
 
-    // Check file size (max 10MB)
+    // Check file size (max 10MB to match backend limit)
     const maxSize = 10 * 1024 * 1024; // 10MB
     if (file.fileSize && file.fileSize > maxSize) {
-      throw new Error('Kích thước file không được vượt quá 10MB');
+      throw new Error('Kích thước file không được vượt quá 10MB. Vui lòng chọn ảnh nhỏ hơn hoặc nén ảnh.');
     }
 
     // Check file type
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
     if (file.mimeType && !allowedTypes.includes(file.mimeType.toLowerCase())) {
-      throw new Error('Chỉ chấp nhận file JPG, PNG hoặc PDF');
+      throw new Error('Chỉ chấp nhận file JPG hoặc PNG');
     }
 
     return true;

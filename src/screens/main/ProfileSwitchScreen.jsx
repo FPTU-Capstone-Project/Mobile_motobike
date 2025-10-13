@@ -15,16 +15,38 @@ import * as Animatable from 'react-native-animatable';
 
 import ModernButton from '../../components/ModernButton.jsx';
 import authService from '../../services/authService';
+import verificationService from '../../services/verificationService';
 import { ApiError } from '../../services/api';
 
 const ProfileSwitchScreen = ({ navigation }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [switchLoading, setSwitchLoading] = useState(false);
+  const [currentStudentVerification, setCurrentStudentVerification] = useState(null);
 
   useEffect(() => {
     loadUserProfile();
   }, []);
+
+  // Refresh verification status when screen comes into focus
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      refreshVerificationStatus();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+
+  const refreshVerificationStatus = async () => {
+    try {
+      console.log('Refreshing verification status...');
+      const verification = await verificationService.getCurrentStudentVerification();
+      setCurrentStudentVerification(verification);
+      console.log('Updated verification status:', verification);
+    } catch (error) {
+      console.log('Could not refresh verification status:', error);
+    }
+  };
 
   const loadUserProfile = async () => {
     try {
@@ -34,6 +56,15 @@ const ProfileSwitchScreen = ({ navigation }) => {
       } else {
         const profile = await authService.getCurrentUserProfile();
         setUser(profile);
+      }
+
+      // Load current student verification status from user profile
+      try {
+        const verification = await verificationService.getCurrentStudentVerification();
+        setCurrentStudentVerification(verification);
+      } catch (error) {
+        console.log('No current verification found or error:', error);
+        setCurrentStudentVerification(null);
       }
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -92,18 +123,106 @@ const ProfileSwitchScreen = ({ navigation }) => {
     }
   };
 
-  const getVerificationStatus = (profile) => {
-    if (!profile) return { status: 'not_verified', text: 'Chưa xác minh', color: '#999' };
+  // Get student verification status (only for rider)
+  const getStudentVerificationStatus = () => {
+    if (!currentStudentVerification) return { status: 'not_verified', text: 'Chưa xác minh', color: '#999' };
     
-    // This would depend on your backend verification status field
-    // Assuming there's a status field in profile
-    if (profile.status === 'verified' || profile.status === 'active') {
+    const status = currentStudentVerification.status?.toLowerCase();
+    if (status === 'active' || status === 'verified' || status === 'approved') {
       return { status: 'verified', text: 'Đã xác minh', color: '#4CAF50' };
-    } else if (profile.status === 'pending') {
-      return { status: 'pending', text: 'Đang chờ duyệt', color: '#FF9800' };
+    } else if (status === 'pending') {
+      return { status: 'pending', text: 'Đang xác minh', color: '#FF9800' };
+    } else if (status === 'rejected' || status === 'suspended') {
+      return { status: 'rejected', text: 'Bị từ chối', color: '#F44336' };
     } else {
-      return { status: 'not_verified', text: 'Chưa xác minh', color: '#F44336' };
+      return { status: 'not_verified', text: 'Chưa xác minh', color: '#999' };
     }
+  };
+
+  // Get driver verification status (requires rider verification first)
+  const getDriverVerificationStatus = (driverProfile) => {
+    // Check if rider is verified first
+    const riderStatus = getStudentVerificationStatus();
+    if (riderStatus.status !== 'verified') {
+      return { 
+        status: 'locked', 
+        text: 'Cần xác minh rider trước', 
+        color: '#999',
+        disabled: true 
+      };
+    }
+    
+    if (!driverProfile) return { status: 'not_verified', text: 'Chưa xác minh', color: '#999' };
+    
+    // Driver verification is based on driver profile status
+    const status = driverProfile.status?.toLowerCase();
+    if (status === 'active' || status === 'verified' || status === 'approved') {
+      return { status: 'verified', text: 'Đã xác minh', color: '#4CAF50' };
+    } else if (status === 'pending') {
+      return { status: 'pending', text: 'Đang xác minh', color: '#FF9800' };
+    } else if (status === 'rejected' || status === 'suspended') {
+      return { status: 'rejected', text: 'Bị từ chối', color: '#F44336' };
+    } else {
+      return { status: 'not_verified', text: 'Chưa xác minh', color: '#999' };
+    }
+  };
+
+  const handleStudentVerificationPress = () => {
+    // Check if there's a pending verification
+    if (currentStudentVerification?.status?.toLowerCase() === 'pending') {
+      Alert.alert(
+        'Đang xác minh',
+        'Yêu cầu xác minh sinh viên của bạn đang được admin xem xét. Vui lòng chờ kết quả.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    // Check if there's a rejected verification
+    if (currentStudentVerification?.status?.toLowerCase() === 'rejected') {
+      const rejectionReason = currentStudentVerification.rejection_reason || 'Không rõ lý do';
+      Alert.alert(
+        'Giấy tờ bị từ chối',
+        `Giấy tờ sinh viên của bạn đã bị từ chối với lý do: ${rejectionReason}\n\nBạn có thể gửi lại giấy tờ mới.`,
+        [
+          { text: 'Hủy', style: 'cancel' },
+          { text: 'Gửi lại', onPress: () => navigation.navigate('StudentVerification') }
+        ]
+      );
+      return;
+    }
+
+    // If verified, show success message
+    if (currentStudentVerification?.status?.toLowerCase() === 'approved') {
+      Alert.alert(
+        'Đã xác minh',
+        'Tài khoản sinh viên của bạn đã được xác minh thành công.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    // Navigate to verification screen for new submission
+    navigation.navigate('StudentVerification');
+  };
+
+  const handleDriverVerificationPress = () => {
+    // Check if rider is verified first
+    const riderStatus = getStudentVerificationStatus();
+    if (riderStatus.status !== 'verified') {
+      Alert.alert(
+        'Cần xác minh rider trước',
+        'Bạn cần xác minh tài khoản sinh viên trước khi có thể trở thành tài xế.',
+        [
+          { text: 'OK', style: 'cancel' },
+          { text: 'Xác minh rider', onPress: () => handleStudentVerificationPress() }
+        ]
+      );
+      return;
+    }
+
+    // If rider is verified, allow driver verification
+    navigation.navigate('DriverVerification');
   };
 
   if (loading) {
@@ -133,8 +252,8 @@ const ProfileSwitchScreen = ({ navigation }) => {
   }
 
   const currentUserType = user.user?.user_type;
-  const riderStatus = getVerificationStatus(user.rider_profile);
-  const driverStatus = getVerificationStatus(user.driver_profile);
+  const riderStatus = getStudentVerificationStatus(); // Student verification for rider
+  const driverStatus = getDriverVerificationStatus(user.driver_profile); // Driver verification for driver
 
   return (
     <SafeAreaView style={styles.container}>
@@ -290,13 +409,27 @@ const ProfileSwitchScreen = ({ navigation }) => {
                 <Text style={styles.verificationDescription}>
                   Gửi thẻ sinh viên để xác minh bạn là sinh viên trường
                 </Text>
+                <View style={styles.statusContainer}>
+                  <Icon 
+                    name={riderStatus.status === 'verified' ? 'check-circle' : 
+                          riderStatus.status === 'pending' ? 'schedule' : 
+                          riderStatus.status === 'rejected' ? 'cancel' : 'help'} 
+                    size={16} 
+                    color={riderStatus.color} 
+                  />
+                  <Text style={[styles.statusText, { color: riderStatus.color }]}>
+                    {riderStatus.text}
+                  </Text>
+                </View>
               </View>
               <ModernButton
-                title={user.user?.email_verified ? "Đã xác minh" : "Xác minh"}
+                title={riderStatus.status === 'verified' ? "Đã xác minh" : 
+                       riderStatus.status === 'pending' ? "Đang xác minh" : 
+                       riderStatus.status === 'rejected' ? "Gửi lại" : "Gửi giấy tờ"}
                 size="small"
-                variant={user.user?.email_verified ? "outline" : "primary"}
-                disabled={user.user?.email_verified}
-                onPress={() => navigation.navigate('StudentVerification')}
+                variant={riderStatus.status === 'verified' ? "outline" : "primary"}
+                disabled={riderStatus.status === 'verified' || riderStatus.status === 'pending'}
+                onPress={handleStudentVerificationPress}
               />
             </View>
 
@@ -308,13 +441,29 @@ const ProfileSwitchScreen = ({ navigation }) => {
                 <Text style={styles.verificationDescription}>
                   Gửi giấy tờ xe và bằng lái để trở thành tài xế
                 </Text>
+                <View style={styles.statusContainer}>
+                  <Icon 
+                    name={driverStatus.status === 'verified' ? 'check-circle' : 
+                          driverStatus.status === 'pending' ? 'schedule' : 
+                          driverStatus.status === 'rejected' ? 'cancel' : 
+                          driverStatus.status === 'locked' ? 'lock' : 'help'} 
+                    size={16} 
+                    color={driverStatus.color} 
+                  />
+                  <Text style={[styles.statusText, { color: driverStatus.color }]}>
+                    {driverStatus.text}
+                  </Text>
+                </View>
               </View>
               <ModernButton
-                title={user.driver_profile ? "Đã gửi" : "Gửi giấy tờ"}
+                title={driverStatus.status === 'verified' ? "Đã xác minh" : 
+                       driverStatus.status === 'pending' ? "Đang chờ" : 
+                       driverStatus.status === 'locked' ? "Bị khóa" : "Gửi giấy tờ"}
                 size="small"
-                variant={user.driver_profile ? "outline" : "primary"}
-                disabled={user.driver_profile}
-                onPress={() => navigation.navigate('DriverVerification')}
+                variant={driverStatus.status === 'verified' ? "outline" : 
+                        driverStatus.status === 'locked' ? "outline" : "primary"}
+                disabled={driverStatus.status === 'verified' || driverStatus.status === 'locked'}
+                onPress={handleDriverVerificationPress}
               />
             </View>
           </View>
