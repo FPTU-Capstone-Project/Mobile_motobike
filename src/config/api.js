@@ -117,7 +117,9 @@ export const ENDPOINTS = {
   // Verification - User Endpoints
   VERIFICATION: {
     STUDENT: '/me/student-verifications',
-    DRIVER: '/me/driver-verifications',
+    DRIVER_LICENSE: '/me/driver-verifications/license',
+    DRIVER_DOCUMENTS: '/me/driver-verifications/documents',
+    DRIVER_VEHICLE_REGISTRATION: '/me/driver-verifications/vehicle-registration',
     // Fallback endpoints if above don't work
     DRIVER_ALT: '/verification/driver',
     STUDENT_ALT: '/verification/student',

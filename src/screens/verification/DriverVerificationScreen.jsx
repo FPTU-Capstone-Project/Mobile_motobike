@@ -42,6 +42,20 @@ const DriverVerificationScreen = ({ navigation }) => {
 
   const loadCurrentVerification = async () => {
     try {
+      // First check if user has rider verification (required for driver verification)
+      const riderVerification = await verificationService.getCurrentStudentVerification();
+      if (!riderVerification || riderVerification.status?.toLowerCase() !== 'approved') {
+        Alert.alert(
+          'Cần xác minh rider trước',
+          'Bạn cần xác minh tài khoản sinh viên trước khi có thể xác minh tài xế. Vui lòng gửi thẻ sinh viên để admin duyệt.',
+          [
+            { text: 'Hủy', onPress: () => navigation.goBack() },
+            { text: 'Xác minh sinh viên', onPress: () => navigation.navigate('StudentVerification') }
+          ]
+        );
+        return;
+      }
+
       const verification = await verificationService.getCurrentDriverVerification();
       setCurrentVerification(verification);
       
@@ -313,67 +327,57 @@ const DriverVerificationScreen = ({ navigation }) => {
     setUploading(true);
 
     try {
-      // Prepare all documents
-      const documents = [
-        // License documents
-        {
-          uri: licenseFront.uri,
-          mimeType: licenseFront.type || 'image/jpeg',
-          fileName: licenseFront.fileName || 'license_front.jpg',
-          fileSize: licenseFront.fileSize,
-          documentType: 'license',
-          side: 'front'
-        },
-        {
-          uri: licenseBack.uri,
-          mimeType: licenseBack.type || 'image/jpeg',
-          fileName: licenseBack.fileName || 'license_back.jpg',
-          fileSize: licenseBack.fileSize,
-          documentType: 'license',
-          side: 'back'
-        },
-        // Vehicle registration documents
-        {
-          uri: vehicleRegistrationFront.uri,
-          mimeType: vehicleRegistrationFront.type || 'image/jpeg',
-          fileName: vehicleRegistrationFront.fileName || 'vehicle_registration_front.jpg',
-          fileSize: vehicleRegistrationFront.fileSize,
-          documentType: 'vehicleRegistration',
-          side: 'front'
-        },
-        {
-          uri: vehicleRegistrationBack.uri,
-          mimeType: vehicleRegistrationBack.type || 'image/jpeg',
-          fileName: vehicleRegistrationBack.fileName || 'vehicle_registration_back.jpg',
-          fileSize: vehicleRegistrationBack.fileSize,
-          documentType: 'vehicleRegistration',
-          side: 'back'
-        }
-      ];
+      // Prepare documents grouped by type for separate API calls
+      const documentFiles = {
+        license: [
+          {
+            uri: licenseFront.uri,
+            mimeType: licenseFront.type || 'image/jpeg',
+            fileName: licenseFront.fileName || 'license_front.jpg',
+            fileSize: licenseFront.fileSize,
+          },
+          {
+            uri: licenseBack.uri,
+            mimeType: licenseBack.type || 'image/jpeg',
+            fileName: licenseBack.fileName || 'license_back.jpg',
+            fileSize: licenseBack.fileSize,
+          }
+        ],
+        vehicleRegistration: [
+          {
+            uri: vehicleRegistrationFront.uri,
+            mimeType: vehicleRegistrationFront.type || 'image/jpeg',
+            fileName: vehicleRegistrationFront.fileName || 'vehicle_registration_front.jpg',
+            fileSize: vehicleRegistrationFront.fileSize,
+          },
+          {
+            uri: vehicleRegistrationBack.uri,
+            mimeType: vehicleRegistrationBack.type || 'image/jpeg',
+            fileName: vehicleRegistrationBack.fileName || 'vehicle_registration_back.jpg',
+            fileSize: vehicleRegistrationBack.fileSize,
+          }
+        ]
+      };
 
       // Add vehicle authorization if provided
       if (vehicleAuthorizationFront && vehicleAuthorizationBack) {
-        documents.push(
+        documentFiles.vehicleAuthorization = [
           {
             uri: vehicleAuthorizationFront.uri,
             mimeType: vehicleAuthorizationFront.type || 'image/jpeg',
             fileName: vehicleAuthorizationFront.fileName || 'vehicle_authorization_front.jpg',
             fileSize: vehicleAuthorizationFront.fileSize,
-            documentType: 'vehicleAuthorization',
-            side: 'front'
           },
           {
             uri: vehicleAuthorizationBack.uri,
             mimeType: vehicleAuthorizationBack.type || 'image/jpeg',
             fileName: vehicleAuthorizationBack.fileName || 'vehicle_authorization_back.jpg',
             fileSize: vehicleAuthorizationBack.fileSize,
-            documentType: 'vehicleAuthorization',
-            side: 'back'
           }
-        );
+        ];
       }
 
-      const result = await verificationService.submitDriverVerification(documents);
+      const result = await verificationService.submitDriverVerification(documentFiles);
 
       // After successful submission, refresh verification status
       try {

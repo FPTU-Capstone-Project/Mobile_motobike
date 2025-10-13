@@ -177,51 +177,81 @@ class VerificationService {
     try {
       console.log('Submitting driver verification with files:', documentFiles);
       
-      const formData = new FormData();
+      const results = [];
       
-      // Handle multiple document files
-      if (Array.isArray(documentFiles)) {
-        documentFiles.forEach((file, index) => {
-          console.log(`Adding driver document ${index + 1}:`, {
-            uri: file.uri,
-            type: file.mimeType || 'image/jpeg',
-            name: file.fileName || `driver_doc_${index + 1}.jpg`,
-            documentType: file.documentType,
-            side: file.side
+      // Submit license documents (2 sides)
+      if (documentFiles.license) {
+        const licenseFiles = documentFiles.license.filter(file => file);
+        if (licenseFiles.length > 0) {
+          console.log('Submitting license documents:', licenseFiles);
+          const licenseFormData = new FormData();
+          licenseFiles.forEach(file => {
+            licenseFormData.append('documents', {
+              uri: file.uri,
+              type: file.mimeType || 'image/jpeg',
+              name: file.fileName || 'license.jpg',
+            });
           });
           
-          formData.append('document', {
-            uri: file.uri,
-            type: file.mimeType || 'image/jpeg',
-            name: file.fileName || `driver_doc_${index + 1}.jpg`,
+          const licenseResponse = await this.apiService.uploadFile(
+            ENDPOINTS.VERIFICATION.DRIVER_LICENSE, 
+            null, 
+            licenseFormData
+          );
+          results.push({ type: 'license', response: licenseResponse });
+        }
+      }
+      
+      // Submit vehicle registration documents (2 sides)
+      if (documentFiles.vehicleRegistration) {
+        const vehicleFiles = documentFiles.vehicleRegistration.filter(file => file);
+        if (vehicleFiles.length > 0) {
+          console.log('Submitting vehicle registration documents:', vehicleFiles);
+          const vehicleFormData = new FormData();
+          vehicleFiles.forEach(file => {
+            vehicleFormData.append('documents', {
+              uri: file.uri,
+              type: file.mimeType || 'image/jpeg',
+              name: file.fileName || 'vehicle_registration.jpg',
+            });
           });
-        });
-      } else {
-        // Single file (backward compatibility)
-        console.log('Adding single driver file:', {
-          uri: documentFiles.uri,
-          type: documentFiles.mimeType || 'image/jpeg',
-          name: documentFiles.fileName || 'driver_doc.jpg',
-        });
-        
-        formData.append('document', {
-          uri: documentFiles.uri,
-          type: documentFiles.mimeType || 'image/jpeg',
-          name: documentFiles.fileName || 'driver_doc.jpg',
-        });
+          
+          const vehicleResponse = await this.apiService.uploadFile(
+            ENDPOINTS.VERIFICATION.DRIVER_VEHICLE_REGISTRATION, 
+            null, 
+            vehicleFormData
+          );
+          results.push({ type: 'vehicle_registration', response: vehicleResponse });
+        }
+      }
+      
+      // Submit additional documents (optional - authorization letter)
+      if (documentFiles.vehicleAuthorization) {
+        const authFiles = documentFiles.vehicleAuthorization.filter(file => file);
+        if (authFiles.length > 0) {
+          console.log('Submitting authorization documents:', authFiles);
+          const authFormData = new FormData();
+          authFiles.forEach(file => {
+            authFormData.append('documents', {
+              uri: file.uri,
+              type: file.mimeType || 'image/jpeg',
+              name: file.fileName || 'authorization.jpg',
+            });
+          });
+          
+          const authResponse = await this.apiService.uploadFile(
+            ENDPOINTS.VERIFICATION.DRIVER_DOCUMENTS, 
+            null, 
+            authFormData
+          );
+          results.push({ type: 'documents', response: authResponse });
+        }
       }
 
-      console.log('FormData created, calling API...');
-      const response = await this.apiService.uploadFile(
-        ENDPOINTS.VERIFICATION.DRIVER, 
-        null, 
-        formData
-      );
-
-      console.log('API response:', response);
+      console.log('All driver verification submissions completed:', results);
       return {
         success: true,
-        data: response,
+        data: results,
         message: 'Đã gửi yêu cầu xác minh tài xế thành công'
       };
     } catch (error) {
