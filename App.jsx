@@ -12,6 +12,10 @@ import LoginScreen from './src/screens/auth/LoginScreen.jsx';
 import RegisterScreen from './src/screens/auth/RegisterScreen.jsx';
 import OTPVerificationScreen from './src/screens/auth/OTPVerificationScreen.jsx';
 import ResetPasswordScreen from './src/screens/auth/ResetPasswordScreen.jsx';
+
+// Ride screens
+import RideBookingScreen from './src/screens/ride/RideBookingScreen.jsx';
+import RideTrackingScreen from './src/screens/ride/RideTrackingScreen.jsx';
 import HomeScreen from './src/screens/main/HomeScreen.jsx';
 import ProfileScreen from './src/screens/main/ProfileScreen.jsx';
 import WalletScreen from './src/screens/main/WalletScreen.jsx';
@@ -123,11 +127,23 @@ export default function App() {
                 component={OTPVerificationScreen} 
                 options={{ headerShown: false }}
               />
-              <Stack.Screen 
-                name="ResetPassword" 
-                component={ResetPasswordScreen} 
-                options={{ headerShown: false }}
-              />
+        <Stack.Screen
+          name="ResetPassword"
+          component={ResetPasswordScreen}
+          options={{ headerShown: false }}
+        />
+        
+        {/* Ride Screens */}
+        <Stack.Screen
+          name="RideBooking"
+          component={RideBookingScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="RideTracking"
+          component={RideTrackingScreen}
+          options={{ headerShown: false }}
+        />
           <Stack.Screen 
             name="Main" 
             component={MainTabs} 

@@ -1,48 +1,51 @@
 import * as Location from 'expo-location';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Alert } from 'react-native';
 
 class LocationService {
   constructor() {
     this.currentLocation = null;
     this.watchId = null;
-    this.isTracking = false;
+    this.locationCallbacks = [];
   }
 
-  // Yêu cầu quyền truy cập GPS
-  async requestLocationPermission() {
+  // Request location permissions
+  async requestPermissions() {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
-      
       if (status !== 'granted') {
-        throw new Error('Quyền truy cập vị trí bị từ chối');
+        Alert.alert(
+          'Quyền truy cập vị trí',
+          'Ứng dụng cần quyền truy cập vị trí để hoạt động. Vui lòng cấp quyền trong cài đặt.',
+          [{ text: 'OK' }]
+        );
+        return false;
       }
 
-      // Yêu cầu thêm quyền background location cho tài xế
+      // Request background permissions for ride tracking
       const { status: backgroundStatus } = await Location.requestBackgroundPermissionsAsync();
-      
-      return {
-        foreground: status === 'granted',
-        background: backgroundStatus === 'granted'
-      };
+      if (backgroundStatus !== 'granted') {
+        console.warn('Background location permission not granted');
+      }
+
+      return true;
     } catch (error) {
-      console.error('Error requesting location permission:', error);
-      throw error;
+      console.error('Error requesting location permissions:', error);
+      return false;
     }
   }
 
-  // Lấy vị trí hiện tại
+  // Get current location
   async getCurrentLocation() {
     try {
-      const permissions = await this.requestLocationPermission();
-      
-      if (!permissions.foreground) {
-        throw new Error('Không có quyền truy cập vị trí');
+      const hasPermission = await this.requestPermissions();
+      if (!hasPermission) {
+        throw new Error('Location permission denied');
       }
 
       const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.High,
-        timeout: 10000,
-        maximumAge: 60000, // Cache trong 1 phút
+        timeout: 15000,
+        maximumAge: 10000,
       });
 
       this.currentLocation = {
@@ -50,14 +53,7 @@ class LocationService {
         longitude: location.coords.longitude,
         accuracy: location.coords.accuracy,
         timestamp: location.timestamp,
-        address: null
       };
-
-      // Lấy địa chỉ từ tọa độ
-      await this.reverseGeocode();
-
-      // Lưu vị trí vào storage
-      await this.saveLocationToStorage();
 
       return this.currentLocation;
     } catch (error) {
@@ -66,22 +62,27 @@ class LocationService {
     }
   }
 
-  // Theo dõi vị trí liên tục (cho tài xế)
+  // Start watching location changes
   async startLocationTracking(callback) {
     try {
-      const permissions = await this.requestLocationPermission();
-      
-      if (!permissions.foreground) {
-        throw new Error('Không có quyền truy cập vị trí');
+      const hasPermission = await this.requestPermissions();
+      if (!hasPermission) {
+        throw new Error('Location permission denied');
       }
 
-      this.isTracking = true;
+      if (callback && !this.locationCallbacks.includes(callback)) {
+        this.locationCallbacks.push(callback);
+      }
+
+      if (this.watchId) {
+        return; // Already watching
+      }
 
       this.watchId = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.High,
-          timeInterval: 5000, // Cập nhật mỗi 5 giây
-          distanceInterval: 10, // Hoặc khi di chuyển 10m
+          timeInterval: 5000, // Update every 5 seconds
+          distanceInterval: 10, // Update every 10 meters
         },
         (location) => {
           this.currentLocation = {
@@ -90,142 +91,219 @@ class LocationService {
             accuracy: location.coords.accuracy,
             timestamp: location.timestamp,
             speed: location.coords.speed,
-            heading: location.coords.heading
+            heading: location.coords.heading,
           };
 
-          // Callback để cập nhật UI
-          if (callback) {
-            callback(this.currentLocation);
-          }
-
-          // Lưu vị trí
-          this.saveLocationToStorage();
+          // Notify all callbacks
+          this.locationCallbacks.forEach(callback => {
+            try {
+              callback(this.currentLocation);
+            } catch (error) {
+              console.error('Error in location callback:', error);
+            }
+          });
         }
       );
 
-      return this.watchId;
+      console.log('Location tracking started');
     } catch (error) {
       console.error('Error starting location tracking:', error);
       throw error;
     }
   }
 
-  // Dừng theo dõi vị trí
-  stopLocationTracking() {
-    if (this.watchId) {
+  // Stop watching location changes
+  stopLocationTracking(callback = null) {
+    if (callback) {
+      const index = this.locationCallbacks.indexOf(callback);
+      if (index > -1) {
+        this.locationCallbacks.splice(index, 1);
+      }
+    } else {
+      this.locationCallbacks = [];
+    }
+
+    if (this.locationCallbacks.length === 0 && this.watchId) {
       this.watchId.remove();
       this.watchId = null;
+      console.log('Location tracking stopped');
     }
-    this.isTracking = false;
   }
 
-  // Chuyển đổi tọa độ thành địa chỉ
-  async reverseGeocode(latitude, longitude) {
+  // Get cached location
+  getCachedLocation() {
+    return this.currentLocation;
+  }
+
+  // Reverse geocoding - get address from coordinates
+  async getAddressFromCoordinates(latitude, longitude) {
     try {
-      const lat = latitude || this.currentLocation?.latitude;
-      const lng = longitude || this.currentLocation?.longitude;
-
-      if (!lat || !lng) {
-        throw new Error('Không có tọa độ để chuyển đổi');
-      }
-
       const addresses = await Location.reverseGeocodeAsync({
-        latitude: lat,
-        longitude: lng
+        latitude,
+        longitude,
       });
 
-      if (addresses.length > 0) {
+      if (addresses && addresses.length > 0) {
         const address = addresses[0];
-        const formattedAddress = `${address.street || ''} ${address.district || ''}, ${address.city || ''}, ${address.region || ''}`.trim();
-        
-        if (this.currentLocation) {
-          this.currentLocation.address = formattedAddress;
-          this.currentLocation.addressDetails = address;
-        }
-
-        return formattedAddress;
-      }
-
-      return 'Không xác định được địa chỉ';
-    } catch (error) {
-      console.error('Error reverse geocoding:', error);
-      return 'Lỗi khi xác định địa chỉ';
-    }
-  }
-
-  // Chuyển đổi địa chỉ thành tọa độ
-  async geocode(address) {
-    try {
-      const locations = await Location.geocodeAsync(address);
-      
-      if (locations.length > 0) {
         return {
-          latitude: locations[0].latitude,
-          longitude: locations[0].longitude
+          formattedAddress: this.formatAddress(address),
+          street: address.street,
+          name: address.name,
+          city: address.city,
+          region: address.region,
+          country: address.country,
+          postalCode: address.postalCode,
         };
       }
 
-      throw new Error('Không tìm thấy tọa độ cho địa chỉ này');
+      return null;
+    } catch (error) {
+      console.error('Error reverse geocoding:', error);
+      return null;
+    }
+  }
+
+  // Forward geocoding - get coordinates from address
+  async getCoordinatesFromAddress(address) {
+    try {
+      const locations = await Location.geocodeAsync(address);
+      
+      if (locations && locations.length > 0) {
+        return {
+          latitude: locations[0].latitude,
+          longitude: locations[0].longitude,
+        };
+      }
+
+      return null;
     } catch (error) {
       console.error('Error geocoding:', error);
-      throw error;
+      return null;
     }
   }
 
-  // Tính khoảng cách giữa 2 điểm
+  // Format address for display
+  formatAddress(address) {
+    const parts = [];
+    
+    if (address.name && address.name !== address.street) {
+      parts.push(address.name);
+    }
+    
+    if (address.street) {
+      parts.push(address.street);
+    }
+    
+    if (address.city) {
+      parts.push(address.city);
+    }
+    
+    if (address.region && address.region !== address.city) {
+      parts.push(address.region);
+    }
+
+    return parts.join(', ') || 'Vị trí không xác định';
+  }
+
+  // Calculate distance between two points (Haversine formula)
   calculateDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371; // Bán kính Trái Đất (km)
-    const dLat = this.deg2rad(lat2 - lat1);
-    const dLon = this.deg2rad(lon2 - lon1);
+    const R = 6371; // Radius of the Earth in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
     const a = 
       Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(this.deg2rad(lat1)) * Math.cos(this.deg2rad(lat2)) * 
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
       Math.sin(dLon/2) * Math.sin(dLon/2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    const distance = R * c; // Khoảng cách (km)
+    const distance = R * c; // Distance in km
+    return distance;
+  }
+
+  // Calculate bearing between two points
+  calculateBearing(lat1, lon1, lat2, lon2) {
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const lat1Rad = lat1 * Math.PI / 180;
+    const lat2Rad = lat2 * Math.PI / 180;
     
-    return Math.round(distance * 1000) / 1000; // Làm tròn 3 chữ số thập phân
+    const y = Math.sin(dLon) * Math.cos(lat2Rad);
+    const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - 
+              Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLon);
+    
+    const bearing = Math.atan2(y, x) * 180 / Math.PI;
+    return (bearing + 360) % 360; // Normalize to 0-360 degrees
   }
 
-  deg2rad(deg) {
-    return deg * (Math.PI/180);
-  }
-
-  // Lưu vị trí vào AsyncStorage
-  async saveLocationToStorage() {
-    try {
-      if (this.currentLocation) {
-        await AsyncStorage.setItem('lastKnownLocation', JSON.stringify(this.currentLocation));
-      }
-    } catch (error) {
-      console.error('Error saving location to storage:', error);
+  // Format distance for display
+  formatDistance(distanceInKm) {
+    if (distanceInKm < 1) {
+      return `${Math.round(distanceInKm * 1000)}m`;
+    } else {
+      return `${distanceInKm.toFixed(1)}km`;
     }
   }
 
-  // Lấy vị trí đã lưu từ AsyncStorage
-  async getLocationFromStorage() {
-    try {
-      const savedLocation = await AsyncStorage.getItem('lastKnownLocation');
-      if (savedLocation) {
-        this.currentLocation = JSON.parse(savedLocation);
-        return this.currentLocation;
-      }
-      return null;
-    } catch (error) {
-      console.error('Error getting location from storage:', error);
-      return null;
+  // Format duration for display
+  formatDuration(durationInMinutes) {
+    if (durationInMinutes < 60) {
+      return `${Math.round(durationInMinutes)} phút`;
+    } else {
+      const hours = Math.floor(durationInMinutes / 60);
+      const minutes = Math.round(durationInMinutes % 60);
+      return `${hours}h ${minutes}p`;
     }
   }
 
-  // Kiểm tra xem có đang theo dõi vị trí không
-  isLocationTracking() {
-    return this.isTracking;
+  // Check if location is within a certain radius
+  isWithinRadius(centerLat, centerLon, targetLat, targetLon, radiusKm) {
+    const distance = this.calculateDistance(centerLat, centerLon, targetLat, targetLon);
+    return distance <= radiusKm;
   }
 
-  // Lấy vị trí hiện tại (cached hoặc fresh)
-  getLocation() {
-    return this.currentLocation;
+  // Get region for map display
+  getMapRegion(latitude, longitude, latitudeDelta = 0.01, longitudeDelta = 0.01) {
+    return {
+      latitude,
+      longitude,
+      latitudeDelta,
+      longitudeDelta,
+    };
+  }
+
+  // Get region that fits multiple coordinates
+  getRegionForCoordinates(coordinates, padding = 0.01) {
+    if (!coordinates || coordinates.length === 0) {
+      return null;
+    }
+
+    if (coordinates.length === 1) {
+      return this.getMapRegion(coordinates[0].latitude, coordinates[0].longitude);
+    }
+
+    let minLat = coordinates[0].latitude;
+    let maxLat = coordinates[0].latitude;
+    let minLon = coordinates[0].longitude;
+    let maxLon = coordinates[0].longitude;
+
+    coordinates.forEach(coord => {
+      minLat = Math.min(minLat, coord.latitude);
+      maxLat = Math.max(maxLat, coord.latitude);
+      minLon = Math.min(minLon, coord.longitude);
+      maxLon = Math.max(maxLon, coord.longitude);
+    });
+
+    const centerLat = (minLat + maxLat) / 2;
+    const centerLon = (minLon + maxLon) / 2;
+    const latitudeDelta = Math.max(maxLat - minLat + padding, 0.01);
+    const longitudeDelta = Math.max(maxLon - minLon + padding, 0.01);
+
+    return {
+      latitude: centerLat,
+      longitude: centerLon,
+      latitudeDelta,
+      longitudeDelta,
+    };
   }
 }
 
-export default new LocationService();
+const locationService = new LocationService();
+export default locationService;
