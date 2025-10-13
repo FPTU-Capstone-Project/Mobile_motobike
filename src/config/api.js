@@ -164,10 +164,37 @@ export const ENDPOINTS = {
     WEBHOOK: '/payos/webhook',
   },
   
-  // Future endpoints for rides, etc.
+  // Ride Sharing APIs
   RIDES: {
-    LIST: '/rides',
+    // Driver endpoints
     CREATE: '/rides',
-    DETAILS: '/rides/:id',
-  }
+    GET_BY_DRIVER: '/rides/driver',
+    START: '/rides/{rideId}/start',
+    COMPLETE: '/rides/{rideId}/complete',
+    CANCEL: '/rides/{rideId}',
+    
+    // Rider endpoints
+    AVAILABLE: '/rides/available',
+    DETAILS: '/rides/{rideId}',
+  },
+
+  // Ride Requests APIs
+  RIDE_REQUESTS: {
+    // Rider endpoints
+    BOOK_RIDE: '/ride-requests',
+    JOIN_RIDE: '/ride-requests/rides/{rideId}',
+    GET_BY_RIDER: '/ride-requests/rider',
+    CANCEL: '/ride-requests/{requestId}',
+    DETAILS: '/ride-requests/{requestId}',
+    
+    // Driver endpoints
+    GET_BY_RIDE: '/ride-requests/rides/{rideId}',
+    ACCEPT: '/ride-requests/{requestId}/accept',
+    REJECT: '/ride-requests/{requestId}/reject',
+  },
+
+  // Quote API
+  QUOTES: {
+    GET_QUOTE: '/quotes',
+  },
 };

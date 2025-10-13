@@ -6,7 +6,8 @@
       "address": "Lô E2a-7, Đường D1, Khu Công nghệ cao, Quận 9, TP.HCM",
       "type": "university",
       "icon": "school",
-      "coordinates": { "lat": 10.8411, "lng": 106.8098 }
+      "coordinates": { "lat": 10.8411, "lng": 106.8098 },
+      "gradient": ["#2196F3", "#1976D2"]
     },
     {
       "id": 2,
@@ -14,41 +15,8 @@
       "address": "01 Phạm Ngọc Thạch, Quận 3, TP.HCM",
       "type": "cultural",
       "icon": "account-balance",
-      "coordinates": { "lat": 10.7769, "lng": 106.6955 }
-    },
-    {
-      "id": 3,
-      "name": "Nhà của tôi",
-      "address": "Địa chỉ nhà riêng",
-      "type": "home",
-      "icon": "home",
-      "coordinates": { "lat": 10.7626, "lng": 106.6826 },
-      "isPersonal": true
-    },
-    {
-      "id": 4,
-      "name": "Phòng trọ",
-      "address": "Địa chỉ phòng trọ",
-      "type": "accommodation",
-      "icon": "apartment",
-      "coordinates": { "lat": 10.8230, "lng": 106.6296 },
-      "isPersonal": true
-    },
-    {
-      "id": 5,
-      "name": "Chợ Bến Thành",
-      "address": "Lê Lợi, Quận 1, TP.HCM",
-      "type": "market",
-      "icon": "store",
-      "coordinates": { "lat": 10.7720, "lng": 106.6988 }
-    },
-    {
-      "id": 6,
-      "name": "Vincom Center",
-      "address": "70-72 Lê Thánh Tôn, Quận 1, TP.HCM",
-      "type": "shopping",
-      "icon": "shopping-bag",
-      "coordinates": { "lat": 10.7796, "lng": 106.7015 }
+      "coordinates": { "lat": 10.7769, "lng": 106.6955 },
+      "gradient": ["#FF9800", "#F57C00"]
     }
   ],
   "users": [
