@@ -132,7 +132,7 @@ const StudentVerificationScreen = ({ navigation }) => {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images, // Only images
+        mediaTypes: ['images'], // Only images
         allowsEditing: false,
         quality: 1, // Use full quality first, we'll convert to JPEG later
         exif: false, // Don't include EXIF data to reduce file size
@@ -191,7 +191,7 @@ const StudentVerificationScreen = ({ navigation }) => {
       }
 
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images, // Only images
+        mediaTypes: ['images'], // Only images
         allowsEditing: false,
         quality: 1, // Use full quality first, we'll convert to JPEG later
         exif: false, // Don't include EXIF data to reduce file size
