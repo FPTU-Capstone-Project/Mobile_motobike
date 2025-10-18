@@ -21,6 +21,8 @@ import locationService from '../../services/locationService';
 import rideService from '../../services/rideService';
 import authService from '../../services/authService';
 import goongService from '../../services/goongService';
+import poiService from '../../services/poiService';
+import { locationStorageService } from '../../services/locationStorageService';
 import ModernButton from '../../components/ModernButton.jsx';
 import AddressInput from '../../components/AddressInput';
 import GoongMap from '../../components/GoongMap.jsx';
@@ -56,7 +58,7 @@ const RideBookingScreen = ({ navigation, route }) => {
     
     const initialize = async () => {
       if (mounted) {
-        await initializeLocation();
+        await initializeLocationWithCache();
       }
     };
     
@@ -141,28 +143,39 @@ const RideBookingScreen = ({ navigation, route }) => {
     return markers;
   }, [pickupLocation, dropoffLocation, pickupAddress, dropoffAddress]);
 
-  const initializeLocation = async () => {
+  const initializeLocationWithCache = async () => {
     try {
       setLoadingLocation(true);
       
-      // Debug Goong API
-      console.log('Goong API configured:', goongService.isConfigured());
+      // Try to get cached location first
+      const locationData = await locationStorageService.getCurrentLocationWithAddress();
       
-      const location = await locationService.getCurrentLocation();
-      setCurrentLocation(location);
-      
-      // Set pickup to current location by default
-      setPickupLocation(location);
-      const address = await locationService.getAddressFromCoordinates(
-        location.latitude, 
-        location.longitude
-      );
-      setPickupAddress(address?.formattedAddress || 'Vị trí hiện tại');
+      if (locationData.location) {
+        setCurrentLocation(locationData.location);
+        
+        // Set pickup to current location by default
+        setPickupLocation(locationData.location);
+        
+        // Use cached address if available
+        if (locationData.address) {
+          setPickupAddress(locationData.address.shortAddress || 'Vị trí hiện tại');
+        } else {
+          setPickupAddress('Vị trí hiện tại');
+        }
+      } else {
+        // Fallback to regular location service
+        const location = await locationService.getCurrentLocation();
+        setCurrentLocation(location);
+        setPickupLocation(location);
+        setPickupAddress('Vị trí hiện tại');
+      }
 
       // Start location tracking only once
       if (!locationService.watchId) {
         locationService.startLocationTracking((newLocation) => {
           setCurrentLocation(newLocation);
+          // Update cache with new location
+          locationStorageService.saveCurrentLocation(newLocation);
         });
       }
 
@@ -175,21 +188,48 @@ const RideBookingScreen = ({ navigation, route }) => {
   };
 
   const handleMapPress = async (event) => {
-    const { latitude, longitude } = event.nativeEvent.coordinate;
-    
-    if (isSelectingPickup) {
-      setPickupLocation({ latitude, longitude });
-      setIsSelectingPickup(false);
-      
+    if (!isSelectingPickup && !isSelectingDropoff) {
+      return; // Not in selection mode
+    }
+
+    try {
+      const { latitude, longitude } = event.nativeEvent.coordinate;
+      console.log('Map pressed:', { latitude, longitude });
+
+      // Get address for the coordinates
       const address = await locationService.getAddressFromCoordinates(latitude, longitude);
-      setPickupAddress(address?.formattedAddress || 'Vị trí đã chọn');
-      
-    } else if (isSelectingDropoff) {
-      setDropoffLocation({ latitude, longitude });
-      setIsSelectingDropoff(false);
-      
-      const address = await locationService.getAddressFromCoordinates(latitude, longitude);
-      setDropoffAddress(address?.formattedAddress || 'Điểm đến đã chọn');
+      const addressText = address?.formattedAddress || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+
+      // Try to find nearby POI
+      const nearbyPOI = await poiService.findLocationByCoordinates(latitude, longitude, 200); // 200m radius
+
+      const locationData = nearbyPOI ? {
+        id: nearbyPOI.locationId,
+        locationId: nearbyPOI.locationId,
+        latitude: nearbyPOI.latitude,
+        longitude: nearbyPOI.longitude,
+        name: nearbyPOI.name,
+        isPOI: true
+      } : {
+        latitude: latitude,
+        longitude: longitude,
+        isPOI: false
+      };
+
+      if (isSelectingPickup) {
+        setPickupLocation(locationData);
+        setPickupAddress(nearbyPOI ? nearbyPOI.name : addressText);
+        setIsSelectingPickup(false);
+        console.log('Pickup location set:', locationData);
+      } else if (isSelectingDropoff) {
+        setDropoffLocation(locationData);
+        setDropoffAddress(nearbyPOI ? nearbyPOI.name : addressText);
+        setIsSelectingDropoff(false);
+        console.log('Dropoff location set:', locationData);
+      }
+    } catch (error) {
+      console.error('Error handling map press:', error);
+      Alert.alert('Lỗi', 'Không thể xác định địa chỉ cho vị trí này');
     }
   };
 
@@ -207,37 +247,71 @@ const RideBookingScreen = ({ navigation, route }) => {
       return;
     }
 
-    // If we don't have coordinates, try to geocode the addresses
+    // Process pickup location - prefer POI, fallback to coordinates
     let pickup = pickupLocation;
-    let dropoff = dropoffLocation;
-
     if (!pickup && pickupAddress.trim()) {
       try {
-        const pickupCoords = await goongService.geocode(pickupAddress);
-        if (pickupCoords && pickupCoords.geometry && pickupCoords.geometry.location) {
+        // First try to find POI by address
+        const pickupPOI = await poiService.searchLocations(pickupAddress, 1);
+        if (pickupPOI && pickupPOI.length > 0) {
           pickup = {
-            latitude: pickupCoords.geometry.location.latitude,
-            longitude: pickupCoords.geometry.location.longitude
+            id: pickupPOI[0].id,
+            locationId: pickupPOI[0].id,
+            latitude: pickupPOI[0].latitude,
+            longitude: pickupPOI[0].longitude,
+            name: pickupPOI[0].name,
+            isPOI: true
           };
-          setPickupLocation(pickup);
+          console.log('Found pickup POI:', pickup);
+        } else {
+          // Fallback to geocoding
+          const pickupCoords = await goongService.geocode(pickupAddress);
+          if (pickupCoords && pickupCoords.geometry && pickupCoords.geometry.location) {
+            // Try to find nearby POI for these coordinates
+            pickup = await poiService.coordinatesToPOI(
+              pickupCoords.geometry.location.latitude,
+              pickupCoords.geometry.location.longitude
+            );
+            console.log('Pickup location processed:', pickup);
+          }
         }
+        setPickupLocation(pickup);
       } catch (error) {
-        console.error('Error geocoding pickup:', error);
+        console.error('Error processing pickup location:', error);
       }
     }
 
+    // Process dropoff location - prefer POI, fallback to coordinates
+    let dropoff = dropoffLocation;
     if (!dropoff && dropoffAddress.trim()) {
       try {
-        const dropoffCoords = await goongService.geocode(dropoffAddress);
-        if (dropoffCoords && dropoffCoords.geometry && dropoffCoords.geometry.location) {
+        // First try to find POI by address
+        const dropoffPOI = await poiService.searchLocations(dropoffAddress, 1);
+        if (dropoffPOI && dropoffPOI.length > 0) {
           dropoff = {
-            latitude: dropoffCoords.geometry.location.latitude,
-            longitude: dropoffCoords.geometry.location.longitude
+            id: dropoffPOI[0].id,
+            locationId: dropoffPOI[0].id,
+            latitude: dropoffPOI[0].latitude,
+            longitude: dropoffPOI[0].longitude,
+            name: dropoffPOI[0].name,
+            isPOI: true
           };
-          setDropoffLocation(dropoff);
+          console.log('Found dropoff POI:', dropoff);
+        } else {
+          // Fallback to geocoding
+          const dropoffCoords = await goongService.geocode(dropoffAddress);
+          if (dropoffCoords && dropoffCoords.geometry && dropoffCoords.geometry.location) {
+            // Try to find nearby POI for these coordinates
+            dropoff = await poiService.coordinatesToPOI(
+              dropoffCoords.geometry.location.latitude,
+              dropoffCoords.geometry.location.longitude
+            );
+            console.log('Dropoff location processed:', dropoff);
+          }
         }
+        setDropoffLocation(dropoff);
       } catch (error) {
-        console.error('Error geocoding dropoff:', error);
+        console.error('Error processing dropoff location:', error);
       }
     }
 
@@ -249,7 +323,11 @@ const RideBookingScreen = ({ navigation, route }) => {
     try {
       setLoading(true);
       
-      const quoteData = await rideService.getQuote(pickup, dropoff);
+      // Get desired pickup time (optional - can be set by user)
+      const desiredPickupTime = null; // TODO: Add time picker
+      const notes = null; // TODO: Add notes input
+      
+      const quoteData = await rideService.getQuote(pickup, dropoff, desiredPickupTime, notes);
       
       // Process the quote data to match our UI needs
       const processedQuote = {
@@ -307,19 +385,16 @@ const RideBookingScreen = ({ navigation, route }) => {
       const result = await rideService.bookRide(quote.quoteId);
       console.log('Book ride result:', result);
       
-      Alert.alert(
-        'Đặt xe thành công!',
-        'Chúng tôi đang tìm tài xế phù hợp cho bạn.',
-        [
-          {
-            text: 'Xem chi tiết',
-            onPress: () => navigation.navigate('RideTracking', { 
-              proposals: result,
-              quote: quote 
-            })
-          }
-        ]
-      );
+      // Navigate to rider matching screen
+      navigation.navigate('RiderMatching', {
+        rideRequest: {
+          ...result,
+          quote: quote,
+          pickupAddress: pickupAddress,
+          dropoffAddress: dropoffAddress,
+          fare: quote.fare
+        }
+      });
     } catch (error) {
       console.error('Book ride error:', error);
       let errorMessage = 'Không thể đặt xe. Vui lòng thử lại.';
@@ -484,6 +559,15 @@ const RideBookingScreen = ({ navigation, route }) => {
                 isPickupInput={true}
                 currentLocation={currentLocation}
               />
+              
+              {/* Pickup location selection button */}
+              <TouchableOpacity 
+                style={styles.mapSelectionButton}
+                onPress={() => setIsSelectingPickup(true)}
+              >
+                <Icon name="my-location" size={16} color="#4CAF50" />
+                <Text style={styles.mapSelectionText}>Chọn trên bản đồ</Text>
+              </TouchableOpacity>
 
               <View style={styles.locationDivider}>
                 <View style={styles.dividerLine} />
@@ -503,6 +587,15 @@ const RideBookingScreen = ({ navigation, route }) => {
                 iconColor="#F44336"
                 style={styles.addressInput}
               />
+              
+              {/* Dropoff location selection button */}
+              <TouchableOpacity 
+                style={styles.mapSelectionButton}
+                onPress={() => setIsSelectingDropoff(true)}
+              >
+                <Icon name="my-location" size={16} color="#F44336" />
+                <Text style={styles.mapSelectionText}>Chọn trên bản đồ</Text>
+              </TouchableOpacity>
             </View>
 
             {/* Get Quote Button */}
@@ -914,6 +1007,22 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 10,
     fontStyle: 'italic',
+  },
+  mapSelectionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    marginBottom: 10,
+    alignSelf: 'flex-start',
+  },
+  mapSelectionText: {
+    fontSize: 12,
+    color: '#666',
+    marginLeft: 6,
+    fontWeight: '500',
   },
 });
 

@@ -1,10 +1,11 @@
 {
   "expo": {
     "name": "MSSUS",
+    "scheme": "mssus-iat-rs-app",
     "slug": "mssus-iat-rs",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/motorcycle-vector.jpg",
     "userInterfaceStyle": "light",
     "splash": {
       "resizeMode": "contain",
@@ -13,17 +14,25 @@
     "assetBundlePatterns": [
       "**/*"
     ],
+    "notification": {
+      "icon": "./assets/motorcycle-vector.jpg",
+      "color": "#4CAF50"
+    },
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSCameraUsageDescription": "This app needs access to camera to take photos for verification documents.",
-        "NSPhotoLibraryUsageDescription": "This app needs access to photo library to select images for verification documents.",
-        "NSMicrophoneUsageDescription": "This app needs access to microphone for video recording."
+        "NSLocationWhenInUseUsageDescription": "Ứng dụng cần truy cập vị trí để xác định điểm đón và điểm đến của bạn.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Ứng dụng cần truy cập vị trí để theo dõi chuyến đi và cung cấp dịch vụ tốt hơn.",
+        "NSLocationAlwaysUsageDescription": "Ứng dụng cần truy cập vị trí ngay cả khi không sử dụng để theo dõi chuyến đi của tài xế.",
+        "NSCameraUsageDescription": "Ứng dụng cần truy cập camera để chụp ảnh tài liệu xác minh.",
+        "NSPhotoLibraryUsageDescription": "Ứng dụng cần truy cập thư viện ảnh để chọn hình ảnh tài liệu xác minh.",
+        "NSMicrophoneUsageDescription": "Ứng dụng cần truy cập microphone để ghi âm video xác minh.",
+        "NSContactsUsageDescription": "Ứng dụng cần truy cập danh bạ để tìm liên hệ khẩn cấp."
       }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/icon.png",
+        "foregroundImage": "./assets/motorcycle-vector.jpg",
         "backgroundColor": "#4CAF50"
       },
       "permissions": [
@@ -35,11 +44,24 @@
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE",
-        "READ_MEDIA_IMAGES"
-      ]
+        "READ_MEDIA_IMAGES",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "WAKE_LOCK"
+      ],
+      "package": "com.dbao0312.mssusiatrs",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
-      "favicon": "./assets/icon.png"
-    }
+      "favicon": "./assets/motorcycle-vector.jpg"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "01e2e762-35a2-4a2d-b8de-6f20d91b77bf"
+      }
+    },
+    "plugins": [
+      "expo-font", "expo-dev-client", "expo-notifications"
+    ]
   }
 }

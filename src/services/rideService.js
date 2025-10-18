@@ -8,18 +8,44 @@ class RideService {
 
   // ========== QUOTE SERVICES ==========
   
-  async getQuote(pickup, dropoff) {
+  async getQuote(pickup, dropoff, desiredPickupTime = null, notes = null) {
     try {
-      const response = await this.apiService.post(ENDPOINTS.QUOTES.GET_QUOTE, {
-        pickup: {
+      const body = {};
+
+      // Handle pickup location - prefer POI ID if available
+      if (pickup.locationId || pickup.id) {
+        body.pickupLocationId = pickup.locationId || pickup.id;
+      } else if (pickup.latitude && pickup.longitude) {
+        body.pickup = {
           latitude: pickup.latitude,
           longitude: pickup.longitude
-        },
-        dropoff: {
+        };
+      } else {
+        throw new Error('Invalid pickup location: must have either locationId or coordinates');
+      }
+
+      // Handle dropoff location - prefer POI ID if available  
+      if (dropoff.locationId || dropoff.id) {
+        body.dropoffLocationId = dropoff.locationId || dropoff.id;
+      } else if (dropoff.latitude && dropoff.longitude) {
+        body.dropoff = {
           latitude: dropoff.latitude,
           longitude: dropoff.longitude
-        }
-      });
+        };
+      } else {
+        throw new Error('Invalid dropoff location: must have either locationId or coordinates');
+      }
+
+      // Add optional fields if provided
+      if (desiredPickupTime) {
+        body.desiredPickupTime = desiredPickupTime;
+      }
+      if (notes) {
+        body.notes = notes;
+      }
+
+      console.log('Quote request body:', JSON.stringify(body, null, 2));
+      const response = await this.apiService.post(ENDPOINTS.QUOTES.GET_QUOTE, body);
       return response;
     } catch (error) {
       console.error('Get quote error:', error);
@@ -29,11 +55,22 @@ class RideService {
 
   // ========== RIDER SERVICES ==========
 
-  async bookRide(quoteId) {
+  async bookRide(quoteId, desiredPickupTime = null, notes = null) {
     try {
-      const response = await this.apiService.post(ENDPOINTS.RIDE_REQUESTS.BOOK_RIDE, {
+      const body = {
         quoteId: quoteId
-      });
+      };
+
+      // Add optional fields if provided
+      if (desiredPickupTime) {
+        body.desiredPickupTime = desiredPickupTime;
+      }
+      if (notes) {
+        body.notes = notes;
+      }
+
+      const response = await this.apiService.post(ENDPOINTS.RIDE_REQUESTS.BOOK_RIDE, body);
+      console.log('Book ride response:', response);
       return response;
     } catch (error) {
       console.error('Book ride error:', error);
@@ -41,12 +78,22 @@ class RideService {
     }
   }
 
-  async joinRide(rideId, quoteId) {
+  async joinRide(rideId, quoteId, desiredPickupTime = null, notes = null) {
     try {
       const endpoint = ENDPOINTS.RIDE_REQUESTS.JOIN_RIDE.replace('{rideId}', rideId);
-      const response = await this.apiService.post(endpoint, {
+      const body = {
         quoteId: quoteId
-      });
+      };
+
+      // Add optional fields if provided
+      if (desiredPickupTime) {
+        body.desiredPickupTime = desiredPickupTime;
+      }
+      if (notes) {
+        body.notes = notes;
+      }
+
+      const response = await this.apiService.post(endpoint, body);
       return response;
     } catch (error) {
       console.error('Join ride error:', error);
@@ -102,6 +149,85 @@ class RideService {
   }
 
   // ========== DRIVER SERVICES ==========
+
+  // Driver decision APIs
+  // Create shared ride (Driver)
+  async createSharedRide(rideData) {
+    try {
+      console.log('Creating shared ride:', rideData);
+      const response = await this.apiService.post(ENDPOINTS.RIDES.CREATE, rideData);
+      return response;
+    } catch (error) {
+      console.error('Create shared ride error:', error);
+      throw error;
+    }
+  }
+
+  async acceptRideRequest(requestId, rideId) {
+    try {
+      const endpoint = ENDPOINTS.RIDE_REQUESTS.ACCEPT.replace('{requestId}', requestId);
+      const response = await this.apiService.post(endpoint, {
+        rideId: rideId
+      });
+      return response;
+    } catch (error) {
+      console.error('Accept ride request error:', error);
+      throw error;
+    }
+  }
+
+  async rejectRideRequest(requestId, reason = null) {
+    try {
+      const endpoint = ENDPOINTS.RIDE_REQUESTS.REJECT.replace('{requestId}', requestId);
+      const params = reason ? `?reason=${encodeURIComponent(reason)}` : '';
+      const response = await this.apiService.post(endpoint + params);
+      return response;
+    } catch (error) {
+      console.error('Reject ride request error:', error);
+      throw error;
+    }
+  }
+
+  // Ride management APIs
+  async startRide(rideId, currentDriverLocation) {
+    try {
+      const endpoint = ENDPOINTS.RIDES.START.replace('{rideId}', rideId);
+      const response = await this.apiService.post(endpoint, {
+        rideId: rideId,
+        currentDriverLocation: {
+          latitude: currentDriverLocation.latitude,
+          longitude: currentDriverLocation.longitude
+        }
+      });
+      return response;
+    } catch (error) {
+      console.error('Start ride error:', error);
+      throw error;
+    }
+  }
+
+  async completeRide(rideId) {
+    try {
+      const endpoint = ENDPOINTS.RIDES.COMPLETE.replace('{rideId}', rideId);
+      const response = await this.apiService.post(endpoint);
+      return response;
+    } catch (error) {
+      console.error('Complete ride error:', error);
+      throw error;
+    }
+  }
+
+  // GPS tracking API
+  async trackRide(rideId, locationPoints) {
+    try {
+      const endpoint = ENDPOINTS.RIDES.TRACK.replace('{rideId}', rideId);
+      const response = await this.apiService.post(endpoint, locationPoints);
+      return response;
+    } catch (error) {
+      console.error('Track ride error:', error);
+      throw error;
+    }
+  }
 
   async createRide(vehicleId, startLocationId, endLocationId, startLatLng, endLatLng, scheduledDepartureTime) {
     try {

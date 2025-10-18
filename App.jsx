@@ -16,6 +16,7 @@ import ResetPasswordScreen from './src/screens/auth/ResetPasswordScreen.jsx';
 // Ride screens
 import RideBookingScreen from './src/screens/ride/RideBookingScreen.jsx';
 import RideTrackingScreen from './src/screens/ride/RideTrackingScreen.jsx';
+import RiderMatchingScreen from './src/screens/ride/RiderMatchingScreen.jsx';
 import HomeScreen from './src/screens/main/HomeScreen.jsx';
 import ProfileScreen from './src/screens/main/ProfileScreen.jsx';
 import WalletScreen from './src/screens/main/WalletScreen.jsx';
@@ -35,6 +36,9 @@ import ChangePasswordScreen from './src/screens/profile/ChangePasswordScreen.jsx
 
 // Driver Screens
 import DriverHomeScreen from './src/screens/driver/DriverHomeScreen.jsx';
+import DriverTestScreen from './src/screens/driver/DriverTestScreen.jsx';
+import CreateSharedRideScreen from './src/screens/driver/CreateSharedRideScreen.jsx';
+import VehicleManagementScreen from './src/screens/driver/VehicleManagementScreen.jsx';
 import DriverDashboardScreen from './src/screens/driver/DriverDashboardScreen.jsx';
 import DriverEarningsScreen from './src/screens/driver/DriverEarningsScreen.jsx';
 import DriverRatingsScreen from './src/screens/driver/DriverRatingsScreen.jsx';
@@ -142,6 +146,26 @@ export default function App() {
         <Stack.Screen
           name="RideTracking"
           component={RideTrackingScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="RiderMatching"
+          component={RiderMatchingScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="DriverTest"
+          component={DriverTestScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="CreateSharedRide"
+          component={CreateSharedRideScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="VehicleManagement"
+          component={VehicleManagementScreen}
           options={{ headerShown: false }}
         />
           <Stack.Screen 

@@ -1,434 +1,439 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   SafeAreaView,
   TouchableOpacity,
+  Alert,
   Switch,
-  ScrollView,
-  Alert
+  Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Animatable from 'react-native-animatable';
 
-import mockData from '../../data/mockData.json';
-import ModernButton from '../../components/ModernButton.jsx';
-import ModeSelector from '../../components/ModeSelector.jsx';
+import websocketService from '../../services/websocketService';
+import fcmService from '../../services/fcmService';
+import authService from '../../services/authService';
+import { locationStorageService } from '../../services/locationStorageService';
+import { locationTrackingService } from '../../services/locationTrackingService';
+import RideOfferModal from '../../components/RideOfferModal';
+
+const { width, height } = Dimensions.get('window');
 
 const DriverHomeScreen = ({ navigation }) => {
   const [isOnline, setIsOnline] = useState(false);
-  const [allowSharing, setAllowSharing] = useState(true);
-  const [driverMode, setDriverMode] = useState('manual');
-  const [currentRide, setCurrentRide] = useState(null);
+  const [currentLocation, setCurrentLocation] = useState(null);
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [connectionStatus, setConnectionStatus] = useState('disconnected');
+  
+  // Ride offer states
+  const [currentOffer, setCurrentOffer] = useState(null);
+  const [showOfferModal, setShowOfferModal] = useState(false);
+  const [offerCountdown, setOfferCountdown] = useState(0);
+  
+  const countdownInterval = useRef(null);
 
-  const driver = mockData.users[1]; // Driver user
-  const todayStats = {
-    earnings: 125000,
-    rides: 8,
-    hours: 6.5,
-    rating: 4.8
-  };
+  useEffect(() => {
+    initializeDriver();
+    
+    return () => {
+      if (countdownInterval.current) {
+        clearInterval(countdownInterval.current);
+      }
+      websocketService.disconnect();
+    };
+  }, []);
 
-  const handleToggleOnline = () => {
-    setIsOnline(!isOnline);
-    Alert.alert(
-      isOnline ? 'Đã offline' : 'Đã online',
-      isOnline ? 'Bạn đã ngừng nhận chuyến đi' : 'Bạn đã sẵn sàng nhận chuyến đi'
-    );
-  };
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      console.log('🧹 DriverHomeScreen unmounting - cleaning up...');
+      websocketService.disconnect();
+      if (countdownInterval.current) {
+        clearInterval(countdownInterval.current);
+      }
+    };
+  }, []);
 
-  const rideRequests = [
-    {
-      id: 1,
-      riderName: 'Nguyen Van A',
-      riderRating: 4.5,
-      pickupLocation: 'Ký túc xá A',
-      dropoffLocation: 'Trường Đại học FPT',
-      distance: 5.2,
-      estimatedFare: 15000,
-      estimatedTime: 3,
-      requestTime: '2 phút trước',
-      isShared: false
-    },
-    {
-      id: 2,
-      riderName: 'Le Thi B',
-      riderRating: 4.8,
-      pickupLocation: 'Nhà văn hóa',
-      dropoffLocation: 'Chợ Bến Thành',
-      distance: 8.7,
-      estimatedFare: 25000,
-      estimatedTime: 7,
-      requestTime: '5 phút trước',
-      isShared: true
+  const initializeDriver = async () => {
+    try {
+      setLoading(true);
+      
+      // Get user info
+      const currentUser = authService.getCurrentUser();
+      setUser(currentUser);
+      
+      // Get current location
+      const locationData = await locationStorageService.getCurrentLocationWithAddress();
+      if (locationData.location) {
+        setCurrentLocation(locationData.location);
+      }
+      
+      // Initialize and register FCM for driver notifications
+      try {
+        await fcmService.initialize();
+        await fcmService.registerToken();
+        console.log('FCM initialized and token registered successfully');
+      } catch (fcmError) {
+        console.warn('FCM initialization failed, continuing without push notifications:', fcmError);
+      }
+      
+    } catch (error) {
+      console.error('Error initializing driver:', error);
+      Alert.alert('Lỗi', 'Không thể khởi tạo ứng dụng tài xế');
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
-  const nearbyRiders = [
-    {
-      id: 3,
-      riderName: 'Pham Van C',
-      pickupLocation: 'Gần vị trí của bạn',
-      dropoffLocation: 'Trường Đại học FPT',
-      distance: 0.8,
-      estimatedFare: 12000,
-      matchPercentage: 95
+
+  const handleRideOffer = (offer) => {
+    console.log('Processing ride offer:', offer);
+    
+    // Check if this is a tracking start signal
+    if (offer.type === 'TRACKING_START') {
+      handleTrackingStart(offer);
+      return;
     }
-  ];
-
-  const handleAcceptRide = (ride) => {
-    Alert.alert(
-      'Xác nhận nhận chuyến',
-      `Khách hàng: ${ride.riderName}\nTừ: ${ride.pickupLocation}\nĐến: ${ride.dropoffLocation}\nThu nhập: ${ride.estimatedFare.toLocaleString()} đ`,
-      [
-        { text: 'Từ chối', style: 'cancel' },
-        { text: 'Nhận chuyến', onPress: () => {
-          setCurrentRide(ride);
-          Alert.alert('Thành công', 'Đã nhận chuyến đi! Hãy đến điểm đón.');
-        }}
-      ]
-    );
+    
+    // This is a ride offer
+    setCurrentOffer(offer);
+    setShowOfferModal(true);
+    
+    // Start countdown timer
+    if (offer.offerExpiresAt) {
+      const expiresAt = new Date(offer.offerExpiresAt);
+      const now = new Date();
+      const timeLeft = Math.max(0, Math.floor((expiresAt - now) / 1000));
+      
+      setOfferCountdown(timeLeft);
+      
+      if (countdownInterval.current) {
+        clearInterval(countdownInterval.current);
+      }
+      
+      countdownInterval.current = setInterval(() => {
+        setOfferCountdown((prev) => {
+          if (prev <= 1) {
+            // Offer expired
+            setCurrentOffer(null);
+            setShowOfferModal(false);
+            clearInterval(countdownInterval.current);
+            Alert.alert('Hết thời gian', 'Yêu cầu đã hết thời gian chờ');
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
   };
 
-  const handleRequestRider = (rider) => {
-    Alert.alert(
-      'Gửi lời mời',
-      `Gửi lời mời cho ${rider.riderName}?\nĐộ phù hợp: ${rider.matchPercentage}%`,
-      [
-        { text: 'Hủy', style: 'cancel' },
-        { text: 'Gửi lời mời', onPress: () => Alert.alert('Đã gửi!', 'Lời mời đã được gửi đến khách hàng') }
-      ]
-    );
+  const handleNotification = (notification) => {
+    console.log('🔔 Driver received notification:', notification);
+    
+    // Show notification as alert or toast
+    if (notification.message) {
+      Alert.alert('Thông báo', notification.message);
+    }
   };
+
+  const handleTrackingStart = async (trackingSignal) => {
+    console.log('Tracking start signal received:', trackingSignal);
+    
+    try {
+      // Start GPS tracking service
+      await locationTrackingService.startTracking(trackingSignal.rideId);
+      
+      Alert.alert(
+        'Bắt đầu theo dõi',
+        'Chuyến đi đã bắt đầu. Hệ thống đang theo dõi vị trí của bạn.',
+        [
+          {
+            text: 'Xem chuyến đi',
+            onPress: () => {
+              // Navigate to ride tracking screen
+              navigation.navigate('RideTracking', {
+                rideId: trackingSignal.rideId,
+                startTracking: true
+              });
+            }
+          },
+          {
+            text: 'OK',
+            style: 'cancel'
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Failed to start tracking:', error);
+      Alert.alert(
+        'Lỗi',
+        'Không thể bắt đầu theo dõi GPS. Vui lòng kiểm tra quyền truy cập vị trí.',
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
+  const handleToggleOnline = async (value) => {
+    if (value && !currentLocation) {
+      Alert.alert(
+        'Cần vị trí',
+        'Vui lòng bật GPS để có thể nhận chuyến đi',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    
+    try {
+      if (value) {
+        // Going online - connect WebSocket
+        console.log('🟢 Going online - connecting WebSocket...');
+        setConnectionStatus('connecting');
+        
+        await websocketService.connectAsDriver(
+          handleRideOffer,
+          handleNotification
+        );
+        
+        setConnectionStatus('connected');
+        console.log('✅ Driver is now online and ready for rides');
+        
+        // Force UI update
+        setIsOnline(true);
+        
+      } else {
+        // Going offline - disconnect WebSocket
+        console.log('🔴 Going offline - disconnecting WebSocket...');
+        setConnectionStatus('disconnecting');
+        
+        websocketService.disconnect();
+        
+        setConnectionStatus('disconnected');
+        console.log('✅ Driver is now offline');
+      }
+      
+      setIsOnline(value);
+      
+    } catch (error) {
+      console.error('Error toggling online status:', error);
+      setConnectionStatus('error');
+      
+      Alert.alert(
+        'Lỗi kết nối',
+        `Không thể ${value ? 'kết nối' : 'ngắt kết nối'}: ${error.message}`,
+        [{ text: 'OK' }]
+      );
+      
+      // Reset toggle if connection failed
+      if (value) {
+        setIsOnline(false);
+      }
+    }
+  };
+
+  const handleOfferResponse = (accepted, reason = null) => {
+    if (countdownInterval.current) {
+      clearInterval(countdownInterval.current);
+    }
+    
+    setShowOfferModal(false);
+    setCurrentOffer(null);
+    setOfferCountdown(0);
+  };
+
+  const getConnectionStatusColor = () => {
+    switch (connectionStatus) {
+      case 'connected': return '#4CAF50';
+      case 'connecting': return '#FF9800';
+      case 'error': return '#F44336';
+      default: return '#9E9E9E';
+    }
+  };
+
+  const getConnectionStatusText = () => {
+    switch (connectionStatus) {
+      case 'connected': return 'Đã kết nối';
+      case 'connecting': return 'Đang kết nối...';
+      case 'error': return 'Lỗi kết nối';
+      default: return 'Chưa kết nối';
+    }
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#4CAF50" />
+          <Text style={styles.loadingText}>Đang khởi tạo...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Header with Gradient */}
-        <LinearGradient
-          colors={['#4CAF50', '#2E7D32']}
-          style={styles.header}
-        >
-          <View style={styles.headerContent}>
-            <View style={styles.driverInfo}>
-              <Text style={styles.greeting}>Xin chào tài xế,</Text>
-              <Text style={styles.driverName}>{driver.name}</Text>
-              <View style={styles.statusContainer}>
-                <View style={[styles.statusDot, { backgroundColor: isOnline ? '#4CAF50' : '#F44336' }]} />
-                <Text style={styles.statusText}>
-                  {isOnline ? 'Đang online' : 'Offline'}
-                </Text>
-              </View>
+      <LinearGradient
+        colors={isOnline ? ['#4CAF50', '#2E7D32'] : ['#9E9E9E', '#616161']}
+        style={styles.header}
+      >
+        <View style={styles.headerContent}>
+          <View style={styles.userInfo}>
+            <View style={styles.avatar}>
+              <Icon name="person" size={32} color="#fff" />
             </View>
+            <View style={styles.userDetails}>
+              <Text style={styles.userName}>{user?.fullName || 'Tài xế'}</Text>
+              <Text style={styles.userRole}>Tài xế xe ôm</Text>
+            </View>
+          </View>
+          
+          <View style={styles.headerActions}>
             <TouchableOpacity 
-              style={styles.notificationButton}
-              onPress={() => navigation.navigate('SOSAlert')}
+              style={styles.createRideButton}
+              onPress={() => navigation.navigate('CreateSharedRide')}
             >
-              <Icon name="emergency" size={24} color="#fff" />
+              <Icon name="add-circle" size={20} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.vehicleButton}
+              onPress={() => navigation.navigate('VehicleManagement')}
+            >
+              <Icon name="motorcycle" size={20} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.testButton}
+              onPress={() => navigation.navigate('DriverTest')}
+            >
+              <Icon name="bug-report" size={20} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.settingsButton}>
+              <Icon name="settings" size={24} color="#fff" />
             </TouchableOpacity>
           </View>
-        </LinearGradient>
+        </View>
+      </LinearGradient>
 
-        <View style={styles.content}>
-          {/* Online Status Card */}
-          <View style={styles.statusCard}>
-            <View style={styles.statusHeader}>
-              <Text style={styles.cardTitle}>Trạng thái hoạt động</Text>
-              <Switch
-                value={isOnline}
-                onValueChange={handleToggleOnline}
-                trackColor={{ false: '#ddd', true: '#4CAF50' }}
-                thumbColor={isOnline ? '#fff' : '#f4f3f4'}
-              />
+      <View style={styles.content}>
+        {/* Online/Offline Toggle */}
+        <Animatable.View 
+          animation={isOnline ? "pulse" : "fadeIn"} 
+          style={styles.statusCard}
+        >
+          <View style={styles.statusHeader}>
+            <View style={styles.statusIndicator}>
+              <View style={[
+                styles.statusDot, 
+                { backgroundColor: isOnline ? '#4CAF50' : '#9E9E9E' }
+              ]} />
+              <Text style={styles.statusTitle}>
+                {isOnline ? 'ĐANG ONLINE' : 'OFFLINE'}
+              </Text>
             </View>
             
-            <View style={styles.settingsRow}>
-              <Text style={styles.settingLabel}>Cho phép chia sẻ chuyến đi</Text>
-              <Switch
-                value={allowSharing}
-                onValueChange={setAllowSharing}
-                trackColor={{ false: '#ddd', true: '#4CAF50' }}
-                thumbColor={allowSharing ? '#fff' : '#f4f3f4'}
-              />
-            </View>
-          </View>
-
-          {/* Mode Selector */}
-          {isOnline && (
-            <ModeSelector 
-              mode={driverMode} 
-              onModeChange={setDriverMode}
-              userType="driver"
+            <Switch
+              value={isOnline}
+              onValueChange={handleToggleOnline}
+              trackColor={{ false: '#E0E0E0', true: '#C8E6C9' }}
+              thumbColor={isOnline ? '#4CAF50' : '#9E9E9E'}
             />
-          )}
-
-          {/* Today's Stats */}
-          <View style={styles.statsCard}>
-            <Text style={styles.cardTitle}>Thống kê hôm nay</Text>
-            <View style={styles.statsGrid}>
-              <View style={styles.statItem}>
-                <LinearGradient
-                  colors={['#4CAF50', '#2E7D32']}
-                  style={styles.statIcon}
-                >
-                  <Icon name="attach-money" size={24} color="#fff" />
-                </LinearGradient>
-                <Text style={styles.statValue}>{todayStats.earnings.toLocaleString()}đ</Text>
-                <Text style={styles.statLabel}>Thu nhập</Text>
-              </View>
-
-              <View style={styles.statItem}>
-                <LinearGradient
-                  colors={['#2196F3', '#1976D2']}
-                  style={styles.statIcon}
-                >
-                  <Icon name="directions-car" size={24} color="#fff" />
-                </LinearGradient>
-                <Text style={styles.statValue}>{todayStats.rides}</Text>
-                <Text style={styles.statLabel}>Chuyến đi</Text>
-              </View>
-
-              <View style={styles.statItem}>
-                <LinearGradient
-                  colors={['#FF9800', '#F57C00']}
-                  style={styles.statIcon}
-                >
-                  <Icon name="schedule" size={24} color="#fff" />
-                </LinearGradient>
-                <Text style={styles.statValue}>{todayStats.hours}h</Text>
-                <Text style={styles.statLabel}>Thời gian</Text>
-              </View>
-
-              <View style={styles.statItem}>
-                <LinearGradient
-                  colors={['#9C27B0', '#7B1FA2']}
-                  style={styles.statIcon}
-                >
-                  <Icon name="star" size={24} color="#fff" />
-                </LinearGradient>
-                <Text style={styles.statValue}>{todayStats.rating}</Text>
-                <Text style={styles.statLabel}>Đánh giá</Text>
-              </View>
-            </View>
           </View>
+          
+          <Text style={styles.statusDescription}>
+            {isOnline 
+              ? 'Bạn đang sẵn sàng nhận chuyến đi' 
+              : 'Bật để bắt đầu nhận chuyến đi'
+            }
+          </Text>
+        </Animatable.View>
 
-          {/* Current Ride */}
-          {currentRide && (
-            <Animatable.View animation="slideInUp" style={styles.currentRideCard}>
-              <View style={styles.currentRideHeader}>
-                <Text style={styles.cardTitle}>Chuyến đi hiện tại</Text>
-                <TouchableOpacity style={styles.sosButton}>
-                  <Icon name="emergency" size={20} color="#F44336" />
-                </TouchableOpacity>
-              </View>
-              <View style={styles.rideInfo}>
-                <Text style={styles.riderName}>{currentRide.riderName}</Text>
-                <Text style={styles.routeText}>{currentRide.pickupLocation} → {currentRide.dropoffLocation}</Text>
-              </View>
-              <View style={styles.rideActions}>
-                <ModernButton
-                  title="Liên hệ khách"
-                  variant="outline"
-                  size="small"
-                  icon="phone"
-                  onPress={() => Alert.alert('Gọi', 'Đang gọi khách hàng...')}
-                />
-                <ModernButton
-                  title="Hoàn thành"
-                  size="small"
-                  icon="check"
-                  onPress={() => {
-                    setCurrentRide(null);
-                    Alert.alert('Hoàn thành', 'Chuyến đi đã hoàn thành!');
-                  }}
-                />
-              </View>
-            </Animatable.View>
+        {/* Connection Status */}
+        <View style={styles.connectionCard}>
+          <View style={styles.connectionHeader}>
+            <Icon name="wifi" size={20} color={getConnectionStatusColor()} />
+            <Text style={[
+              styles.connectionText,
+              { color: getConnectionStatusColor() }
+            ]}>
+              {getConnectionStatusText()}
+            </Text>
+          </View>
+          
+          {connectionStatus === 'error' && (
+            <TouchableOpacity 
+              style={styles.retryButton}
+              onPress={() => setIsOnline(true)}
+            >
+              <Text style={styles.retryText}>Thử lại</Text>
+            </TouchableOpacity>
           )}
+        </View>
 
-          {/* Ride Requests or Nearby Riders */}
-          {isOnline && !currentRide && (
-            <>
-              {driverMode === 'auto' && rideRequests.length > 0 && (
-                <View style={styles.requestsSection}>
-                  <Text style={styles.sectionTitle}>Yêu cầu chuyến đi</Text>
-                  {rideRequests.map((request) => (
-                    <Animatable.View 
-                      key={request.id} 
-                      animation="slideInRight" 
-                      style={styles.requestCard}
-                    >
-                      <View style={styles.requestHeader}>
-                        <View style={styles.riderInfo}>
-                          <Text style={styles.riderName}>{request.riderName}</Text>
-                          <View style={styles.riderRating}>
-                            <Icon name="star" size={14} color="#FF9800" />
-                            <Text style={styles.ratingText}>{request.riderRating}</Text>
-                          </View>
-                        </View>
-                        <Text style={styles.requestTime}>{request.requestTime}</Text>
-                      </View>
-                      
-                      <View style={styles.routeContainer}>
-                        <View style={styles.routePoint}>
-                          <View style={styles.pickupDot} />
-                          <Text style={styles.locationText}>{request.pickupLocation}</Text>
-                        </View>
-                        <View style={styles.routeLine} />
-                        <View style={styles.routePoint}>
-                          <View style={styles.dropoffDot} />
-                          <Text style={styles.locationText}>{request.dropoffLocation}</Text>
-                        </View>
-                      </View>
+        {/* Current Location */}
+        {currentLocation && (
+          <View style={styles.locationCard}>
+            <Icon name="my-location" size={20} color="#4CAF50" />
+            <Text style={styles.locationText}>
+              Vị trí hiện tại đã được xác định
+            </Text>
+          </View>
+        )}
 
-                      <View style={styles.requestDetails}>
-                        <View style={styles.detailItem}>
-                          <Icon name="straighten" size={16} color="#666" />
-                          <Text style={styles.detailText}>{request.distance} km</Text>
-                        </View>
-                        <View style={styles.detailItem}>
-                          <Icon name="schedule" size={16} color="#666" />
-                          <Text style={styles.detailText}>{request.estimatedTime} phút</Text>
-                        </View>
-                        <View style={styles.detailItem}>
-                          <Icon name="attach-money" size={16} color="#4CAF50" />
-                          <Text style={[styles.detailText, { color: '#4CAF50', fontWeight: '600' }]}>
-                            {request.estimatedFare.toLocaleString()} đ
-                          </Text>
-                        </View>
-                        {request.isShared && (
-                          <View style={styles.sharedBadge}>
-                            <Text style={styles.sharedText}>Chia sẻ</Text>
-                          </View>
-                        )}
-                      </View>
-
-                      <View style={styles.requestActions}>
-                        <ModernButton
-                          title="Từ chối"
-                          variant="outline"
-                          size="small"
-                          onPress={() => Alert.alert('Đã từ chối', 'Bạn đã từ chối chuyến đi này')}
-                        />
-                        <ModernButton
-                          title="Nhận chuyến"
-                          size="small"
-                          onPress={() => handleAcceptRide(request)}
-                        />
-                      </View>
-                    </Animatable.View>
-                  ))}
-                </View>
-              )}
-
-              {driverMode === 'manual' && nearbyRiders.length > 0 && (
-                <View style={styles.nearbySection}>
-                  <Text style={styles.sectionTitle}>Khách hàng gần bạn</Text>
-                  {nearbyRiders.map((rider) => (
-                    <View key={rider.id} style={styles.nearbyCard}>
-                      <View style={styles.nearbyHeader}>
-                        <Text style={styles.riderName}>{rider.riderName}</Text>
-                        <View style={styles.matchBadge}>
-                          <Text style={styles.matchText}>{rider.matchPercentage}% phù hợp</Text>
-                        </View>
-                      </View>
-                      <Text style={styles.nearbyRoute}>
-                        {rider.pickupLocation} → {rider.dropoffLocation}
-                      </Text>
-                      <View style={styles.nearbyDetails}>
-                        <Text style={styles.nearbyDistance}>{rider.distance} km</Text>
-                        <Text style={styles.nearbyFare}>{rider.estimatedFare.toLocaleString()} đ</Text>
-                      </View>
-                      <ModernButton
-                        title="Gửi lời mời"
-                        size="small"
-                        icon="send"
-                        onPress={() => handleRequestRider(rider)}
-                      />
-                    </View>
-                  ))}
-                </View>
-              )}
-
-              {((driverMode === 'auto' && rideRequests.length === 0) || 
-                (driverMode === 'manual' && nearbyRiders.length === 0)) && (
-                <View style={styles.emptyState}>
-                  <Icon name="hourglass-empty" size={64} color="#ccc" />
-                  <Text style={styles.emptyTitle}>
-                    {driverMode === 'auto' ? 'Chưa có yêu cầu nào' : 'Không có khách hàng gần bạn'}
-                  </Text>
-                  <Text style={styles.emptySubtitle}>
-                    {driverMode === 'auto' ? 
-                      'Vui lòng chờ khách hàng đặt chuyến' : 
-                      'Thử chuyển sang chế độ tự động'}
-                  </Text>
-                  {driverMode === 'manual' && (
-                    <ModernButton
-                      title="Chế độ tự động"
-                      variant="outline"
-                      onPress={() => setDriverMode('auto')}
-                    />
-                  )}
-                </View>
-              )}
-            </>
-          )}
-
-          {/* Quick Actions */}
-          <View style={styles.quickActions}>
-            <Text style={styles.sectionTitle}>Thao tác nhanh</Text>
-            <View style={styles.actionsGrid}>
-              <TouchableOpacity 
-                style={styles.actionItem}
-                onPress={() => navigation.navigate('Earnings')}
-              >
-                <LinearGradient
-                  colors={['#4CAF50', '#2E7D32']}
-                  style={styles.actionIcon}
-                >
-                  <Icon name="trending-up" size={20} color="#fff" />
-                </LinearGradient>
-                <Text style={styles.actionText}>Thu nhập</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={styles.actionItem}
-                onPress={() => navigation.navigate('Ratings')}
-              >
-                <LinearGradient
-                  colors={['#FF9800', '#F57C00']}
-                  style={styles.actionIcon}
-                >
-                  <Icon name="star-rate" size={20} color="#fff" />
-                </LinearGradient>
-                <Text style={styles.actionText}>Đánh giá</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.actionItem}>
-                <LinearGradient
-                  colors={['#2196F3', '#1976D2']}
-                  style={styles.actionIcon}
-                >
-                  <Icon name="history" size={20} color="#fff" />
-                </LinearGradient>
-                <Text style={styles.actionText}>Lịch sử</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.actionItem}>
-                <LinearGradient
-                  colors={['#9C27B0', '#7B1FA2']}
-                  style={styles.actionIcon}
-                >
-                  <Icon name="help" size={20} color="#fff" />
-                </LinearGradient>
-                <Text style={styles.actionText}>Hỗ trợ</Text>
-              </TouchableOpacity>
-            </View>
+        {/* Stats Cards */}
+        <View style={styles.statsContainer}>
+          <View style={styles.statCard}>
+            <Icon name="directions-car" size={24} color="#2196F3" />
+            <Text style={styles.statNumber}>0</Text>
+            <Text style={styles.statLabel}>Chuyến hôm nay</Text>
+          </View>
+          
+          <View style={styles.statCard}>
+            <Icon name="star" size={24} color="#FF9800" />
+            <Text style={styles.statNumber}>5.0</Text>
+            <Text style={styles.statLabel}>Đánh giá</Text>
+          </View>
+          
+          <View style={styles.statCard}>
+            <Icon name="account-balance-wallet" size={24} color="#4CAF50" />
+            <Text style={styles.statNumber}>0đ</Text>
+            <Text style={styles.statLabel}>Thu nhập</Text>
           </View>
         </View>
-      </ScrollView>
+
+        {/* Action Buttons */}
+        <View style={styles.actionsContainer}>
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => navigation.navigate('RideHistory')}
+          >
+            <Icon name="history" size={24} color="#666" />
+            <Text style={styles.actionText}>Lịch sử chuyến đi</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => navigation.navigate('Earnings')}
+          >
+            <Icon name="trending-up" size={24} color="#666" />
+            <Text style={styles.actionText}>Thu nhập</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Ride Offer Modal */}
+      {showOfferModal && currentOffer && (
+        <RideOfferModal
+          visible={showOfferModal}
+          offer={currentOffer}
+          countdown={offerCountdown}
+          onAccept={() => handleOfferResponse(true)}
+          onReject={(reason) => handleOfferResponse(false, reason)}
+          onClose={() => handleOfferResponse(false)}
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -436,11 +441,21 @@ const DriverHomeScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f5f5f5',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
   },
   header: {
     paddingTop: 20,
-    paddingBottom: 24,
+    paddingBottom: 30,
     paddingHorizontal: 20,
   },
   headerContent: {
@@ -448,36 +463,53 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  driverInfo: {
-    flex: 1,
-  },
-  greeting: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.8)',
-  },
-  driverName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginTop: 4,
-    marginBottom: 8,
-  },
-  statusContainer: {
+  userInfo: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
+  avatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
-  statusText: {
+  userDetails: {
+    flex: 1,
+  },
+  userName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  userRole: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.9)',
-    fontWeight: '500',
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 2,
   },
-  notificationButton: {
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  createRideButton: {
+    backgroundColor: 'rgba(76, 175, 80, 0.8)',
+    borderRadius: 20,
+    padding: 8,
+    marginRight: 8,
+  },
+  vehicleButton: {
+    backgroundColor: 'rgba(33, 150, 243, 0.8)',
+    borderRadius: 20,
+    padding: 8,
+    marginRight: 8,
+  },
+  testButton: {
+    padding: 8,
+    marginRight: 8,
+  },
+  settingsButton: {
     padding: 8,
   },
   content: {
@@ -486,333 +518,132 @@ const styles = StyleSheet.create({
   },
   statusCard: {
     backgroundColor: '#fff',
-    borderRadius: 16,
+    borderRadius: 12,
     padding: 20,
-    marginBottom: 20,
+    marginBottom: 16,
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
+    shadowRadius: 4,
   },
   statusHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 8,
+  },
+  statusIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  statusTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  statusDescription: {
+    fontSize: 14,
+    color: '#666',
+  },
+  connectionCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
     marginBottom: 16,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1a1a1a',
-  },
-  settingsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
   },
-  settingLabel: {
-    fontSize: 16,
-    color: '#1a1a1a',
+  connectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  statsCard: {
+  connectionText: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 8,
+  },
+  retryButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#F44336',
+    borderRadius: 6,
+  },
+  retryText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  locationCard: {
     backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  locationText: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 8,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginBottom: 20,
+  },
+  statCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    flex: 1,
+    marginHorizontal: 4,
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
+    shadowRadius: 4,
   },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  statItem: {
-    width: '48%',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  statIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  statValue: {
-    fontSize: 18,
+  statNumber: {
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginBottom: 4,
+    color: '#333',
+    marginTop: 8,
   },
   statLabel: {
     fontSize: 12,
     color: '#666',
+    marginTop: 4,
   },
-  currentRideCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    elevation: 3,
-    shadowColor: '#4CAF50',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: '#4CAF50',
-  },
-  currentRideHeader: {
+  actionsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
   },
-  sosButton: {
-    padding: 8,
-  },
-  rideInfo: {
-    marginBottom: 16,
-  },
-  riderName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginBottom: 4,
-  },
-  routeText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  rideActions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 16,
-  },
-  requestsSection: {
-    marginBottom: 24,
-  },
-  requestCard: {
+  actionButton: {
     backgroundColor: '#fff',
-    borderRadius: 16,
+    borderRadius: 12,
     padding: 16,
-    marginBottom: 12,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-  },
-  requestHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
-  },
-  riderInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  riderRating: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginLeft: 8,
-  },
-  ratingText: {
-    fontSize: 12,
-    color: '#666',
-    marginLeft: 2,
-  },
-  requestTime: {
-    fontSize: 12,
-    color: '#666',
-  },
-  routeContainer: {
-    marginBottom: 12,
-  },
-  routePoint: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 4,
-  },
-  pickupDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#4CAF50',
-    marginRight: 10,
-  },
-  dropoffDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#F44336',
-    marginRight: 10,
-  },
-  routeLine: {
-    width: 2,
-    height: 16,
-    backgroundColor: '#ddd',
-    marginLeft: 4,
-    marginVertical: 2,
-  },
-  locationText: {
-    fontSize: 14,
-    color: '#1a1a1a',
     flex: 1,
-  },
-  requestDetails: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  detailItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  detailText: {
-    fontSize: 12,
-    color: '#666',
-    marginLeft: 4,
-  },
-  sharedBadge: {
-    backgroundColor: '#4CAF50',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    marginLeft: 'auto',
-  },
-  sharedText: {
-    fontSize: 10,
-    color: '#fff',
-    fontWeight: '500',
-  },
-  requestActions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  nearbySection: {
-    marginBottom: 24,
-  },
-  nearbyCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
+    marginHorizontal: 4,
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
-  },
-  nearbyHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  matchBadge: {
-    backgroundColor: '#E8F5E8',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  matchText: {
-    fontSize: 12,
-    color: '#4CAF50',
-    fontWeight: '500',
-  },
-  nearbyRoute: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 12,
-  },
-  nearbyDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  nearbyDistance: {
-    fontSize: 14,
-    color: '#666',
-  },
-  nearbyFare: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#4CAF50',
-  },
-  emptyState: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 40,
-    alignItems: 'center',
-    marginBottom: 24,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#666',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  quickActions: {
-    marginTop: 8,
-  },
-  actionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  actionItem: {
-    width: '22%',
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    alignItems: 'center',
-    marginBottom: 12,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-  },
-  actionIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
+    shadowRadius: 4,
   },
   actionText: {
     fontSize: 12,
     color: '#666',
+    marginTop: 8,
     textAlign: 'center',
   },
 });

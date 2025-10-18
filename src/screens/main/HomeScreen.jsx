@@ -19,7 +19,9 @@ import LocationCard from '../../components/LocationCard.jsx';
 import locationService from '../../services/locationService';
 import rideService from '../../services/rideService';
 import authService from '../../services/authService';
-import mockData from '../../data/mockData.json';
+import poiService from '../../services/poiService';
+import { locationStorageService } from '../../services/locationStorageService';
+import permissionService from '../../services/permissionService';
 
 const { width } = Dimensions.get('window');
 
@@ -29,10 +31,7 @@ const HomeScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [nearbyRides, setNearbyRides] = useState([]);
   const [loadingRides, setLoadingRides] = useState(false);
-
-  // Mock data fallback
-  const presetLocations = mockData.presetLocations;
-
+  const [presetLocations, setPresetLocations] = useState([]);
   useEffect(() => {
     initializeHome();
   }, []);
@@ -45,13 +44,28 @@ const HomeScreen = ({ navigation }) => {
       const currentUser = authService.getCurrentUser();
       setUser(currentUser);
 
-      // Get current location
-      const location = await locationService.getCurrentLocation();
-      setCurrentLocation(location);
+      // Check and request location permission first
+      console.log('🔐 Checking location permission on app start...');
+      const locationPermission = await permissionService.requestLocationPermission(true);
+      
+      if (locationPermission.granted) {
+        // Get current location (try cache first)
+        const locationData = await locationStorageService.getCurrentLocationWithAddress();
+        if (locationData.location) {
+          setCurrentLocation(locationData.location);
+        } else {
+          const location = await locationService.getCurrentLocation();
+          setCurrentLocation(location);
+        }
+      } else {
+        console.warn('Location permission denied, using default location');
+        // Set a default location or show appropriate message
+      }
 
       // Load nearby rides if user is a rider
       if (currentUser?.active_profile === 'rider') {
         await loadNearbyRides();
+        await loadPresetLocations();
       }
 
     } catch (error) {
@@ -74,7 +88,18 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
-  const handleBookRide = () => {
+  const handleBookRide = async () => {
+    // Check location permission before booking
+    const locationPermission = await permissionService.requestLocationPermission(true);
+    if (!locationPermission.granted) {
+      Alert.alert(
+        'Cần quyền truy cập vị trí',
+        'Để đặt xe, ứng dụng cần biết vị trí hiện tại của bạn. Vui lòng cấp quyền truy cập vị trí.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    
     navigation.navigate('RideBooking');
   };
 
@@ -82,15 +107,20 @@ const HomeScreen = ({ navigation }) => {
     try {
       if (!currentLocation) {
         Alert.alert('Lỗi', 'Không thể xác định vị trí hiện tại');
-        return;
-      }
+      return;
+    }
 
       console.log(currentLocation);
 
-      // Convert coordinates format if needed
+      // Convert coordinates format and include POI info if available
       const dropoffCoords = {
         latitude: location.coordinates?.latitude || location.coordinates?.lat || 0,
-        longitude: location.coordinates?.longitude || location.coordinates?.lng || 0
+        longitude: location.coordinates?.longitude || location.coordinates?.lng || 0,
+        // Include POI information if available
+        id: location.id,
+        locationId: location.locationId || location.id,
+        name: location.name,
+        isPOI: location.isPOI || true // Preset locations are usually POIs
       };
 
       // Navigate to ride booking with preset destination
@@ -114,48 +144,22 @@ const HomeScreen = ({ navigation }) => {
     <Animatable.View animation="fadeInUp" delay={200} style={styles.quickActionsCard}>
       <Text style={styles.sectionTitle}>Đặt xe nhanh</Text>
       
-      <ModernButton
-        title="Đặt xe ngay"
-        onPress={handleBookRide}
-        icon="directions-car"
-        size="large"
-        style={styles.bookRideButton}
-      />
-
-      <Text style={styles.quickLocationTitle}>Hoặc chọn điểm đến phổ biến:</Text>
+      <View style={styles.buttonContainer}>
+        <ModernButton
+          title="Đặt xe ngay"
+          onPress={handleBookRide}
+          icon="directions-car"
+          size="large"
+          style={[styles.bookRideButton, styles.riderButton]}
+              />
+            </View>
+            
       
       <ScrollView 
         horizontal 
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.locationsList}
       >
-        {(presetLocations || []).map((location, index) => (
-          <TouchableOpacity
-            key={location.id}
-            style={styles.quickLocationCard}
-            onPress={() => handleQuickLocation(location)}
-          >
-            <LinearGradient
-              colors={location.gradient || ['#4CAF50', '#2E7D32']}
-              style={styles.locationGradient}
-            >
-              <Icon name={location.icon} size={24} color="#fff" />
-            </LinearGradient>
-            <Text style={styles.locationName}>{location.name}</Text>
-            <Text style={styles.locationDistance}>
-              {currentLocation ? 
-                locationService.formatDistance(
-                  locationService.calculateDistance(
-                    currentLocation.latitude,
-                    currentLocation.longitude,
-                    location.coordinates?.latitude || location.coordinates?.lat || 0,
-                    location.coordinates?.longitude || location.coordinates?.lng || 0
-                  )
-                ) : '-- km'
-              }
-            </Text>
-          </TouchableOpacity>
-        ))}
       </ScrollView>
     </Animatable.View>
   );
@@ -169,8 +173,8 @@ const HomeScreen = ({ navigation }) => {
           <Text style={styles.sectionTitle}>Chuyến xe gần bạn</Text>
           <TouchableOpacity onPress={loadNearbyRides}>
             <Icon name="refresh" size={20} color="#4CAF50" />
-          </TouchableOpacity>
-        </View>
+            </TouchableOpacity>
+          </View>
 
         {loadingRides ? (
           <ActivityIndicator size="small" color="#4CAF50" style={styles.loadingIndicator} />
@@ -196,7 +200,7 @@ const HomeScreen = ({ navigation }) => {
                   <Text style={styles.ridePrice}>
                     {rideService.formatCurrency(ride.estimatedFare)}
                   </Text>
-                </View>
+        </View>
 
                 <View style={styles.rideRoute}>
                   <View style={styles.routePoint}>
@@ -210,8 +214,8 @@ const HomeScreen = ({ navigation }) => {
                     <Text style={styles.routeText} numberOfLines={1}>
                       {ride.endLocationName}
                     </Text>
-                  </View>
-                </View>
+          </View>
+        </View>
 
                 <View style={styles.rideDetails}>
                   <Text style={styles.rideTime}>
@@ -221,12 +225,41 @@ const HomeScreen = ({ navigation }) => {
                     {ride.availableSeats} chỗ trống
                   </Text>
                 </View>
-              </TouchableOpacity>
+            </TouchableOpacity>
             ))}
           </ScrollView>
         )}
       </Animatable.View>
     );
+  };
+
+  const loadPresetLocations = async () => {
+    try {
+      const locations = await poiService.getPresetLocations();
+      
+      // Transform POI data to match UI format
+      const transformedLocations = locations.map(poi => ({
+        id: poi.locationId,
+        locationId: poi.locationId,
+        name: poi.name,
+        coordinates: {
+          latitude: poi.latitude,
+          longitude: poi.longitude,
+          lat: poi.latitude,
+          lng: poi.longitude
+        },
+        icon: 'location-on', // Default icon
+        gradient: ['#4CAF50', '#2E7D32'], // Default gradient
+        isPOI: true,
+        isAdminDefined: poi.isAdminDefined
+      }));
+      
+      setPresetLocations(transformedLocations);
+      console.log(`Loaded ${transformedLocations.length} preset locations from POI API`);
+    } catch (error) {
+      console.error('Error loading preset locations:', error);
+      setPresetLocations([]); // Set empty array on error
+    }
   };
 
   const renderUserStats = () => {
@@ -268,7 +301,7 @@ const HomeScreen = ({ navigation }) => {
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#4CAF50" />
           <Text style={styles.loadingText}>Đang tải...</Text>
-        </View>
+          </View>
       </SafeAreaView>
     );
   }
@@ -287,15 +320,15 @@ const HomeScreen = ({ navigation }) => {
               <Text style={styles.userName}>{user?.user?.full_name || 'Người dùng'}</Text>
               <Text style={styles.location}>
                 {currentLocation ? '📍 Vị trí hiện tại' : '📍 Đang xác định vị trí...'}
-              </Text>
-            </View>
+                </Text>
+              </View>
             <TouchableOpacity
               style={styles.profileButton}
               onPress={() => navigation.navigate('Profile')}
             >
               <Icon name="person" size={24} color="#fff" />
             </TouchableOpacity>
-          </View>
+            </View>
         </LinearGradient>
 
         {/* Quick Actions */}
@@ -312,7 +345,7 @@ const HomeScreen = ({ navigation }) => {
           <View style={styles.safetyHeader}>
             <Icon name="security" size={24} color="#FF9800" />
             <Text style={styles.safetyTitle}>An toàn là ưu tiên hàng đầu</Text>
-          </View>
+        </View>
           <Text style={styles.safetyText}>
             • Luôn đeo mũ bảo hiểm khi di chuyển{'\n'}
             • Chia sẻ thông tin chuyến đi với người thân{'\n'}
@@ -395,8 +428,20 @@ const styles = StyleSheet.create({
     color: '#1a1a1a',
     marginBottom: 16,
   },
-  bookRideButton: {
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginBottom: 20,
+  },
+  bookRideButton: {
+    flex: 1,
+    marginHorizontal: 6,
+  },
+  riderButton: {
+    // Default gradient will be used
+  },
+  driverButton: {
+    // Custom gradient applied inline
   },
   quickLocationTitle: {
     fontSize: 14,

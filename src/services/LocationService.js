@@ -1,5 +1,6 @@
 import * as Location from 'expo-location';
 import { Alert } from 'react-native';
+import permissionService from './permissionService';
 
 class LocationService {
   constructor() {
@@ -8,23 +9,25 @@ class LocationService {
     this.locationCallbacks = [];
   }
 
-  // Request location permissions
-  async requestPermissions() {
+  // Request location permissions using PermissionService
+  async requestPermissions(requestBackground = false) {
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert(
-          'Quyền truy cập vị trí',
-          'Ứng dụng cần quyền truy cập vị trí để hoạt động. Vui lòng cấp quyền trong cài đặt.',
-          [{ text: 'OK' }]
-        );
+      console.log('🔐 LocationService requesting permissions...');
+      
+      // Request foreground permission
+      const foregroundResult = await permissionService.requestLocationPermission(true);
+      if (!foregroundResult.granted) {
+        console.warn('Foreground location permission denied');
         return false;
       }
 
-      // Request background permissions for ride tracking
-      const { status: backgroundStatus } = await Location.requestBackgroundPermissionsAsync();
-      if (backgroundStatus !== 'granted') {
-        console.warn('Background location permission not granted');
+      // Request background permission if needed
+      if (requestBackground) {
+        const backgroundResult = await permissionService.requestBackgroundLocationPermission(true);
+        if (!backgroundResult.granted) {
+          console.warn('Background location permission denied');
+          // Still return true for foreground permission
+        }
       }
 
       return true;
