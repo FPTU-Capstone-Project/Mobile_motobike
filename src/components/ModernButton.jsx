@@ -66,7 +66,7 @@ const ModernButton = ({
         {...props}
       >
         <LinearGradient
-          colors={disabled ? ['#ccc', '#999'] : ['#4CAF50', '#2E7D32']}
+          colors={disabled ? ['#ccc', '#999'] : ['#34D399', '#059669']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={[styles.gradientButton, getSizeStyle()]}

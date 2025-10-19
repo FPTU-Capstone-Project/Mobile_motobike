@@ -13,6 +13,8 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import authService from '../../services/authService';
+import GlassHeader from '../../components/ui/GlassHeader.jsx';
+import CleanCard from '../../components/ui/CleanCard.jsx';
 import { ApiError } from '../../services/api';
 import { runImagePickerTests } from '../../utils/imagePickerTest';
 
@@ -127,14 +129,11 @@ const ProfileScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Hồ sơ của tôi</Text>
-        </View>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+        <GlassHeader title="Hồ sơ của tôi" />
 
         {/* User Info Card */}
-        <View style={styles.userCard}>
+        <CleanCard style={styles.userCard}>
           <View style={styles.userInfo}>
             <Image 
               source={{ 
@@ -161,10 +160,10 @@ const ProfileScreen = ({ navigation }) => {
               </View>
             </View>
           </View>
-        </View>
+        </CleanCard>
 
         {/* Stats Card */}
-        <View style={styles.statsCard}>
+        <CleanCard style={styles.statsCard}>
           <Text style={styles.statsTitle}>Thống kê</Text>
           <View style={styles.statsContainer}>
             <View style={styles.statItem}>
@@ -190,10 +189,10 @@ const ProfileScreen = ({ navigation }) => {
               <Text style={styles.statLabel}>Đánh giá</Text>
             </View>
           </View>
-        </View>
+        </CleanCard>
 
         {/* Menu Items */}
-        <View style={styles.menuContainer}>
+        <CleanCard style={styles.menuContainer}>
           {menuItems.map((item, index) => (
             <TouchableOpacity 
               key={index} 
@@ -227,13 +226,15 @@ const ProfileScreen = ({ navigation }) => {
               {!item.disabled && <Icon name="chevron-right" size={24} color="#ccc" />}
             </TouchableOpacity>
           ))}
-        </View>
+        </CleanCard>
 
         {/* Logout Button */}
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Icon name="logout" size={24} color="#F44336" />
-          <Text style={styles.logoutText}>Đăng xuất</Text>
-        </TouchableOpacity>
+        <CleanCard>
+          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+            <Icon name="logout" size={24} color="#F44336" />
+            <Text style={styles.logoutText}>Đăng xuất</Text>
+          </TouchableOpacity>
+        </CleanCard>
 
         {/* App Version */}
         <Text style={styles.versionText}>Phiên bản 1.0.0</Text>

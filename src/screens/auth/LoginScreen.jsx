@@ -1,21 +1,10 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
-  ActivityIndicator,
-  Image
-} from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, Image } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { FontAwesome } from '@expo/vector-icons'; // icon cho Google/Facebook
 import authService from '../../services/authService';
 import { ApiError } from '../../services/api';
+import GlassButton from '../../components/ui/GlassButton.jsx';
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -196,14 +185,7 @@ const LoginScreen = ({ navigation }) => {
           </TouchableOpacity>
 
           {/* Sign In */}
-          <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleLogin}
-            disabled={loading}
-            activeOpacity={0.9}
-          >
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Sign In</Text>}
-          </TouchableOpacity>
+          <GlassButton title={loading ? '...' : 'Sign In'} onPress={handleLogin} />
 
           {/* Divider: Or With */}
           <View style={styles.dividerRow}>

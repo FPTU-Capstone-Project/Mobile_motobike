@@ -11,6 +11,9 @@ import {
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Animatable from 'react-native-animatable';
+import GlassHeader from '../../components/ui/GlassHeader.jsx';
+import CleanCard from '../../components/ui/CleanCard.jsx';
+import { colors } from '../../theme/designTokens';
 
 import mockData from '../../data/mockData.json';
 import ModernButton from '../../components/ModernButton.jsx';
@@ -214,41 +217,11 @@ const HomeScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Verification Banner */}
-        {authService.isRider() && authService.needsRiderVerification() && (
-          <Animatable.View animation="fadeInDown" style={styles.verificationBanner}>
-            <View style={styles.bannerContent}>
-              <Icon name="warning" size={20} color="#FF9800" />
-              <Text style={styles.bannerText}>Cần xác minh tài khoản để sử dụng dịch vụ</Text>
-              <TouchableOpacity 
-                style={styles.bannerButton}
-                onPress={() => navigation.navigate('ProfileSwitch')}
-              >
-                <Text style={styles.bannerButtonText}>Xác minh</Text>
-              </TouchableOpacity>
-            </View>
-          </Animatable.View>
-        )}
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+        {/* Verification Banner removed per request */}
 
-        {/* Header with Gradient */}
-        <LinearGradient
-          colors={['#4CAF50', '#2E7D32']}
-          style={styles.header}
-        >
-          <View style={styles.headerContent}>
-            <View style={styles.userInfo}>
-              <Text style={styles.greeting}>Xin chào,</Text>
-              <Text style={styles.userName}>{user.name}</Text>
-            </View>
-            <TouchableOpacity style={styles.notificationButton}>
-              <Icon name="notifications" size={24} color="#fff" />
-              <View style={styles.notificationBadge}>
-                <Text style={styles.badgeText}>2</Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-        </LinearGradient>
+        {/* Glass Header */}
+        <GlassHeader title={user.name} subtitle="Xin chào," onBellPress={() => {}} />
 
         {/* Mode Selector */}
         <View style={styles.content}>
@@ -289,21 +262,23 @@ const HomeScreen = ({ navigation }) => {
             </ScrollView>
           </View>
 
-          {/* Selected Route Summary */}
+          {/* Selected Route Summary (Glass) */}
           {selectedPickup && selectedDropoff && (
-            <Animatable.View animation="fadeInUp" style={styles.routeSummary}>
-              <Text style={styles.routeTitle}>Tuyến đường đã chọn</Text>
-              <View style={styles.routeContainer}>
-                <View style={styles.routePoint}>
-                  <View style={styles.pickupDot} />
-                  <Text style={styles.routeText}>{selectedPickup.name}</Text>
+            <Animatable.View animation="fadeInUp">
+              <CleanCard>
+                <Text style={styles.routeTitle}>Tuyến đường đã chọn</Text>
+                <View style={styles.routeContainer}>
+                  <View style={styles.routePoint}>
+                    <View style={styles.pickupDot} />
+                    <Text style={styles.routeText}>{selectedPickup.name}</Text>
+                  </View>
+                  <View style={styles.routeLine} />
+                  <View style={styles.routePoint}>
+                    <View style={styles.dropoffDot} />
+                    <Text style={styles.routeText}>{selectedDropoff.name}</Text>
+                  </View>
                 </View>
-                <View style={styles.routeLine} />
-                <View style={styles.routePoint}>
-                  <View style={styles.dropoffDot} />
-                  <Text style={styles.routeText}>{selectedDropoff.name}</Text>
-                </View>
-              </View>
+              </CleanCard>
             </Animatable.View>
           )}
 
@@ -313,7 +288,6 @@ const HomeScreen = ({ navigation }) => {
               title={userMode === 'manual' ? 'Tìm tài xế xung quanh' : 'Tìm xe tự động'}
               onPress={handleFindRide}
               icon={userMode === 'manual' ? 'search' : 'auto-fix-high'}
-              size="large"
             />
           </View>
 
@@ -322,7 +296,7 @@ const HomeScreen = ({ navigation }) => {
             <Animatable.View animation="slideInUp" style={styles.driversSection}>
               <Text style={styles.sectionTitle}>Tài xế có sẵn</Text>
               {availableDrivers.length === 0 ? (
-                <View style={styles.noDrivers}>
+                <CleanCard style={{ padding: 24 }}>
                   <Icon name="search-off" size={48} color="#ccc" />
                   <Text style={styles.noDriversText}>Không có tài xế nào phù hợp</Text>
                   <ModernButton
@@ -333,7 +307,7 @@ const HomeScreen = ({ navigation }) => {
                       setShowDrivers(false);
                     }}
                   />
-                </View>
+                </CleanCard>
               ) : (
                 availableDrivers.map((driver) => (
                   <TouchableOpacity
@@ -370,22 +344,30 @@ const HomeScreen = ({ navigation }) => {
           <View style={styles.quickActions}>
             <Text style={styles.sectionTitle}>Thao tác nhanh</Text>
             <View style={styles.actionsGrid}>
-              <TouchableOpacity style={styles.actionItem} onPress={() => navigation.navigate('History')}>
+              <CleanCard style={styles.actionItem}>
+                <TouchableOpacity onPress={() => navigation.navigate('History')} style={{ alignItems: 'center' }}>
                 <Icon name="history" size={24} color="#2196F3" />
                 <Text style={styles.actionText}>Lịch sử</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.actionItem} onPress={() => navigation.navigate('Wallet')}>
+                </TouchableOpacity>
+              </CleanCard>
+              <CleanCard style={styles.actionItem}>
+                <TouchableOpacity onPress={() => navigation.navigate('Wallet')} style={{ alignItems: 'center' }}>
                 <Icon name="account-balance-wallet" size={24} color="#4CAF50" />
                 <Text style={styles.actionText}>Ví tiền</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.actionItem}>
+                </TouchableOpacity>
+              </CleanCard>
+              <CleanCard style={styles.actionItem}>
+                <TouchableOpacity style={{ alignItems: 'center' }}>
                 <Icon name="local-offer" size={24} color="#FF9800" />
                 <Text style={styles.actionText}>Ưu đãi</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.actionItem}>
+                </TouchableOpacity>
+              </CleanCard>
+              <CleanCard style={styles.actionItem}>
+                <TouchableOpacity style={{ alignItems: 'center' }}>
                 <Icon name="help" size={24} color="#9C27B0" />
                 <Text style={styles.actionText}>Hỗ trợ</Text>
-              </TouchableOpacity>
+                </TouchableOpacity>
+              </CleanCard>
             </View>
           </View>
         </View>
@@ -395,10 +377,7 @@ const HomeScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
-  },
+  container: { flex: 1, backgroundColor: '#F5F7FB' },
   verificationBanner: {
     backgroundColor: '#FFF3E0',
     marginHorizontal: 16,
@@ -480,12 +459,7 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 24,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 16,
-  },
+  sectionTitle: { fontSize: 18, fontWeight: '600', color: '#111827', marginBottom: 16 },
   locationScroll: {
     marginHorizontal: -4,
   },
@@ -504,12 +478,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
   },
-  routeTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 16,
-  },
+  routeTitle: { fontSize: 16, fontWeight: '600', color: '#111827', marginBottom: 16 },
   routeContainer: {
     alignItems: 'flex-start',
   },
@@ -539,11 +508,7 @@ const styles = StyleSheet.create({
     marginLeft: 5,
     marginVertical: 2,
   },
-  routeText: {
-    fontSize: 16,
-    color: '#1a1a1a',
-    fontWeight: '500',
-  },
+  routeText: { fontSize: 16, color: '#1f2937', fontWeight: '500' },
   buttonContainer: {
     marginBottom: 24,
   },
@@ -639,19 +604,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
-  actionItem: {
-    width: '22%',
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    alignItems: 'center',
-    marginBottom: 12,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-  },
+  actionItem: { width: '22%', borderRadius: 16, padding: 16, alignItems: 'center', marginBottom: 12 },
   actionText: {
     fontSize: 12,
     color: '#666',

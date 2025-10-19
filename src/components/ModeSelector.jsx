@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import * as Animatable from 'react-native-animatable';
+import CleanCard from './ui/CleanCard.jsx';
 
 const ModeSelector = ({ mode, onModeChange, userType = 'user' }) => {
   const modes = [
@@ -28,46 +29,45 @@ const ModeSelector = ({ mode, onModeChange, userType = 'user' }) => {
         {modes.map((modeOption) => (
           <TouchableOpacity
             key={modeOption.key}
-            style={[
-              styles.modeCard,
-              mode === modeOption.key && styles.selectedMode
-            ]}
+            style={[styles.touchWrapper]}
             onPress={() => onModeChange(modeOption.key)}
             activeOpacity={0.8}
           >
-            <Animatable.View
-              animation={mode === modeOption.key ? 'pulse' : undefined}
-              iterationCount={mode === modeOption.key ? 'infinite' : 1}
-              direction="alternate"
-              style={[
-                styles.iconContainer,
-                { backgroundColor: mode === modeOption.key ? modeOption.color : '#f5f5f5' }
-              ]}
-            >
-              <Icon 
-                name={modeOption.icon} 
-                size={24} 
-                color={mode === modeOption.key ? '#fff' : modeOption.color} 
-              />
-            </Animatable.View>
-            
-            <View style={styles.textContainer}>
-              <Text style={[
-                styles.modeTitle,
-                mode === modeOption.key && { color: modeOption.color }
-              ]}>
-                {modeOption.title}
-              </Text>
-              <Text style={styles.modeSubtitle}>
-                {modeOption.subtitle}
-              </Text>
-            </View>
-            
-            {mode === modeOption.key && (
-              <View style={[styles.selectedIndicator, { backgroundColor: modeOption.color }]}>
-                <Icon name="check" size={16} color="#fff" />
+            <CleanCard style={[styles.modeCard, mode === modeOption.key && styles.selectedMode]}>
+              <Animatable.View
+                animation={mode === modeOption.key ? 'pulse' : undefined}
+                iterationCount={mode === modeOption.key ? 'infinite' : 1}
+                direction="alternate"
+                style={[
+                  styles.iconContainer,
+                  { backgroundColor: mode === modeOption.key ? modeOption.color : '#f5f5f5' }
+                ]}
+              >
+                <Icon 
+                  name={modeOption.icon} 
+                  size={24} 
+                  color={mode === modeOption.key ? '#fff' : modeOption.color} 
+                />
+              </Animatable.View>
+              
+              <View style={styles.textContainer}>
+                <Text style={[
+                  styles.modeTitle,
+                  mode === modeOption.key && { color: modeOption.color }
+                ]}>
+                  {modeOption.title}
+                </Text>
+                <Text style={styles.modeSubtitle}>
+                  {modeOption.subtitle}
+                </Text>
               </View>
-            )}
+              
+              {mode === modeOption.key && (
+                <View style={[styles.selectedIndicator, { backgroundColor: modeOption.color }]}> 
+                  <Icon name="check" size={16} color="#fff" />
+                </View>
+              )}
+            </CleanCard>
           </TouchableOpacity>
         ))}
       </View>
@@ -90,24 +90,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
   },
+  touchWrapper: { flex: 1 },
   modeCard: {
     flex: 1,
-    backgroundColor: '#fff',
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 16,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    borderWidth: 1,
-    borderColor: '#f0f0f0',
   },
   selectedMode: {
     borderColor: '#4CAF50',
     borderWidth: 2,
-    elevation: 4,
-    shadowOpacity: 0.15,
   },
   iconContainer: {
     width: 48,

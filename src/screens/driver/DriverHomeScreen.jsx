@@ -108,7 +108,7 @@ const DriverHomeScreen = ({ navigation }) => {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header with Gradient */}
         <LinearGradient
-          colors={['#4CAF50', '#2E7D32']}
+          colors={['#10412F', '#000000']}
           style={styles.header}
         >
           <View style={styles.headerContent}>
@@ -170,7 +170,7 @@ const DriverHomeScreen = ({ navigation }) => {
             <View style={styles.statsGrid}>
               <View style={styles.statItem}>
                 <LinearGradient
-                  colors={['#4CAF50', '#2E7D32']}
+                  colors={['#10412F', '#000000']}
                   style={styles.statIcon}
                 >
                   <Icon name="attach-money" size={24} color="#fff" />
@@ -385,7 +385,7 @@ const DriverHomeScreen = ({ navigation }) => {
                 onPress={() => navigation.navigate('Earnings')}
               >
                 <LinearGradient
-                  colors={['#4CAF50', '#2E7D32']}
+                  colors={['#10412F', '#000000']}
                   style={styles.actionIcon}
                 >
                   <Icon name="trending-up" size={20} color="#fff" />

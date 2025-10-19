@@ -75,7 +75,7 @@ const DriverProfileScreen = ({ navigation }) => {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header */}
         <LinearGradient
-          colors={['#4CAF50', '#2E7D32']}
+          colors={['#10412F', '#000000']}
           style={styles.header}
         >
           <View style={styles.headerContent}>
@@ -143,7 +143,7 @@ const DriverProfileScreen = ({ navigation }) => {
 
               <View style={styles.statItem}>
                 <LinearGradient
-                  colors={['#4CAF50', '#2E7D32']}
+                  colors={['#10412F', '#000000']}
                   style={styles.statIcon}
                 >
                   <Icon name="schedule" size={20} color="#fff" />

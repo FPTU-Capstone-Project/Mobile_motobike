@@ -257,10 +257,10 @@ const ProfileSwitchScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
         {/* Header */}
         <LinearGradient
-          colors={['#4CAF50', '#2E7D32']}
+          colors={['#10412F', '#000000']}
           style={styles.header}
         >
           <View style={styles.headerContent}>

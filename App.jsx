@@ -3,8 +3,10 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { PaperProvider } from 'react-native-paper';
+import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import { View, ActivityIndicator } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { colors } from './src/theme/designTokens';
 import authService from './src/services/authService';
 
 // Screens
@@ -39,6 +41,7 @@ import SOSAlertScreen from './src/screens/driver/SOSAlertScreen.jsx';
 
 // Navigation
 import DriverTabNavigator from './src/navigation/DriverTabNavigator.jsx';
+import GlassTabBar from './src/components/ui/GlassTabBar.jsx';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -47,6 +50,7 @@ function MainTabs() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
+        tabBarStyle: { position: 'absolute', backgroundColor: 'transparent', borderTopWidth: 0, elevation: 0, height: 0 },
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
           
@@ -62,10 +66,11 @@ function MainTabs() {
           
           return <Icon name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: '#000',
-        tabBarInactiveTintColor: 'gray',
+        tabBarActiveTintColor: colors.primaryDark,
+        tabBarInactiveTintColor: '#9CA3AF',
         headerShown: false,
       })}
+      tabBar={(props) => <GlassTabBar {...props} />}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Wallet" component={WalletScreen} />
@@ -76,6 +81,7 @@ function MainTabs() {
 }
 
 export default function App() {
+  const [fontsLoaded] = useFonts({ Inter_400Regular, Inter_600SemiBold, Inter_700Bold });
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
@@ -94,7 +100,7 @@ export default function App() {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || !fontsLoaded) {
     return (
       <PaperProvider>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>

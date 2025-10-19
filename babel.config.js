@@ -14,6 +14,7 @@ module.exports = function(api) {
           },
         },
       ],
+      // removed reanimated plugin due to revert
     ],
   };
 };

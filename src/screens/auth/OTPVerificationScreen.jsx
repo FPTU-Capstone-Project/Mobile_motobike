@@ -183,7 +183,7 @@ const OTPVerificationScreen = ({ navigation, route }) => {
       >
         {/* Header */}
         <LinearGradient
-          colors={['#4CAF50', '#2E7D32']}
+          colors={['#10412F', '#000000']}
           style={styles.header}
         >
           <View style={styles.headerContent}>
@@ -203,7 +203,7 @@ const OTPVerificationScreen = ({ navigation, route }) => {
           <Animatable.View animation="fadeInUp" style={styles.instructionsContainer}>
             <View style={styles.iconContainer}>
               <LinearGradient
-                colors={['#4CAF50', '#2E7D32']}
+                colors={['#10412F', '#000000']}
                 style={styles.iconGradient}
               >
                 <Icon name="email" size={48} color="#fff" />

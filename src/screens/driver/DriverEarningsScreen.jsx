@@ -110,7 +110,7 @@ const DriverEarningsScreen = ({ navigation }) => {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header */}
         <LinearGradient
-          colors={['#4CAF50', '#2E7D32']}
+          colors={['#10412F', '#000000']}
           style={styles.header}
         >
           <View style={styles.headerContent}>
@@ -176,7 +176,7 @@ const DriverEarningsScreen = ({ navigation }) => {
 
               <View style={styles.summaryItem}>
                 <LinearGradient
-                  colors={['#4CAF50', '#2E7D32']}
+                  colors={['#10412F', '#000000']}
                   style={styles.summaryIcon}
                 >
                   <Icon name="attach-money" size={24} color="#fff" />

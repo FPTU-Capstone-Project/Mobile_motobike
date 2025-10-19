@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { LinearGradient } from 'expo-linear-gradient';
+import CleanCard from './ui/CleanCard.jsx';
 
 const LocationCard = ({ location, onPress, selected = false }) => {
   const getGradientColors = () => {
@@ -20,11 +21,8 @@ const LocationCard = ({ location, onPress, selected = false }) => {
   };
 
   return (
-    <TouchableOpacity
-      style={[styles.container, selected && styles.selected]}
-      onPress={onPress}
-      activeOpacity={0.8}
-    >
+    <TouchableOpacity onPress={onPress} activeOpacity={0.9}>
+      <CleanCard style={[styles.container, selected && styles.selected]}>
       <LinearGradient
         colors={getGradientColors()}
         style={styles.iconContainer}
@@ -48,6 +46,7 @@ const LocationCard = ({ location, onPress, selected = false }) => {
           <Icon name="check-circle" size={20} color="#4CAF50" />
         </View>
       )}
+      </CleanCard>
     </TouchableOpacity>
   );
 };
@@ -56,24 +55,14 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 16,
     marginVertical: 6,
     marginHorizontal: 4,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    borderWidth: 1,
-    borderColor: '#f0f0f0',
   },
   selected: {
     borderColor: '#4CAF50',
     borderWidth: 2,
-    elevation: 4,
-    shadowOpacity: 0.15,
   },
   iconContainer: {
     width: 48,

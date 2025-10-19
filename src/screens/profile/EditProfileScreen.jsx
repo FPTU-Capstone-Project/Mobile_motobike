@@ -284,7 +284,7 @@ const EditProfileScreen = ({ navigation }) => {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header */}
         <LinearGradient
-          colors={['#4CAF50', '#2E7D32']}
+          colors={['#10412F', '#000000']}
           style={styles.header}
         >
           <View style={styles.headerContent}>
@@ -324,7 +324,7 @@ const EditProfileScreen = ({ navigation }) => {
                 onPress={showAvatarPicker}
               >
                 <LinearGradient
-                  colors={['#4CAF50', '#2E7D32']}
+                  colors={['#10412F', '#000000']}
                   style={styles.avatarEditIcon}
                 >
                   <Icon name="camera-alt" size={20} color="#fff" />
