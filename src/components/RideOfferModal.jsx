@@ -132,10 +132,20 @@ const RideOfferModal = ({
     );
   };
 
-  if (!offer) return null;
+  if (!offer) {
+    console.log('❌ RideOfferModal: No offer data, returning null');
+    return null;
+  }
 
   const isExpired = countdown <= 0;
   const isUrgent = countdown <= 10;
+
+  console.log('🎭 RideOfferModal rendering:', {
+    visible,
+    isExpired,
+    isUrgent,
+    countdown
+  });
 
   return (
     <Modal

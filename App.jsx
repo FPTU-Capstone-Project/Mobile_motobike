@@ -39,6 +39,7 @@ import DriverHomeScreen from './src/screens/driver/DriverHomeScreen.jsx';
 import DriverTestScreen from './src/screens/driver/DriverTestScreen.jsx';
 import CreateSharedRideScreen from './src/screens/driver/CreateSharedRideScreen.jsx';
 import VehicleManagementScreen from './src/screens/driver/VehicleManagementScreen.jsx';
+import DriverRideTrackingScreen from './src/screens/driver/RideTrackingScreen.jsx';
 import DriverDashboardScreen from './src/screens/driver/DriverDashboardScreen.jsx';
 import DriverEarningsScreen from './src/screens/driver/DriverEarningsScreen.jsx';
 import DriverRatingsScreen from './src/screens/driver/DriverRatingsScreen.jsx';
@@ -166,6 +167,11 @@ export default function App() {
         <Stack.Screen
           name="VehicleManagement"
           component={VehicleManagementScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="DriverRideTracking"
+          component={DriverRideTrackingScreen}
           options={{ headerShown: false }}
         />
           <Stack.Screen 

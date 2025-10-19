@@ -7,46 +7,82 @@ class RideService {
   }
 
   // ========== QUOTE SERVICES ==========
+
+  async normalizeQuoteFromBE(payload = {}) {
+    const fare = payload.fare || {};
+  
+    const safeAmount = (obj) =>
+      (obj && typeof obj.amount === 'number') ? obj.amount : null;
+  
+    return {
+      // giữ lại thông tin gốc quan trọng
+      quoteId: payload.quoteId ?? null,
+      riderId: payload.riderId ?? null,
+      pricingConfigId: payload.pricingConfigId ?? null,
+      createdAt: payload.createdAt ?? null,
+      expiresAt: payload.expiresAt ?? null,
+  
+      // quãng đường & thời gian
+      distanceM: (typeof payload.distanceM === 'number') ? payload.distanceM : null,
+      durationS: (typeof payload.durationS === 'number') ? payload.durationS : null,
+  
+      // toạ độ nếu cần dùng lại
+      pickupLat: payload.pickupLat ?? null,
+      pickupLng: payload.pickupLng ?? null,
+      dropoffLat: payload.dropoffLat ?? null,
+      dropoffLng: payload.dropoffLng ?? null,
+  
+      // giá cước — đưa về dạng số, KHÔNG còn .amount ở UI
+      fare: {
+        total:       safeAmount(fare.total),
+        subtotal:    safeAmount(fare.subtotal),
+        base2Km:     safeAmount(fare.base2KmVnd),
+        after2KmPerKm: safeAmount(fare.after2KmPerKmVnd),
+        discount:    safeAmount(fare.discount),
+        commissionRate: typeof fare.commissionRate === 'number' ? fare.commissionRate : null,
+        pricingVersion: fare.pricingVersion ?? null,
+        distanceMetersEcho: typeof fare.distanceMeters === 'number' ? fare.distanceMeters : null
+      },
+  
+      polyline: payload.polyline ?? null,
+  
+      // giữ toàn bộ gốc nếu UI cần soi thêm
+      raw: payload
+    };
+  }
   
   async getQuote(pickup, dropoff, desiredPickupTime = null, notes = null) {
     try {
       const body = {};
-
-      // Handle pickup location - prefer POI ID if available
-      if (pickup.locationId || pickup.id) {
+  
+      if (pickup?.locationId || pickup?.id) {
         body.pickupLocationId = pickup.locationId || pickup.id;
-      } else if (pickup.latitude && pickup.longitude) {
-        body.pickup = {
-          latitude: pickup.latitude,
-          longitude: pickup.longitude
-        };
+      } else if (pickup?.latitude && pickup?.longitude) {
+        body.pickup = { latitude: pickup.latitude, longitude: pickup.longitude };
       } else {
         throw new Error('Invalid pickup location: must have either locationId or coordinates');
       }
-
-      // Handle dropoff location - prefer POI ID if available  
-      if (dropoff.locationId || dropoff.id) {
+  
+      if (dropoff?.locationId || dropoff?.id) {
         body.dropoffLocationId = dropoff.locationId || dropoff.id;
-      } else if (dropoff.latitude && dropoff.longitude) {
-        body.dropoff = {
-          latitude: dropoff.latitude,
-          longitude: dropoff.longitude
-        };
+      } else if (dropoff?.latitude && dropoff?.longitude) {
+        body.dropoff = { latitude: dropoff.latitude, longitude: dropoff.longitude };
       } else {
         throw new Error('Invalid dropoff location: must have either locationId or coordinates');
       }
-
-      // Add optional fields if provided
-      if (desiredPickupTime) {
-        body.desiredPickupTime = desiredPickupTime;
-      }
-      if (notes) {
-        body.notes = notes;
-      }
-
+  
+      if (desiredPickupTime) body.desiredPickupTime = desiredPickupTime;
+      if (notes) body.notes = notes;
+  
       console.log('Quote request body:', JSON.stringify(body, null, 2));
-      const response = await this.apiService.post(ENDPOINTS.QUOTES.GET_QUOTE, body);
-      return response;
+  
+      const raw = await this.apiService.post(ENDPOINTS.QUOTES.GET_QUOTE, body);
+      // Nếu apiService là axios wrapper, nó có thể trả { data: ... }
+      const payload = (raw && typeof raw === 'object' && 'data' in raw) ? raw.data : raw;
+  
+      const normalized = await this.normalizeQuoteFromBE(payload);
+  
+      return normalized;
     } catch (error) {
       console.error('Get quote error:', error);
       throw error;
@@ -184,6 +220,43 @@ class RideService {
       return response;
     } catch (error) {
       console.error('Reject ride request error:', error);
+      throw error;
+    }
+  }
+
+  // Get ride by ID
+  async getRideById(rideId) {
+    try {
+      const endpoint = ENDPOINTS.SHARED_RIDES.GET_BY_ID.replace('{rideId}', rideId);
+      const response = await this.apiService.get(endpoint);
+      return response;
+    } catch (error) {
+      console.error('Get ride by ID error:', error);
+      throw error;
+    }
+  }
+
+  // Complete ride
+  async completeRide(rideId) {
+    try {
+      const endpoint = ENDPOINTS.SHARED_RIDES.COMPLETE.replace('{rideId}', rideId);
+      const response = await this.apiService.post(endpoint);
+      return response;
+    } catch (error) {
+      console.error('Complete ride error:', error);
+      throw error;
+    }
+  }
+
+  // Cancel ride
+  async cancelRide(rideId, reason = null) {
+    try {
+      const endpoint = ENDPOINTS.SHARED_RIDES.CANCEL.replace('{rideId}', rideId);
+      const body = reason ? { reason } : {};
+      const response = await this.apiService.post(endpoint, body);
+      return response;
+    } catch (error) {
+      console.error('Cancel ride error:', error);
       throw error;
     }
   }

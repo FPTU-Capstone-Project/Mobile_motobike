@@ -1,6 +1,7 @@
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import * as Notifications from 'expo-notifications';
+import { AppState } from 'react-native';
 import apiService from './api';
 import { ENDPOINTS } from '../config/api';
 import permissionService from './permissionService';
@@ -16,6 +17,23 @@ class LocationTrackingService {
     this.lastSendTime = 0;
     this.sendInterval = 30000; // 30 seconds
     this.maxBufferSize = 5; // Send when buffer reaches 5 points
+    this.pendingRideId = null;
+    
+    // Listen for app state changes
+    this.appStateSubscription = AppState.addEventListener('change', this.handleAppStateChange.bind(this));
+  }
+
+  /**
+   * Handle app state changes
+   */
+  handleAppStateChange(nextAppState) {
+    if (nextAppState === 'active' && this.pendingRideId) {
+      console.log('App became active, starting pending GPS tracking...');
+      this.startTracking(this.pendingRideId).catch(error => {
+        console.error('Failed to start pending GPS tracking:', error);
+      });
+      this.pendingRideId = null;
+    }
   }
 
   /**
@@ -24,6 +42,16 @@ class LocationTrackingService {
   async startTracking(rideId) {
     try {
       console.log(`Starting GPS tracking for ride ${rideId}`);
+
+      // Check if app is in foreground
+      if (AppState.currentState !== 'active') {
+        console.log('App is in background, showing notification to start tracking...');
+        // Show notification to bring app to foreground
+        await this.showTrackingNotification(rideId);
+        // Store rideId to start tracking when app becomes active
+        this.pendingRideId = rideId;
+        return false; // Return false to indicate tracking will start later
+      }
 
       // Request location permissions using PermissionService
       const foregroundResult = await permissionService.requestLocationPermission(true);

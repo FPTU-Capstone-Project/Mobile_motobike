@@ -92,17 +92,25 @@ const DriverHomeScreen = ({ navigation }) => {
 
 
   const handleRideOffer = (offer) => {
+    console.log('📨 Received driver offer:', offer);
     console.log('Processing ride offer:', offer);
     
     // Check if this is a tracking start signal
     if (offer.type === 'TRACKING_START') {
+      console.log('📍 Tracking start signal received:', offer);
       handleTrackingStart(offer);
       return;
     }
     
     // This is a ride offer
+    console.log('🚗 Ride offer received, showing modal...');
+    console.log('📊 Offer data:', JSON.stringify(offer, null, 2));
+    console.log('🔍 Offer keys:', Object.keys(offer));
+    
     setCurrentOffer(offer);
     setShowOfferModal(true);
+    
+    console.log('✅ Modal should be visible now');
     
     // Start countdown timer
     if (offer.offerExpiresAt) {
@@ -425,14 +433,21 @@ const DriverHomeScreen = ({ navigation }) => {
 
       {/* Ride Offer Modal */}
       {showOfferModal && currentOffer && (
-        <RideOfferModal
-          visible={showOfferModal}
-          offer={currentOffer}
-          countdown={offerCountdown}
-          onAccept={() => handleOfferResponse(true)}
-          onReject={(reason) => handleOfferResponse(false, reason)}
-          onClose={() => handleOfferResponse(false)}
-        />
+        <>
+          {console.log('🎭 Rendering RideOfferModal with:', {
+            showOfferModal,
+            currentOffer: currentOffer ? Object.keys(currentOffer) : null,
+            offerCountdown
+          })}
+          <RideOfferModal
+            visible={showOfferModal}
+            offer={currentOffer}
+            countdown={offerCountdown}
+            onAccept={() => handleOfferResponse(true)}
+            onReject={(reason) => handleOfferResponse(false, reason)}
+            onClose={() => handleOfferResponse(false)}
+          />
+        </>
       )}
     </SafeAreaView>
   );

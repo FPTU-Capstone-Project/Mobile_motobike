@@ -331,17 +331,25 @@ const RideBookingScreen = ({ navigation, route }) => {
       
       // Process the quote data to match our UI needs
       const processedQuote = {
-        ...quoteData,
-        pickup: pickup,
-        dropoff: dropoff,
-        pickupAddress: pickupAddress,
-        dropoffAddress: dropoffAddress,
-        distance: quoteData.distanceM / 1000, // Convert meters to km
-        estimatedDuration: Math.round(quoteData.durationS / 60), // Convert seconds to minutes
-        totalFare: quoteData.fare.total.amount,
-        baseFare: quoteData.fare.baseFlag.amount,
-        distanceFare: quoteData.fare.perKmComponent.amount,
-        timeFare: quoteData.fare.perMinComponent.amount,
+        ...quoteData, // có: distanceM, durationS, expiresAt, fare.{total,subtotal,base2Km,after2KmPerKm,...}, polyline
+        pickup,
+        dropoff,
+        pickupAddress,
+        dropoffAddress,
+      
+        distance: (typeof quoteData.distanceM === 'number')
+          ? quoteData.distanceM / 1000
+          : null,
+      
+        estimatedDuration: (typeof quoteData.durationS === 'number')
+          ? Math.round(quoteData.durationS / 60)
+          : null,
+      
+        // map sang tên cũ UI đang hiển thị, nhưng từ giá trị đã normalize
+        totalFare: quoteData.fare?.total ?? null,
+        baseFare: quoteData.fare?.base2Km ?? null,             // giá mở cửa 2km đầu
+        distanceFare: quoteData.fare?.after2KmPerKm ?? null,    // đơn giá/km sau 2km
+        timeFare: null,                                         // BE hiện chưa cung cấp theo phút
         validUntil: quoteData.expiresAt
       };
       

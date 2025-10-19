@@ -1,4 +1,6 @@
+// services/websocketService.js
 import { Client } from '@stomp/stompjs';
+import SockJS from 'sockjs-client';
 import { API_CONFIG, ENDPOINTS } from '../config/api';
 import authService from './authService';
 
@@ -12,6 +14,10 @@ class WebSocketService {
     this.subscriptions = new Map();
     this.messageHandlers = new Map();
     this.connectionPromise = null;
+
+    // PATCH: keep constants here for clarity
+    this.HEARTBEAT_MS = 10000;
+    this.CONNECTION_TIMEOUT_MS = 30000;
   }
 
   // Initialize WebSocket connection
@@ -21,84 +27,110 @@ class WebSocketService {
       return this.connectionPromise;
     }
 
-    this.connectionPromise = new Promise((resolve, reject) => {
+    this.connectionPromise = new Promise(async (outerResolve, outerReject) => {
+      let timeoutId = null; // PATCH: keep local timer, do not reassign resolve/reject
       try {
-        const token = authService.token;
+        // Get valid token (will refresh if expired)
+        const token = await authService.getValidToken();
         if (!token) {
-          reject(new Error('No authentication token available'));
+          outerReject(new Error('No authentication token available'));
           return;
         }
 
         // Disconnect existing connection first
         this.disconnect();
 
-        // Try multiple WebSocket endpoints
+        // Build base URLs
         const baseUrl = API_CONFIG.CURRENT.BASE_URL.replace('/api/v1', '');
         const wsBaseUrl = baseUrl.replace('http://', 'ws://').replace('https://', 'wss://');
-        
-        const endpoints = [
-          // Direct WebSocket endpoints (not SockJS)
-          `${wsBaseUrl}/ws-native?token=${encodeURIComponent(token)}`,
-          // Fallback endpoints
-          `${wsBaseUrl}/websocket?token=${encodeURIComponent(token)}`,
-          `${wsBaseUrl}/ws?token=${encodeURIComponent(token)}`,
-          // SockJS endpoints as last resort
-          `${baseUrl}/ws-native/websocket?token=${encodeURIComponent(token)}`,
-        ];
 
-        let currentEndpointIndex = 0;
+        // PATCH: ưu tiên native trước, SockJS sau (fallback)
+        const endpoints = [
+          // Native WebSocket endpoint (backend /ws-native + STOMP)
+          { url: `${wsBaseUrl}${ENDPOINTS.WEBSOCKET.ENDPOINT || '/ws-native'}?token=${encodeURIComponent(token)}`, type: 'websocket', token },
+          // SockJS endpoint (backend /ws có withSockJS)
+          { url: `${baseUrl}/ws?token=${encodeURIComponent(token)}`, type: 'sockjs', token },
+        ];
 
         const tryConnect = (endpointIndex) => {
           if (endpointIndex >= endpoints.length) {
-            reject(new Error('All WebSocket endpoints failed'));
+            outerReject(new Error('All WebSocket endpoints failed'));
             return;
           }
 
-          const wsUrl = endpoints[endpointIndex];
+          const endpoint = endpoints[endpointIndex];
+          const wsUrl = endpoint.url;
+          const connectionType = endpoint.type;
+
           console.log(`🔄 WebSocket attempt ${endpointIndex + 1}/${endpoints.length}:`, wsUrl);
+          console.log(`🔄 Connection type: ${connectionType}`);
           console.log('Auth token:', token ? token.substring(0, 20) + '...' : 'null');
 
-          this.client = new Client({
-            brokerURL: wsUrl,
+          // Configure client based on connection type
+          const clientConfig = {
+            // NOTE: Spring đang đọc token ở query, vẫn giữ headers để không phá API cũ
             connectHeaders: {
-              Authorization: `Bearer ${token}`
+              Authorization: `Bearer ${token}`,
             },
             debug: (str) => {
               if (__DEV__) {
                 console.log('STOMP Debug:', str);
-                // Log specific STOMP frames
                 if (str.includes('>>> CONNECT')) {
                   console.log('📤 Sending STOMP CONNECT frame...');
                 } else if (str.includes('<<< CONNECTED')) {
                   console.log('📥 Received STOMP CONNECTED frame');
                 } else if (str.includes('<<< ERROR')) {
                   console.log('❌ Received STOMP ERROR frame');
+                } else if (str.includes('<<< RECEIPT')) {
+                  console.log('📥 Received STOMP RECEIPT frame');
                 }
               }
             },
-            reconnectDelay: 0, // Disable auto-reconnect
-            heartbeatIncoming: 10000, // Increase heartbeat for Simple Broker
-            heartbeatOutgoing: 10000,
-            // Add connection timeout for Simple Broker compatibility
-            connectionTimeout: 15000,
-            // Add custom headers for WebSocket handshake
+            // Ta tự quản reconnect ở ngoài, không dùng reconnectDelay của lib (giữ = 0)
+            reconnectDelay: 0,
+            heartbeatIncoming: this.HEARTBEAT_MS,
+            heartbeatOutgoing: this.HEARTBEAT_MS,
             beforeConnect: () => {
               console.log('🤝 Preparing WebSocket handshake...');
             },
-          });
+
+            // PATCH: tương thích RN + Spring
+            forceBinaryWSFrames: true,
+            appendMissingNULLonIncoming: true,
+          };
+
+          // PATCH: dùng webSocketFactory cho cả 2 kiểu; khi có factory thì KHÔNG set brokerURL
+          if (connectionType === 'sockjs') {
+            console.log('🔌 Using SockJS connection');
+            clientConfig.webSocketFactory = () => {
+              // Không truyền headers ở đây: SockJS RN không hỗ trợ header handshake.
+              // Token đã có trong query string (wsUrl)
+              return new SockJS(wsUrl);
+            };
+          } else {
+            console.log('🔌 Using native WebSocket connection');
+            clientConfig.webSocketFactory = () => new WebSocket(wsUrl, ['v12.stomp']); // ép subprotocol STOMP 1.2
+          }
+
+          this.client = new Client(clientConfig);
 
           this.client.onConnect = (frame) => {
             console.log('✅ WebSocket connected successfully:', frame);
             console.log('🔗 STOMP session ID:', frame.headers?.['session'] || 'N/A');
             console.log('🔗 STOMP server:', frame.headers?.['server'] || 'N/A');
+            console.log('🔗 STOMP version:', frame.headers?.['version'] || 'N/A');
             console.log('🔗 Connection established at:', new Date().toISOString());
-            
+
             this.isConnected = true;
             this.reconnectAttempts = 0;
-            clearTimeout(connectionTimeout);
+
+            if (timeoutId) {
+              clearTimeout(timeoutId);
+              timeoutId = null;
+            }
             this.connectionPromise = null;
-            
-            resolve(frame);
+
+            outerResolve(frame);
           };
 
           this.client.onDisconnect = (frame) => {
@@ -113,43 +145,55 @@ class WebSocketService {
             console.error('❌ STOMP error headers:', frame.headers);
             console.error('❌ STOMP error body:', frame.body);
             this.isConnected = false;
-            clearTimeout(connectionTimeout);
-            
+
+            if (timeoutId) {
+              clearTimeout(timeoutId);
+              timeoutId = null;
+            }
+
             // Try next endpoint
             console.log(`🔄 Trying next endpoint due to STOMP error...`);
+            try {
+              this.client?.deactivate();
+            } catch {}
             tryConnect(endpointIndex + 1);
           };
 
           this.client.onWebSocketError = (error) => {
             console.error(`❌ WebSocket error (endpoint ${endpointIndex + 1}):`, error);
+            console.error('❌ WebSocket error details:', {
+              type: error?.type,
+              code: error?.code,
+              reason: error?.reason,
+              message: error?.message,
+            });
             this.isConnected = false;
-            
+
+            if (timeoutId) {
+              clearTimeout(timeoutId);
+              timeoutId = null;
+            }
+
             // Try next endpoint
             console.log(`🔄 Trying next endpoint...`);
+            try {
+              this.client?.deactivate();
+            } catch {}
             tryConnect(endpointIndex + 1);
           };
 
-          // Set connection timeout (increase to 15 seconds)
-          const connectionTimeout = setTimeout(() => {
-            console.error('⏰ WebSocket connection timeout after 15 seconds');
-            if (this.client) {
-              this.client.deactivate();
-            }
-            reject(new Error('Connection timeout after 15 seconds'));
-          }, 15000);
-
-          // Clear timeout on successful connection
-          const originalResolve = resolve;
-          resolve = (frame) => {
-            clearTimeout(connectionTimeout);
-            originalResolve(frame);
-          };
-
-          const originalReject = reject;
-          reject = (error) => {
-            clearTimeout(connectionTimeout);
-            originalReject(error);
-          };
+          // PATCH: connection timeout đúng cách
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+          }
+          timeoutId = setTimeout(() => {
+            console.error(`⏰ WebSocket connection timeout after ${this.CONNECTION_TIMEOUT_MS / 1000} seconds`);
+            this.isConnected = false;
+            try {
+              this.client?.deactivate();
+            } catch {}
+            outerReject(new Error(`Connection timeout after ${this.CONNECTION_TIMEOUT_MS / 1000} seconds`));
+          }, this.CONNECTION_TIMEOUT_MS);
 
           // Activate the client
           console.log('🚀 Activating STOMP client...');
@@ -158,11 +202,11 @@ class WebSocketService {
 
         // Start trying to connect
         tryConnect(0);
-
       } catch (error) {
         console.error('Connection setup error:', error);
         this.connectionPromise = null;
-        reject(error);
+        if (timeoutId) clearTimeout(timeoutId);
+        outerReject(error);
       }
     });
 
@@ -172,7 +216,7 @@ class WebSocketService {
   // Disconnect from WebSocket
   disconnect() {
     console.log('🔌 Disconnecting WebSocket...');
-    
+
     if (this.client) {
       try {
         // Unsubscribe from all subscriptions
@@ -280,11 +324,11 @@ class WebSocketService {
   async connectAsRider(onRideMatching, onNotification) {
     try {
       await this.connect();
-      
+
       // Subscribe to rider-specific queues
       this.subscribeToRiderMatching(onRideMatching);
       this.subscribeToNotifications(onNotification);
-      
+
       console.log('✅ Rider connected and subscribed to all queues');
       return true;
     } catch (error) {
@@ -297,12 +341,28 @@ class WebSocketService {
   async connectAsDriver(onRideOffer, onNotification) {
     try {
       await this.connect();
-      
+
       // Subscribe to driver-specific queues
       this.subscribeToDriverOffers(onRideOffer);
       this.subscribeToNotifications(onNotification);
-      
+
       console.log('✅ Driver connected and subscribed to all queues');
+
+      // Send test message to verify connection (like in HTML demo)
+      setTimeout(() => {
+        if (this.client && this.client.connected) {
+          console.log('📤 Sending test message to /app/test...');
+          this.client.publish({
+            destination: '/app/test',
+            body: JSON.stringify({
+              message: 'Driver connected from mobile app',
+              timestamp: new Date().toISOString(),
+              type: 'driver_connection_test',
+            }),
+          });
+        }
+      }, 1000);
+
       return true;
     } catch (error) {
       console.error('❌ Failed to connect as driver:', error);
@@ -334,7 +394,7 @@ class WebSocketService {
     console.log('📤 Sending message to:', destination, message);
     this.client.publish({
       destination: destination,
-      body: JSON.stringify(message)
+      body: JSON.stringify(message),
     });
   }
 
@@ -344,7 +404,7 @@ class WebSocketService {
       isConnected: this.isConnected,
       reconnectAttempts: this.reconnectAttempts,
       subscriptions: Array.from(this.subscriptions.keys()),
-      hasClient: !!this.client
+      hasClient: !!this.client,
     };
   }
 

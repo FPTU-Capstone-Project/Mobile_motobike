@@ -22,19 +22,114 @@ import authService from '../../services/authService';
 import poiService from '../../services/poiService';
 import { locationStorageService } from '../../services/locationStorageService';
 import permissionService from '../../services/permissionService';
+import websocketService from '../../services/websocketService';
+import fcmService from '../../services/fcmService';
 
 const { width } = Dimensions.get('window');
 
 const HomeScreen = ({ navigation }) => {
   const [currentLocation, setCurrentLocation] = useState(null);
   const [user, setUser] = useState(null);
+  const [isWebSocketConnected, setIsWebSocketConnected] = useState(false);
   const [loading, setLoading] = useState(true);
   const [nearbyRides, setNearbyRides] = useState([]);
   const [loadingRides, setLoadingRides] = useState(false);
   const [presetLocations, setPresetLocations] = useState([]);
   useEffect(() => {
     initializeHome();
+    initializeRiderWebSocket();
+    
+    // Don't disconnect WebSocket on unmount - keep it alive for ride booking
+    return () => {
+      console.log('🧹 HomeScreen unmounting - keeping WebSocket alive...');
+      // websocketService.disconnect(); // Commented out to keep connection alive
+    };
   }, []);
+
+  // Initialize WebSocket for rider
+  const initializeRiderWebSocket = async () => {
+    try {
+      console.log('🔌 Initializing rider WebSocket connection...');
+      
+      // Initialize FCM first
+      try {
+        await fcmService.initialize();
+        await fcmService.registerToken();
+        console.log('FCM initialized and token registered successfully');
+      } catch (fcmError) {
+        console.warn('FCM initialization failed, continuing without push notifications:', fcmError);
+      }
+      
+      // Connect as rider
+      await websocketService.connectAsRider(
+        handleRideMatchingUpdate,
+        handleRiderNotification
+      );
+      
+      setIsWebSocketConnected(true);
+      console.log('✅ Rider WebSocket initialized successfully');
+    } catch (error) {
+      console.error('❌ Failed to initialize rider WebSocket:', error);
+      setIsWebSocketConnected(false);
+      // Don't throw error - app should work without WebSocket
+    }
+  };
+
+  // Handle ride matching updates
+  const handleRideMatchingUpdate = (data) => {
+    console.log('📨 Ride matching update:', data);
+    
+    switch (data.status) {
+      case 'ACCEPTED':
+        Alert.alert(
+          'Chuyến đi được chấp nhận!',
+          `Tài xế ${data.driverName || 'N/A'} đã chấp nhận chuyến đi của bạn.`,
+          [
+            {
+              text: 'Xem chi tiết',
+              onPress: () => navigation.navigate('RideDetails', { rideId: data.rideId })
+            }
+          ]
+        );
+        break;
+      
+      case 'NO_MATCH':
+        Alert.alert(
+          'Không tìm thấy tài xế',
+          'Không có tài xế nào chấp nhận chuyến đi của bạn. Vui lòng thử lại.',
+          [{ text: 'OK' }]
+        );
+        break;
+      
+      case 'JOIN_REQUEST_FAILED':
+        Alert.alert(
+          'Yêu cầu tham gia thất bại',
+          data.reason || 'Không thể tham gia chuyến đi này.',
+          [{ text: 'OK' }]
+        );
+        break;
+      
+      default:
+        console.log('Unknown ride matching status:', data.status);
+    }
+  };
+
+  // Handle rider notifications
+  const handleRiderNotification = (notification) => {
+    console.log('📨 Rider notification:', notification);
+    
+    // Handle different notification types
+    switch (notification.type) {
+      case 'RIDE_UPDATE':
+        // Handle ride status updates
+        break;
+      case 'DRIVER_LOCATION':
+        // Handle driver location updates
+        break;
+      default:
+        console.log('Unknown notification type:', notification.type);
+    }
+  };
 
   const initializeHome = async () => {
     try {
@@ -321,6 +416,15 @@ const HomeScreen = ({ navigation }) => {
               <Text style={styles.location}>
                 {currentLocation ? '📍 Vị trí hiện tại' : '📍 Đang xác định vị trí...'}
                 </Text>
+              <View style={styles.connectionStatus}>
+                <View style={[
+                  styles.connectionDot, 
+                  { backgroundColor: isWebSocketConnected ? '#4CAF50' : '#f44336' }
+                ]} />
+                <Text style={styles.connectionText}>
+                  {isWebSocketConnected ? 'Đã kết nối' : 'Mất kết nối'}
+                </Text>
+              </View>
               </View>
             <TouchableOpacity
               style={styles.profileButton}
@@ -632,5 +736,21 @@ const styles = StyleSheet.create({
     color: '#666',
     lineHeight: 20,
   },
+  connectionStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  connectionDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  connectionText: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
 });
 export default HomeScreen;
+

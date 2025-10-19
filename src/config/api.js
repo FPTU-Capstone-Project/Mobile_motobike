@@ -194,6 +194,18 @@ export const ENDPOINTS = {
     REJECT: '/ride-requests/{requestId}/reject',
   },
 
+  // Shared Rides APIs
+  SHARED_RIDES: {
+    CREATE: '/shared-rides',
+    GET_BY_ID: '/shared-rides/{rideId}',
+    GET_BY_DRIVER: '/shared-rides/driver',
+    UPDATE: '/shared-rides/{rideId}',
+    DELETE: '/shared-rides/{rideId}',
+    COMPLETE: '/shared-rides/{rideId}/complete',
+    CANCEL: '/shared-rides/{rideId}/cancel',
+    START: '/shared-rides/{rideId}/start',
+  },
+
   // Quote API
   QUOTES: {
     GET_QUOTE: '/quotes',
