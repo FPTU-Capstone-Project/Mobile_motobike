@@ -3,6 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { PaperProvider } from 'react-native-paper';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import { View, ActivityIndicator } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -111,9 +112,10 @@ export default function App() {
   }
 
   return (
-    <PaperProvider>
-      <NavigationContainer>
-        <Stack.Navigator initialRouteName={isAuthenticated ? (authService.isDriver() ? "DriverMain" : "Main") : "Login"}>
+    <SafeAreaProvider>
+      <PaperProvider>
+        <NavigationContainer>
+          <Stack.Navigator initialRouteName={isAuthenticated ? (authService.isDriver() ? "DriverMain" : "Main") : "Login"}>
           <Stack.Screen 
             name="Login" 
             component={LoginScreen} 
@@ -204,13 +206,14 @@ export default function App() {
             component={EditProfileScreen} 
             options={{ headerShown: false }}
           />
-          <Stack.Screen 
-            name="ChangePassword" 
-            component={ChangePasswordScreen} 
-            options={{ headerShown: false }}
-          />
-        </Stack.Navigator>
-      </NavigationContainer>
-    </PaperProvider>
+            <Stack.Screen 
+              name="ChangePassword" 
+              component={ChangePasswordScreen} 
+              options={{ headerShown: false }}
+            />
+          </Stack.Navigator>
+        </NavigationContainer>
+      </PaperProvider>
+    </SafeAreaProvider>
   );
 }

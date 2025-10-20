@@ -98,9 +98,16 @@ const styles = StyleSheet.create({
   modeCard: {
     flex: 1,
     borderRadius: 24,
+    shadowColor: 'transparent',
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 0,
   },
   modeContent: {
     padding: 20,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
   },
   selectedMode: {
     borderColor: 'rgba(59,130,246,0.35)',

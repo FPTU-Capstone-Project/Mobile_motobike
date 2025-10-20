@@ -68,7 +68,9 @@ const RideHistoryScreen = () => {
           contentContainerStyle={styles.scrollContent}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
-          <GlassHeader title="Lịch sử chuyến đi" subtitle="Theo dõi các chuyến đã thực hiện" />
+          <View style={styles.headerSpacing}>
+            <GlassHeader title="Lịch sử chuyến đi" subtitle="Theo dõi các chuyến đã thực hiện" />
+          </View>
 
           <Animatable.View animation="fadeInUp" duration={480} delay={40}>
             <CleanCard style={styles.cardSpacing} contentStyle={styles.searchSection}>
@@ -179,7 +181,10 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   scrollContent: {
     paddingBottom: 140,
-    paddingTop: 12,
+    paddingTop: 24,
+  },
+  headerSpacing: {
+    marginBottom: 24,
   },
   cardSpacing: {
     marginHorizontal: 20,

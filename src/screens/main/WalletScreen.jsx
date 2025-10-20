@@ -275,7 +275,9 @@ const WalletScreen = ({ navigation }) => {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           contentContainerStyle={styles.scrollContent}
         >
-          <GlassHeader title="Ví của tôi" subtitle="Quản lý giao dịch" />
+          <View style={styles.headerSpacing}>
+            <GlassHeader title="Ví của tôi" subtitle="Quản lý giao dịch" />
+          </View>
 
           <Animatable.View animation="fadeInUp" duration={500}>
             <CleanCard style={styles.cardSpacing} contentStyle={styles.balanceCardContent}>
@@ -496,7 +498,10 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   scrollContent: {
     paddingBottom: 140,
-    paddingTop: 12,
+    paddingTop: 24,
+  },
+  headerSpacing: {
+    marginBottom: 24,
   },
   cardSpacing: {
     marginHorizontal: 20,

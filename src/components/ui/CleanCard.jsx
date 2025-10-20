@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { colors, gradients, radii } from '../../theme/designTokens';
 
 const variantGradients = {
-  default: gradients.card,
+  default: ['#FFFFFF', '#FFFFFF'],
   highlight: gradients.cardHighlight,
   accent: ['rgba(59,130,246,0.16)', 'rgba(14,165,233,0.12)'],
 };
@@ -29,17 +29,17 @@ const styles = StyleSheet.create({
     borderRadius: radii.lg,
     backgroundColor: colors.background,
     shadowColor: '#FFFFFF',
-    shadowOpacity: 0.9,
-    shadowRadius: 18,
-    shadowOffset: { width: -6, height: -6 },
+    shadowOpacity: 0.75,
+    shadowRadius: 16,
+    shadowOffset: { width: -5, height: -5 },
   },
   shadowDepth: {
     borderRadius: radii.lg,
     backgroundColor: colors.background,
-    shadowColor: 'rgba(163, 177, 198, 0.7)',
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    shadowOffset: { width: 6, height: 8 },
+    shadowColor: 'rgba(163, 177, 198, 0.65)',
+    shadowOpacity: 0.32,
+    shadowRadius: 18,
+    shadowOffset: { width: 8, height: 10 },
     overflow: 'hidden',
     ...Platform.select({
       android: {
@@ -52,9 +52,11 @@ const styles = StyleSheet.create({
     borderRadius: radii.lg,
   },
   surface: {
-    backgroundColor: colors.glassLighter,
-    borderRadius: radii.lg - 4,
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg - 3,
     padding: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.75)',
   },
 });
 

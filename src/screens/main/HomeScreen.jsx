@@ -256,54 +256,81 @@ const HomeScreen = ({ navigation }) => {
 
         {/* Mode Selector */}
         <View style={styles.content}>
-          <Animatable.View animation="fadeInUp" duration={450} useNativeDriver>
-            <ModeSelector 
-              mode={userMode} 
-              onModeChange={setUserMode}
-              userType="user"
-            />
+          <Animatable.View animation="fadeInUp" duration={420} useNativeDriver>
+            <CleanCard style={styles.card} contentStyle={styles.cardBody}>
+              <Text style={styles.cardTitle}>Chế độ đặt chuyến</Text>
+              <Text style={styles.cardSubtitle}>Chọn cách tìm xe phù hợp với nhu cầu của bạn</Text>
+              <ModeSelector 
+                mode={userMode} 
+                onModeChange={setUserMode}
+                userType="user"
+              />
+            </CleanCard>
           </Animatable.View>
 
-          {/* Location Selection */}
-          <Animatable.View animation="fadeInUp" duration={480} delay={50} useNativeDriver>
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Chọn điểm đón</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.locationScroll}>
-                {presetLocations.map((location) => (
-                  <View key={location.id} style={styles.locationItem}>
-                    <LocationCard
-                      location={location}
-                      selected={selectedPickup?.id === location.id}
-                      onPress={() => handleLocationSelect(location, 'pickup')}
-                    />
-                  </View>
-                ))}
-              </ScrollView>
-            </View>
+          <Animatable.View animation="fadeInUp" duration={440} delay={40} useNativeDriver>
+            <CleanCard style={styles.card} contentStyle={styles.cardBody}>
+              <Text style={styles.cardTitle}>Lộ trình của bạn</Text>
+              <Text style={styles.cardSubtitle}>Chọn nhanh các điểm đến phổ biến quanh khuôn viên</Text>
+
+              <View style={styles.plannerSection}>
+                <View style={styles.sectionHeadingRow}>
+                  <View style={styles.headingDot} />
+                  <Text style={styles.sectionHeading}>Điểm đón</Text>
+                </View>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.locationList}
+                >
+                  {presetLocations.map((location) => (
+                    <View key={`pickup-${location.id}`} style={styles.locationItem}>
+                      <LocationCard
+                        location={location}
+                        selected={selectedPickup?.id === location.id}
+                        onPress={() => handleLocationSelect(location, 'pickup')}
+                      />
+                    </View>
+                  ))}
+                </ScrollView>
+              </View>
+
+              <View style={styles.plannerSection}>
+                <View style={styles.sectionHeadingRow}>
+                  <View style={[styles.headingDot, { backgroundColor: colors.accent }]} />
+                  <Text style={styles.sectionHeading}>Điểm đến</Text>
+                </View>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.locationList}
+                >
+                  {presetLocations.map((location) => (
+                    <View key={`dropoff-${location.id}`} style={styles.locationItem}>
+                      <LocationCard
+                        location={location}
+                        selected={selectedDropoff?.id === location.id}
+                        onPress={() => handleLocationSelect(location, 'dropoff')}
+                      />
+                    </View>
+                  ))}
+                </ScrollView>
+              </View>
+            </CleanCard>
           </Animatable.View>
 
-          <Animatable.View animation="fadeInUp" duration={480} delay={120} useNativeDriver>
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Chọn điểm đến</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.locationScroll}>
-                {presetLocations.map((location) => (
-                  <View key={location.id} style={styles.locationItem}>
-                    <LocationCard
-                      location={location}
-                      selected={selectedDropoff?.id === location.id}
-                      onPress={() => handleLocationSelect(location, 'dropoff')}
-                    />
-                  </View>
-                ))}
-              </ScrollView>
-            </View>
-          </Animatable.View>
-
-          {/* Selected Route Summary (Glass) */}
           {selectedPickup && selectedDropoff && (
             <Animatable.View animation="fadeInUp">
-              <CleanCard>
-                <Text style={styles.routeTitle}>Tuyến đường đã chọn</Text>
+              <CleanCard style={styles.card} contentStyle={styles.cardBody}>
+                <View style={styles.cardHeader}>
+                  <View>
+                    <Text style={styles.cardTitle}>Tuyến đường của bạn</Text>
+                    <Text style={styles.cardSubtitle}>Kiểm tra lại trước khi gửi yêu cầu</Text>
+                  </View>
+                  <View style={[styles.cardBadge, { backgroundColor: 'rgba(59,130,246,0.22)' }]}>
+                    <Icon name="timeline" size={18} color={colors.accent} />
+                  </View>
+                </View>
                 <View style={styles.routeContainer}>
                   <View style={styles.routePoint}>
                     <View style={styles.pickupDot} />
@@ -319,106 +346,109 @@ const HomeScreen = ({ navigation }) => {
             </Animatable.View>
           )}
 
-          {/* Find Ride Button */}
-          <View style={styles.buttonContainer}>
-            <ModernButton
-              title={userMode === 'manual' ? 'Tìm tài xế xung quanh' : 'Tìm xe tự động'}
-              onPress={handleFindRide}
-              icon={userMode === 'manual' ? 'search' : 'auto-fix-high'}
-            />
-          </View>
+          <Animatable.View animation="fadeInUp" delay={80} useNativeDriver>
+            <CleanCard style={styles.card} contentStyle={styles.ctaCard}>
+              <View>
+                <Text style={styles.cardTitle}>Sẵn sàng đặt xe</Text>
+                <Text style={styles.cardSubtitle}>
+                  {userMode === 'manual'
+                    ? 'Chọn một tài xế phù hợp hoặc chuyển sang chế độ tự động.'
+                    : 'Hệ thống sẽ tìm tài xế tốt nhất cho hành trình của bạn.'}
+                </Text>
+              </View>
+              <ModernButton
+                title={userMode === 'manual' ? 'Tìm tài xế xung quanh' : 'Tìm xe tự động'}
+                onPress={handleFindRide}
+                icon={userMode === 'manual' ? 'search' : 'auto-fix-high'}
+              />
+            </CleanCard>
+          </Animatable.View>
 
-          {/* Available Drivers (Manual Mode) */}
           {showDrivers && userMode === 'manual' && (
-            <Animatable.View animation="slideInUp" style={styles.driversSection}>
-              <Text style={styles.sectionTitle}>Tài xế có sẵn</Text>
-              {availableDrivers.length === 0 ? (
-                <CleanCard contentStyle={styles.emptyState}>
-                  <Icon name="search-off" size={48} color="rgba(148,163,184,0.45)" />
-                  <Text style={styles.noDriversText}>Không có tài xế nào phù hợp</Text>
-                  <ModernButton
-                    title="Thử chế độ tự động"
-                    variant="outline"
-                    onPress={() => {
-                      setUserMode('auto');
-                      setShowDrivers(false);
-                    }}
-                  />
-                </CleanCard>
-              ) : (
-                availableDrivers.map((driver) => (
-                  <TouchableOpacity
-                    key={driver.id}
-                    style={styles.driverCard}
-                    activeOpacity={0.88}
-                    onPress={() => handleDriverSelect(driver)}
-                  >
-                    <CleanCard contentStyle={styles.driverCardContent}>
-                      <View style={styles.driverInfo}>
-                        <View style={styles.driverAvatar}>
-                          <Icon name="person" size={24} color={colors.primary} />
-                        </View>
-                        <View style={styles.driverDetails}>
-                          <Text style={styles.driverName}>{driver.name}</Text>
-                          <View style={styles.driverStats}>
-                            <Icon name="star" size={16} color="#F59E0B" />
-                            <Text style={styles.rating}>{driver.rating}</Text>
-                            <Text style={styles.distance}>• {driver.distance}km</Text>
-                            {driver.isSharing && (
-                              <View style={styles.sharingBadge}>
-                                <Text style={styles.sharingText}>Chia sẻ</Text>
-                              </View>
-                            )}
+            <Animatable.View animation="slideInUp" style={styles.card}>
+              <CleanCard contentStyle={styles.cardBody}>
+                <Text style={styles.cardTitle}>Tài xế có sẵn</Text>
+                <Text style={styles.cardSubtitle}>Chọn tài xế phù hợp nhất với bạn</Text>
+                {availableDrivers.length === 0 ? (
+                  <View style={styles.emptyState}>
+                    <Icon name="search-off" size={48} color="rgba(148,163,184,0.45)" />
+                    <Text style={styles.noDriversText}>Không có tài xế nào phù hợp</Text>
+                    <ModernButton
+                      title="Thử chế độ tự động"
+                      variant="outline"
+                      onPress={() => {
+                        setUserMode('auto');
+                        setShowDrivers(false);
+                      }}
+                    />
+                  </View>
+                ) : (
+                  availableDrivers.map((driver) => (
+                    <TouchableOpacity
+                      key={driver.id}
+                      style={styles.driverCard}
+                      activeOpacity={0.88}
+                      onPress={() => handleDriverSelect(driver)}
+                    >
+                      <CleanCard contentStyle={styles.driverCardContent}>
+                        <View style={styles.driverInfo}>
+                          <View style={styles.driverAvatar}>
+                            <Icon name="person" size={24} color={colors.primary} />
                           </View>
+                          <View style={styles.driverDetails}>
+                            <Text style={styles.driverName}>{driver.name}</Text>
+                            <View style={styles.driverStats}>
+                              <Icon name="star" size={16} color="#F59E0B" />
+                              <Text style={styles.rating}>{driver.rating}</Text>
+                              <Text style={styles.distance}>• {driver.distance}km</Text>
+                              {driver.isSharing && (
+                                <View style={styles.sharingBadge}>
+                                  <Text style={styles.sharingText}>Chia sẻ</Text>
+                                </View>
+                              )}
+                            </View>
+                          </View>
+                          <Text style={styles.estimatedTime}>{driver.estimatedTime} phút</Text>
                         </View>
-                        <Text style={styles.estimatedTime}>{driver.estimatedTime} phút</Text>
-                      </View>
-                    </CleanCard>
-                  </TouchableOpacity>
-                ))
-              )}
+                      </CleanCard>
+                    </TouchableOpacity>
+                  ))
+                )}
+              </CleanCard>
             </Animatable.View>
           )}
 
-          {/* Quick Actions */}
-          <Animatable.View animation="fadeInUp" duration={520} delay={180} useNativeDriver>
-            <View style={styles.quickActions}>
-              <Text style={styles.sectionTitle}>Thao tác nhanh</Text>
+          <Animatable.View animation="fadeInUp" duration={520} delay={160} useNativeDriver>
+            <CleanCard style={styles.card} contentStyle={styles.cardBody}>
+              <Text style={styles.cardTitle}>Thao tác nhanh</Text>
+              <Text style={styles.cardSubtitle}>Truy cập các chức năng được sử dụng nhiều</Text>
               <View style={styles.actionsGrid}>
-                <CleanCard style={styles.actionItem} contentStyle={styles.actionContent}>
-                  <TouchableOpacity onPress={() => navigation.navigate('History')} style={styles.actionButton}>
-                    <View style={[styles.actionIcon, { backgroundColor: 'rgba(59,130,246,0.12)' }]}>
-                      <Icon name="history" size={22} color={colors.accent} />
-                    </View>
-                    <Text style={styles.actionText}>Lịch sử</Text>
-                  </TouchableOpacity>
-                </CleanCard>
-                <CleanCard style={styles.actionItem} contentStyle={styles.actionContent}>
-                  <TouchableOpacity onPress={() => navigation.navigate('Wallet')} style={styles.actionButton}>
-                    <View style={[styles.actionIcon, { backgroundColor: 'rgba(34,197,94,0.12)' }]}>
-                      <Icon name="account-balance-wallet" size={22} color="#16A34A" />
-                    </View>
-                    <Text style={styles.actionText}>Ví tiền</Text>
-                  </TouchableOpacity>
-                </CleanCard>
-                <CleanCard style={styles.actionItem} contentStyle={styles.actionContent}>
-                  <TouchableOpacity style={styles.actionButton}>
-                    <View style={[styles.actionIcon, { backgroundColor: 'rgba(249,115,22,0.12)' }]}>
-                      <Icon name="local-offer" size={22} color="#F97316" />
-                    </View>
-                    <Text style={styles.actionText}>Ưu đãi</Text>
-                  </TouchableOpacity>
-                </CleanCard>
-                <CleanCard style={styles.actionItem} contentStyle={styles.actionContent}>
-                  <TouchableOpacity style={styles.actionButton}>
-                    <View style={[styles.actionIcon, { backgroundColor: 'rgba(148,163,184,0.18)' }]}>
-                      <Icon name="help" size={22} color={colors.textSecondary} />
-                    </View>
-                    <Text style={styles.actionText}>Hỗ trợ</Text>
-                  </TouchableOpacity>
-                </CleanCard>
+                <TouchableOpacity onPress={() => navigation.navigate('History')} style={styles.actionItem}>
+                  <View style={[styles.actionIcon, { backgroundColor: 'rgba(59,130,246,0.12)' }]}>
+                    <Icon name="history" size={22} color={colors.accent} />
+                  </View>
+                  <Text style={styles.actionText}>Lịch sử</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => navigation.navigate('Wallet')} style={styles.actionItem}>
+                  <View style={[styles.actionIcon, { backgroundColor: 'rgba(34,197,94,0.12)' }]}>
+                    <Icon name="account-balance-wallet" size={22} color="#16A34A" />
+                  </View>
+                  <Text style={styles.actionText}>Ví tiền</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.actionItem}>
+                  <View style={[styles.actionIcon, { backgroundColor: 'rgba(249,115,22,0.12)' }]}>
+                    <Icon name="local-offer" size={22} color="#F97316" />
+                  </View>
+                  <Text style={styles.actionText}>Ưu đãi</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.actionItem}>
+                  <View style={[styles.actionIcon, { backgroundColor: 'rgba(148,163,184,0.18)' }]}>
+                    <Icon name="help" size={22} color={colors.textSecondary} />
+                  </View>
+                  <Text style={styles.actionText}>Hỗ trợ</Text>
+                </TouchableOpacity>
               </View>
-            </View>
+            </CleanCard>
           </Animatable.View>
         </View>
         </ScrollView>
@@ -435,27 +465,64 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 24,
   },
-  section: {
-    marginBottom: 28,
+  card: {
+    marginBottom: 20,
   },
-  sectionTitle: {
+  cardBody: {
+    padding: 20,
+    gap: 18,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  cardTitle: {
     fontSize: 20,
     fontFamily: 'Inter_700Bold',
     color: colors.textPrimary,
-    marginBottom: 18,
   },
-  locationScroll: {
-    marginHorizontal: -4,
+  cardSubtitle: {
+    marginTop: 6,
+    fontSize: 14,
+    color: colors.textSecondary,
+    fontFamily: 'Inter_400Regular',
+    lineHeight: 20,
+  },
+  cardBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: 16,
+    backgroundColor: 'rgba(16,65,47,0.36)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  plannerSection: {
+    marginTop: 4,
+  },
+  sectionHeadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 10,
+  },
+  headingDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#22C55E',
+  },
+  sectionHeading: {
+    fontSize: 16,
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.textPrimary,
+  },
+  locationList: {
+    paddingRight: 8,
   },
   locationItem: {
     width: 260,
     marginRight: 12,
-  },
-  routeTitle: {
-    fontSize: 17,
-    fontFamily: 'Inter_700Bold',
-    color: colors.textPrimary,
-    marginBottom: 18,
   },
   routeContainer: {
     marginTop: 6,
@@ -486,15 +553,14 @@ const styles = StyleSheet.create({
     marginLeft: 6,
   },
   routeText: { fontSize: 16, color: colors.textPrimary, fontFamily: 'Inter_600SemiBold' },
-  buttonContainer: {
-    marginBottom: 16,
-  },
-  driversSection: {
-    marginBottom: 32,
+  ctaCard: {
+    padding: 20,
+    gap: 18,
   },
   emptyState: {
     alignItems: 'center',
     paddingVertical: 28,
+    gap: 18,
   },
   noDriversText: {
     fontSize: 15,
@@ -564,25 +630,23 @@ const styles = StyleSheet.create({
     color: colors.accent,
     fontFamily: 'Inter_700Bold',
   },
-  quickActions: {
-    marginTop: 12,
-  },
   actionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+    gap: 12,
   },
   actionItem: {
     width: '48%',
-    borderRadius: 24,
-    marginBottom: 14,
-  },
-  actionContent: {
-    alignItems: 'center',
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
     paddingVertical: 20,
-  },
-  actionButton: {
     alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: 'rgba(15,23,42,0.08)',
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 },
   },
   actionIcon: {
     width: 48,

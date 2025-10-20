@@ -139,7 +139,9 @@ const ProfileScreen = ({ navigation }) => {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
-          <GlassHeader title="Hồ sơ của tôi" />
+          <View style={styles.headerSpacing}>
+            <GlassHeader title="Hồ sơ của tôi" />
+          </View>
 
           <Animatable.View animation="fadeInUp" duration={480}>
             <CleanCard style={styles.cardSpacing} contentStyle={styles.userCardContent}>
@@ -260,7 +262,10 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   scrollContent: {
     paddingBottom: 140,
-    paddingTop: 12,
+    paddingTop: 24,
+  },
+  headerSpacing: {
+    marginBottom: 24,
   },
   cardSpacing: {
     marginHorizontal: 20,

@@ -8,23 +8,23 @@ export const colors = {
   accent: '#3B82F6',
   highlight: '#0EA5E9',
   // neutrals
-  background: '#F5F7FB',
-  backgroundMuted: '#EEF1F7',
+  background: '#EBEBF0',
+  backgroundMuted: '#E2E2EA',
   surface: '#FFFFFF',
   textPrimary: '#111827',
   textSecondary: '#6B7280',
   textMuted: '#9CA3AF',
   border: 'rgba(148,163,184,0.35)',
   // glass overlays
-  glassLight: 'rgba(255,255,255,0.82)',
-  glassLighter: 'rgba(255,255,255,0.92)',
+  glassLight: 'rgba(255,255,255,0.88)',
+  glassLighter: '#FFFFFF',
   glassDark: 'rgba(15,23,42,0.12)',
 };
 
 export const gradients = {
-  background: ['#F6F9FF', '#F4F7FC', '#FFFFFF'],
+  background: ['#EBEBF0', '#F1F1F6', '#FFFFFF'],
   meshAccent: ['rgba(59,130,246,0.12)', 'rgba(236,72,153,0.08)'],
-  hero: ['rgba(16,65,47,0.95)', 'rgba(3,25,19,0.95)'],
+  hero: ['#0C3328', '#081F18', '#0D3F34', '#0B2E25'],
   card: ['rgba(255,255,255,0.95)', 'rgba(255,255,255,0.7)'],
   cardHighlight: ['rgba(59,130,246,0.12)', 'rgba(14,165,233,0.08)'],
   pillActive: ['rgba(59,130,246,0.95)', 'rgba(14,165,233,0.85)'],

@@ -13,21 +13,21 @@ const AppBackground = ({ children, style }) => {
         style={StyleSheet.absoluteFill}
       />
       <LinearGradient
-        colors={['rgba(255,255,255,0.65)', 'rgba(238,241,245,0)']}
+        colors={['rgba(255,255,255,0.2)', 'rgba(245,247,255,0)']}
         start={{ x: 0.15, y: 0.05 }}
         end={{ x: 0.9, y: 0.9 }}
         style={styles.meshLayerOne}
         pointerEvents="none"
       />
       <LinearGradient
-        colors={['rgba(59,130,246,0.12)', 'rgba(255,255,255,0)']}
+        colors={['rgba(59,130,246,0.08)', 'rgba(255,255,255,0)']}
         start={{ x: 0.1, y: 0.95 }}
         end={{ x: 0.9, y: 0.1 }}
         style={styles.meshLayerTwo}
         pointerEvents="none"
       />
       <LinearGradient
-        colors={['rgba(14,165,233,0.1)', 'rgba(255,255,255,0)']}
+        colors={['rgba(14,165,233,0.06)', 'rgba(255,255,255,0)']}
         start={{ x: 0.95, y: 0.95 }}
         end={{ x: 0.2, y: 0.2 }}
         style={styles.meshLayerThree}

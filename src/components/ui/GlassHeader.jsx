@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import Feather from 'react-native-vector-icons/Feather';
 import { colors, gradients, radii, typography } from '../../theme/designTokens';
 
 const DEFAULT_GRADIENT = gradients.hero;
@@ -32,17 +33,42 @@ const GlassHeader = ({ title, subtitle, onBellPress, gradientColors }) => (
   </View>
 );
 
-export const SoftBackHeader = ({ title, subtitle, onBackPress, rightContent }) => (
-  <View style={backStyles.wrapper}>
+export const SoftBackHeader = ({
+  title,
+  subtitle,
+  onBackPress,
+  floating = false,
+  topOffset = 16,
+  rightIcon,
+  onRightPress,
+  rightIconColor = colors.accent,
+  rightLoading = false,
+}) => (
+  <View
+    style={[
+      backStyles.wrapper,
+      floating && [backStyles.wrapperFloating, { top: topOffset }],
+    ]}
+  >
     <View style={backStyles.row}>
-      <TouchableOpacity onPress={onBackPress} style={backStyles.backButton}>
+      <TouchableOpacity onPress={onBackPress} style={backStyles.navButton}>
         <Icon name="arrow-back" size={20} color={colors.textPrimary} />
       </TouchableOpacity>
       <View style={backStyles.center}>
         {!!subtitle && <Text style={backStyles.subtitle}>{subtitle}</Text>}
-        <Text style={backStyles.title}>{title}</Text>
+        {!!title && <Text style={backStyles.title}>{title}</Text>}
       </View>
-      <View style={backStyles.rightPlaceholder}>{rightContent}</View>
+      {rightLoading ? (
+        <View style={backStyles.navButton}>
+          <ActivityIndicator size="small" color={rightIconColor} />
+        </View>
+      ) : rightIcon ? (
+        <TouchableOpacity onPress={onRightPress} style={backStyles.navButton}>
+          <Feather name={rightIcon} size={18} color={rightIconColor} />
+        </TouchableOpacity>
+      ) : (
+        <View style={backStyles.sidePlaceholder} />
+      )}
     </View>
   </View>
 );
@@ -64,7 +90,7 @@ const styles = StyleSheet.create({
   gradient: { height: 140 },
   overlayGlow: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.05)',
   },
   content: {
     position: 'absolute',
@@ -102,16 +128,22 @@ const styles = StyleSheet.create({
 
 const backStyles = StyleSheet.create({
   wrapper: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 24,
     paddingTop: 8,
     paddingBottom: 12,
+  },
+  wrapperFloating: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    zIndex: 50,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  backButton: {
+  navButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
@@ -142,9 +174,8 @@ const backStyles = StyleSheet.create({
     color: colors.textMuted,
     marginBottom: 4,
   },
-  rightPlaceholder: {
+  sidePlaceholder: {
     width: 44,
-    alignItems: 'flex-end',
   },
 });
 
