@@ -17,9 +17,10 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import * as Animatable from 'react-native-animatable';
 
 import ModernButton from '../../components/ModernButton.jsx';
-import authService from '../../services/authService';
 import verificationService from '../../services/verificationService';
-import { ApiError } from '../../services/api';
+import AppBackground from '../../components/layout/AppBackground.jsx';
+import CleanCard from '../../components/ui/CleanCard.jsx';
+import { colors, gradients } from '../../theme/designTokens';
 
 const StudentVerificationScreen = ({ navigation }) => {
   const [frontImage, setFrontImage] = useState(null);
@@ -315,12 +316,18 @@ const StudentVerificationScreen = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+    <AppBackground>
+      <SafeAreaView style={styles.safe}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
         {/* Header */}
         <LinearGradient
-          colors={['#2196F3', '#1976D2']}
+          colors={gradients.hero}
           style={styles.header}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
         >
           <View style={styles.headerContent}>
             <TouchableOpacity 
@@ -344,40 +351,44 @@ const StudentVerificationScreen = ({ navigation }) => {
 
         <View style={styles.content}>
           {/* Instructions */}
-          <Animatable.View animation="fadeInUp" style={styles.instructionsCard}>
-            <Icon name="school" size={48} color="#2196F3" />
-            <Text style={styles.instructionsTitle}>Xác minh tài khoản sinh viên</Text>
-            <Text style={styles.instructionsText}>
-              Để sử dụng dịch vụ, bạn cần xác minh là sinh viên của trường. 
-              Vui lòng chụp ảnh thẻ sinh viên rõ nét.
-            </Text>
+          <Animatable.View animation="fadeInUp" style={styles.cardWrapper}>
+            <CleanCard contentStyle={styles.instructionsCard}>
+              <View style={styles.instructionsIcon}>
+                <Icon name="school" size={40} color={colors.primary} />
+              </View>
+              <Text style={styles.instructionsTitle}>Xác minh tài khoản sinh viên</Text>
+              <Text style={styles.instructionsText}>
+                Để sử dụng dịch vụ, bạn cần xác minh là sinh viên của trường. 
+                Vui lòng chụp ảnh thẻ sinh viên rõ nét.
+              </Text>
+            </CleanCard>
           </Animatable.View>
 
           {/* Requirements */}
-          <View style={styles.requirementsCard}>
+          <CleanCard style={styles.cardWrapper} contentStyle={styles.requirementsCard}>
             <Text style={styles.cardTitle}>Yêu cầu ảnh thẻ sinh viên</Text>
             <View style={styles.requirementsList}>
               <View style={styles.requirementItem}>
-                <Icon name="check-circle" size={20} color="#4CAF50" />
+                <Icon name="check-circle" size={20} color={colors.primary} />
                 <Text style={styles.requirementText}>Ảnh rõ nét, không bị mờ</Text>
               </View>
               <View style={styles.requirementItem}>
-                <Icon name="check-circle" size={20} color="#4CAF50" />
+                <Icon name="check-circle" size={20} color={colors.primary} />
                 <Text style={styles.requirementText}>Hiển thị đầy đủ thông tin trên thẻ</Text>
               </View>
               <View style={styles.requirementItem}>
-                <Icon name="check-circle" size={20} color="#4CAF50" />
+                <Icon name="check-circle" size={20} color={colors.primary} />
                 <Text style={styles.requirementText}>Thẻ còn hiệu lực</Text>
               </View>
               <View style={styles.requirementItem}>
-                <Icon name="check-circle" size={20} color="#4CAF50" />
+                <Icon name="check-circle" size={20} color={colors.primary} />
                 <Text style={styles.requirementText}>Định dạng JPG, PNG (tối đa 5MB)</Text>
               </View>
             </View>
-          </View>
+          </CleanCard>
 
           {/* Front Image Upload Section */}
-          <View style={styles.uploadSection}>
+          <CleanCard style={styles.cardWrapper} contentStyle={styles.uploadSection}>
             <Text style={styles.cardTitle}>Mặt trước thẻ sinh viên</Text>
             
             {frontImage ? (
@@ -387,7 +398,7 @@ const StudentVerificationScreen = ({ navigation }) => {
                   style={styles.changeImageButton}
                   onPress={() => showImagePicker('front')}
                 >
-                  <Icon name="edit" size={20} color="#4CAF50" />
+                  <Icon name="edit" size={20} color={colors.primary} />
                   <Text style={styles.changeImageText}>Đổi ảnh</Text>
                 </TouchableOpacity>
               </Animatable.View>
@@ -397,7 +408,7 @@ const StudentVerificationScreen = ({ navigation }) => {
                 onPress={() => showImagePicker('front')}
               >
                 <LinearGradient
-                  colors={['#2196F3', '#1976D2']}
+                  colors={gradients.pillActive}
                   style={styles.uploadButtonGradient}
                 >
                   <Icon name="camera-alt" size={48} color="#fff" />
@@ -406,10 +417,10 @@ const StudentVerificationScreen = ({ navigation }) => {
                 </LinearGradient>
               </TouchableOpacity>
             )}
-          </View>
+          </CleanCard>
 
           {/* Back Image Upload Section */}
-          <View style={styles.uploadSection}>
+          <CleanCard style={styles.cardWrapper} contentStyle={styles.uploadSection}>
             <Text style={styles.cardTitle}>Mặt sau thẻ sinh viên</Text>
             
             {backImage ? (
@@ -419,7 +430,7 @@ const StudentVerificationScreen = ({ navigation }) => {
                   style={styles.changeImageButton}
                   onPress={() => showImagePicker('back')}
                 >
-                  <Icon name="edit" size={20} color="#4CAF50" />
+                  <Icon name="edit" size={20} color={colors.primary} />
                   <Text style={styles.changeImageText}>Đổi ảnh</Text>
                 </TouchableOpacity>
               </Animatable.View>
@@ -429,7 +440,7 @@ const StudentVerificationScreen = ({ navigation }) => {
                 onPress={() => showImagePicker('back')}
               >
                 <LinearGradient
-                  colors={['#2196F3', '#1976D2']}
+                  colors={gradients.pillActive}
                   style={styles.uploadButtonGradient}
                 >
                   <Icon name="camera-alt" size={48} color="#fff" />
@@ -438,21 +449,21 @@ const StudentVerificationScreen = ({ navigation }) => {
                 </LinearGradient>
               </TouchableOpacity>
             )}
-          </View>
+          </CleanCard>
 
           {/* Sample Image */}
-          <View style={styles.sampleSection}>
+          <CleanCard style={styles.cardWrapper} contentStyle={styles.sampleSection}>
             <Text style={styles.cardTitle}>Ảnh mẫu</Text>
-            <View style={styles.sampleImageContainer}>
+              <View style={styles.sampleImageContainer}>
               <View style={styles.sampleImagePlaceholder}>
-                <Icon name="credit-card" size={64} color="#ccc" />
+                <Icon name="credit-card" size={64} color="rgba(148,163,184,0.6)" />
                 <Text style={styles.sampleImageText}>Mẫu thẻ sinh viên</Text>
               </View>
               <Text style={styles.sampleDescription}>
                 Chụp ảnh thẻ sinh viên như mẫu trên, đảm bảo thông tin rõ ràng và đầy đủ
               </Text>
             </View>
-          </View>
+          </CleanCard>
 
           {/* Submit Button */}
           <ModernButton
@@ -487,33 +498,40 @@ const StudentVerificationScreen = ({ navigation }) => {
 
           {uploading && (
             <View style={styles.uploadingContainer}>
-              <ActivityIndicator size="small" color="#2196F3" />
+              <ActivityIndicator size="small" color={colors.primary} />
               <Text style={styles.uploadingText}>Đang tải lên và xử lý...</Text>
             </View>
           )}
 
           {/* Info */}
-          <View style={styles.infoCard}>
-            <Icon name="info" size={20} color="#FF9800" />
+          <CleanCard style={styles.cardWrapper} contentStyle={styles.infoCard}>
+            <Icon name="info" size={20} color="#F59E0B" />
             <Text style={styles.infoText}>
               Quá trình xác minh có thể mất 1-2 ngày làm việc. 
               Chúng tôi sẽ thông báo kết quả qua email.
             </Text>
-          </View>
+          </CleanCard>
         </View>
       </ScrollView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </AppBackground>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  safe: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+  },
+  scrollContent: {
+    paddingTop: 12,
+    paddingBottom: 140,
   },
   header: {
-    paddingTop: 20,
-    paddingBottom: 24,
+    marginHorizontal: 20,
+    marginTop: 16,
+    marginBottom: 24,
+    borderRadius: 28,
+    paddingVertical: 22,
     paddingHorizontal: 20,
   },
   headerContent: {
@@ -523,107 +541,98 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 8,
+    backgroundColor: colors.glassLight,
+    borderRadius: 16,
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontWeight: '700',
+    color: colors.textPrimary,
   },
   placeholder: {
-    width: 40,
+    width: 36,
   },
   content: {
     flex: 1,
-    padding: 20,
+    paddingHorizontal: 20,
+  },
+  cardWrapper: {
+    marginBottom: 20,
   },
   instructionsCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 24,
     alignItems: 'center',
-    marginBottom: 20,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 24,
+  },
+  instructionsIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: 'rgba(24,78,63,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 18,
   },
   instructionsTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginTop: 16,
+    fontSize: 22,
+    fontWeight: '700',
+    color: colors.textPrimary,
     marginBottom: 12,
     textAlign: 'center',
   },
   instructionsText: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: 15,
+    color: colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 22,
   },
   requirementsCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 24,
   },
   cardTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 16,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: 18,
   },
-  requirementsList: {
-    gap: 12,
-  },
+  requirementsList: {},
   requirementItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 14,
   },
   requirementText: {
     fontSize: 14,
-    color: '#666',
+    color: colors.textSecondary,
     marginLeft: 12,
     flex: 1,
   },
   uploadSection: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 24,
   },
   uploadButton: {
-    borderRadius: 12,
+    borderRadius: 18,
     overflow: 'hidden',
   },
   uploadButtonGradient: {
     padding: 32,
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#E3F2FD',
+    borderWidth: 1.5,
+    borderColor: colors.border,
     borderStyle: 'dashed',
-    borderRadius: 12,
+    borderRadius: 18,
   },
   uploadButtonText: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#fff',
-    marginTop: 12,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginTop: 14,
   },
   uploadButtonSubtext: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
+    color: colors.textSecondary,
     marginTop: 4,
   },
   selectedImageContainer: {
@@ -632,42 +641,36 @@ const styles = StyleSheet.create({
   selectedImage: {
     width: '100%',
     height: 200,
-    borderRadius: 12,
+    borderRadius: 16,
     resizeMode: 'cover',
   },
   changeImageButton: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 12,
-    padding: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
   },
   changeImageText: {
-    fontSize: 16,
-    color: '#4CAF50',
+    fontSize: 15,
+    color: colors.accent,
     marginLeft: 8,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   sampleSection: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 22,
   },
   sampleImageContainer: {
     alignItems: 'center',
   },
   sampleImagePlaceholder: {
     width: '100%',
-    height: 150,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#e0e0e0',
+    height: 160,
+    backgroundColor: colors.glassLight,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: colors.border,
     borderStyle: 'dashed',
     justifyContent: 'center',
     alignItems: 'center',
@@ -675,14 +678,14 @@ const styles = StyleSheet.create({
   },
   sampleImageText: {
     fontSize: 14,
-    color: '#999',
+    color: colors.textSecondary,
     marginTop: 8,
   },
   sampleDescription: {
     fontSize: 14,
-    color: '#666',
+    color: colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 21,
   },
   submitButton: {
     marginBottom: 16,
@@ -695,36 +698,37 @@ const styles = StyleSheet.create({
   },
   uploadingText: {
     fontSize: 14,
-    color: '#2196F3',
+    color: colors.primary,
     marginLeft: 8,
   },
   infoCard: {
-    backgroundColor: '#FFF3E0',
-    borderRadius: 12,
-    padding: 16,
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 20,
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+    backgroundColor: 'rgba(59,130,246,0.12)',
   },
   infoText: {
     flex: 1,
     fontSize: 14,
-    color: '#E65100',
+    color: colors.textSecondary,
     marginLeft: 12,
     lineHeight: 20,
   },
   skipButton: {
-    backgroundColor: '#FF9800',
+    backgroundColor: colors.glassLight,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.border,
     paddingVertical: 12,
     paddingHorizontal: 20,
-    borderRadius: 8,
     alignItems: 'center',
     marginTop: 10,
   },
   skipButtonText: {
-    color: '#fff',
+    color: colors.textPrimary,
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
   },
 });
 

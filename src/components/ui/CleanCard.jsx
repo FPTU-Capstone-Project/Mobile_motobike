@@ -1,31 +1,61 @@
 import React from 'react';
 import { View, StyleSheet, Platform } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { colors, gradients, radii } from '../../theme/designTokens';
 
-const CleanCard = ({ children, style }) => {
-  return <View style={[styles.card, style]}>{children}</View>;
+const variantGradients = {
+  default: gradients.card,
+  highlight: gradients.cardHighlight,
+  accent: ['rgba(59,130,246,0.16)', 'rgba(14,165,233,0.12)'],
 };
 
+const CleanCard = ({ children, style, variant = 'default', contentStyle }) => (
+  <View style={[styles.shadowSoft, style]}>
+    <View style={styles.shadowDepth}>
+      <LinearGradient
+        colors={variantGradients[variant] || variantGradients.default}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.gradient}
+      >
+        <View style={[styles.surface, contentStyle]}>{children}</View>
+      </LinearGradient>
+    </View>
+  </View>
+);
+
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(17,24,39,0.06)', // subtle neutral border
+  shadowSoft: {
+    borderRadius: radii.lg,
+    backgroundColor: colors.background,
+    shadowColor: '#FFFFFF',
+    shadowOpacity: 0.9,
+    shadowRadius: 18,
+    shadowOffset: { width: -6, height: -6 },
+  },
+  shadowDepth: {
+    borderRadius: radii.lg,
+    backgroundColor: colors.background,
+    shadowColor: 'rgba(163, 177, 198, 0.7)',
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    shadowOffset: { width: 6, height: 8 },
+    overflow: 'hidden',
     ...Platform.select({
-      ios: {
-        shadowColor: '#121826',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.08,
-        shadowRadius: 18,
-      },
       android: {
-        elevation: 4,
+        elevation: 6,
       },
     }),
+  },
+  gradient: {
+    padding: 2,
+    borderRadius: radii.lg,
+  },
+  surface: {
+    backgroundColor: colors.glassLighter,
+    borderRadius: radii.lg - 4,
+    padding: 18,
   },
 });
 
 export default CleanCard;
-
-

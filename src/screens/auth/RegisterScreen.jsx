@@ -13,6 +13,7 @@ import {
   ActivityIndicator
 } from 'react-native';
 import { MaterialIcons as Icon } from '@expo/vector-icons'; // khuyên dùng với Expo
+import { SoftBackHeader } from '../../components/ui/GlassHeader.jsx';
 import authService from '../../services/authService';
 
 const RegisterScreen = ({ navigation }) => {
@@ -151,14 +152,11 @@ const RegisterScreen = ({ navigation }) => {
         style={styles.keyboardAvoidingView}
       >
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-          {/* Header */}
-          <View style={styles.header}>
-            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-              <Icon name="arrow-back" size={24} color="#000" />
-            </TouchableOpacity>
-            <Text style={styles.title}>Đăng ký tài khoản</Text>
-            <Text style={styles.subtitle}>Tạo tài khoản mới để sử dụng dịch vụ</Text>
-          </View>
+          <SoftBackHeader
+            title="Đăng ký tài khoản"
+            subtitle="Tạo tài khoản mới để sử dụng dịch vụ"
+            onBackPress={() => navigation.goBack()}
+          />
 
           {/* Form */}
           <View style={styles.form}>
@@ -331,11 +329,7 @@ const RegisterScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   keyboardAvoidingView: { flex: 1 },
-  scrollContent: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 50 },
-  header: { alignItems: 'center', marginBottom: 40 },
-  backButton: { position: 'absolute', left: 0, top: 0, padding: 5 },
-  title: { fontSize: 24, fontWeight: 'bold', color: '#000', marginBottom: 10, marginTop: 30 },
-  subtitle: { fontSize: 14, color: '#666', textAlign: 'center' },
+  scrollContent: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 12 },
   form: { marginBottom: 30 },
   inputContainer: {
     flexDirection: 'row', alignItems: 'center',

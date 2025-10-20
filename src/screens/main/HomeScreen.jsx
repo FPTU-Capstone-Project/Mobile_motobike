@@ -6,13 +6,14 @@ import {
   SafeAreaView,
   TouchableOpacity,
   ScrollView,
-  Alert
+  Alert,
+  StatusBar,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Animatable from 'react-native-animatable';
 import GlassHeader from '../../components/ui/GlassHeader.jsx';
 import CleanCard from '../../components/ui/CleanCard.jsx';
+import AppBackground from '../../components/layout/AppBackground.jsx';
 import { colors } from '../../theme/designTokens';
 
 import mockData from '../../data/mockData.json';
@@ -28,10 +29,31 @@ const HomeScreen = ({ navigation }) => {
   const [userMode, setUserMode] = useState('auto');
   const [availableDrivers, setAvailableDrivers] = useState([]);
   const [showDrivers, setShowDrivers] = useState(false);
+  const [currentUserName, setCurrentUserName] = useState('');
 
-  const user = mockData.users[0];
   const presetLocations = mockData.presetLocations;
   const drivers = mockData.availableDrivers;
+
+  useEffect(() => {
+    const loadCurrentUserName = async () => {
+      try {
+        const cachedUser = authService.getCurrentUser();
+        if (cachedUser?.user?.full_name) {
+          setCurrentUserName(cachedUser.user.full_name);
+          return;
+        }
+
+        const profile = await authService.getCurrentUserProfile();
+        if (profile?.user?.full_name) {
+          setCurrentUserName(profile.user.full_name);
+        }
+      } catch (error) {
+        console.log('Could not load current user name:', error);
+      }
+    };
+
+    loadCurrentUserName();
+  }, []);
 
   // Check verification status when component mounts
   useEffect(() => {
@@ -216,51 +238,66 @@ const HomeScreen = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+    <AppBackground>
+      <StatusBar barStyle="dark-content" />
+      <SafeAreaView style={styles.safe}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
         {/* Verification Banner removed per request */}
 
         {/* Glass Header */}
-        <GlassHeader title={user.name} subtitle="Xin chào," onBellPress={() => {}} />
+        <GlassHeader
+          title={currentUserName || 'Người dùng'}
+          subtitle="Xin chào,"
+          onBellPress={() => {}}
+        />
 
         {/* Mode Selector */}
         <View style={styles.content}>
-          <ModeSelector 
-            mode={userMode} 
-            onModeChange={setUserMode}
-            userType="user"
-          />
+          <Animatable.View animation="fadeInUp" duration={450} useNativeDriver>
+            <ModeSelector 
+              mode={userMode} 
+              onModeChange={setUserMode}
+              userType="user"
+            />
+          </Animatable.View>
 
           {/* Location Selection */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Chọn điểm đón</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.locationScroll}>
-              {presetLocations.map((location) => (
-                <View key={location.id} style={styles.locationItem}>
-                  <LocationCard
-                    location={location}
-                    selected={selectedPickup?.id === location.id}
-                    onPress={() => handleLocationSelect(location, 'pickup')}
-                  />
-                </View>
-              ))}
-            </ScrollView>
-          </View>
+          <Animatable.View animation="fadeInUp" duration={480} delay={50} useNativeDriver>
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Chọn điểm đón</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.locationScroll}>
+                {presetLocations.map((location) => (
+                  <View key={location.id} style={styles.locationItem}>
+                    <LocationCard
+                      location={location}
+                      selected={selectedPickup?.id === location.id}
+                      onPress={() => handleLocationSelect(location, 'pickup')}
+                    />
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          </Animatable.View>
 
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Chọn điểm đến</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.locationScroll}>
-              {presetLocations.map((location) => (
-                <View key={location.id} style={styles.locationItem}>
-                  <LocationCard
-                    location={location}
-                    selected={selectedDropoff?.id === location.id}
-                    onPress={() => handleLocationSelect(location, 'dropoff')}
-                  />
-                </View>
-              ))}
-            </ScrollView>
-          </View>
+          <Animatable.View animation="fadeInUp" duration={480} delay={120} useNativeDriver>
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Chọn điểm đến</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.locationScroll}>
+                {presetLocations.map((location) => (
+                  <View key={location.id} style={styles.locationItem}>
+                    <LocationCard
+                      location={location}
+                      selected={selectedDropoff?.id === location.id}
+                      onPress={() => handleLocationSelect(location, 'dropoff')}
+                    />
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          </Animatable.View>
 
           {/* Selected Route Summary (Glass) */}
           {selectedPickup && selectedDropoff && (
@@ -296,8 +333,8 @@ const HomeScreen = ({ navigation }) => {
             <Animatable.View animation="slideInUp" style={styles.driversSection}>
               <Text style={styles.sectionTitle}>Tài xế có sẵn</Text>
               {availableDrivers.length === 0 ? (
-                <CleanCard style={{ padding: 24 }}>
-                  <Icon name="search-off" size={48} color="#ccc" />
+                <CleanCard contentStyle={styles.emptyState}>
+                  <Icon name="search-off" size={48} color="rgba(148,163,184,0.45)" />
                   <Text style={styles.noDriversText}>Không có tài xế nào phù hợp</Text>
                   <ModernButton
                     title="Thử chế độ tự động"
@@ -313,27 +350,30 @@ const HomeScreen = ({ navigation }) => {
                   <TouchableOpacity
                     key={driver.id}
                     style={styles.driverCard}
+                    activeOpacity={0.88}
                     onPress={() => handleDriverSelect(driver)}
                   >
-                    <View style={styles.driverInfo}>
-                      <View style={styles.driverAvatar}>
-                        <Icon name="person" size={24} color="#4CAF50" />
-                      </View>
-                      <View style={styles.driverDetails}>
-                        <Text style={styles.driverName}>{driver.name}</Text>
-                        <View style={styles.driverStats}>
-                          <Icon name="star" size={16} color="#FF9800" />
-                          <Text style={styles.rating}>{driver.rating}</Text>
-                          <Text style={styles.distance}>• {driver.distance}km</Text>
-                          {driver.isSharing && (
-                            <View style={styles.sharingBadge}>
-                              <Text style={styles.sharingText}>Chia sẻ</Text>
-                            </View>
-                          )}
+                    <CleanCard contentStyle={styles.driverCardContent}>
+                      <View style={styles.driverInfo}>
+                        <View style={styles.driverAvatar}>
+                          <Icon name="person" size={24} color={colors.primary} />
                         </View>
+                        <View style={styles.driverDetails}>
+                          <Text style={styles.driverName}>{driver.name}</Text>
+                          <View style={styles.driverStats}>
+                            <Icon name="star" size={16} color="#F59E0B" />
+                            <Text style={styles.rating}>{driver.rating}</Text>
+                            <Text style={styles.distance}>• {driver.distance}km</Text>
+                            {driver.isSharing && (
+                              <View style={styles.sharingBadge}>
+                                <Text style={styles.sharingText}>Chia sẻ</Text>
+                              </View>
+                            )}
+                          </View>
+                        </View>
+                        <Text style={styles.estimatedTime}>{driver.estimatedTime} phút</Text>
                       </View>
-                      <Text style={styles.estimatedTime}>{driver.estimatedTime} phút</Text>
-                    </View>
+                    </CleanCard>
                   </TouchableOpacity>
                 ))
               )}
@@ -341,228 +381,154 @@ const HomeScreen = ({ navigation }) => {
           )}
 
           {/* Quick Actions */}
-          <View style={styles.quickActions}>
-            <Text style={styles.sectionTitle}>Thao tác nhanh</Text>
-            <View style={styles.actionsGrid}>
-              <CleanCard style={styles.actionItem}>
-                <TouchableOpacity onPress={() => navigation.navigate('History')} style={{ alignItems: 'center' }}>
-                <Icon name="history" size={24} color="#2196F3" />
-                <Text style={styles.actionText}>Lịch sử</Text>
-                </TouchableOpacity>
-              </CleanCard>
-              <CleanCard style={styles.actionItem}>
-                <TouchableOpacity onPress={() => navigation.navigate('Wallet')} style={{ alignItems: 'center' }}>
-                <Icon name="account-balance-wallet" size={24} color="#4CAF50" />
-                <Text style={styles.actionText}>Ví tiền</Text>
-                </TouchableOpacity>
-              </CleanCard>
-              <CleanCard style={styles.actionItem}>
-                <TouchableOpacity style={{ alignItems: 'center' }}>
-                <Icon name="local-offer" size={24} color="#FF9800" />
-                <Text style={styles.actionText}>Ưu đãi</Text>
-                </TouchableOpacity>
-              </CleanCard>
-              <CleanCard style={styles.actionItem}>
-                <TouchableOpacity style={{ alignItems: 'center' }}>
-                <Icon name="help" size={24} color="#9C27B0" />
-                <Text style={styles.actionText}>Hỗ trợ</Text>
-                </TouchableOpacity>
-              </CleanCard>
+          <Animatable.View animation="fadeInUp" duration={520} delay={180} useNativeDriver>
+            <View style={styles.quickActions}>
+              <Text style={styles.sectionTitle}>Thao tác nhanh</Text>
+              <View style={styles.actionsGrid}>
+                <CleanCard style={styles.actionItem} contentStyle={styles.actionContent}>
+                  <TouchableOpacity onPress={() => navigation.navigate('History')} style={styles.actionButton}>
+                    <View style={[styles.actionIcon, { backgroundColor: 'rgba(59,130,246,0.12)' }]}>
+                      <Icon name="history" size={22} color={colors.accent} />
+                    </View>
+                    <Text style={styles.actionText}>Lịch sử</Text>
+                  </TouchableOpacity>
+                </CleanCard>
+                <CleanCard style={styles.actionItem} contentStyle={styles.actionContent}>
+                  <TouchableOpacity onPress={() => navigation.navigate('Wallet')} style={styles.actionButton}>
+                    <View style={[styles.actionIcon, { backgroundColor: 'rgba(34,197,94,0.12)' }]}>
+                      <Icon name="account-balance-wallet" size={22} color="#16A34A" />
+                    </View>
+                    <Text style={styles.actionText}>Ví tiền</Text>
+                  </TouchableOpacity>
+                </CleanCard>
+                <CleanCard style={styles.actionItem} contentStyle={styles.actionContent}>
+                  <TouchableOpacity style={styles.actionButton}>
+                    <View style={[styles.actionIcon, { backgroundColor: 'rgba(249,115,22,0.12)' }]}>
+                      <Icon name="local-offer" size={22} color="#F97316" />
+                    </View>
+                    <Text style={styles.actionText}>Ưu đãi</Text>
+                  </TouchableOpacity>
+                </CleanCard>
+                <CleanCard style={styles.actionItem} contentStyle={styles.actionContent}>
+                  <TouchableOpacity style={styles.actionButton}>
+                    <View style={[styles.actionIcon, { backgroundColor: 'rgba(148,163,184,0.18)' }]}>
+                      <Icon name="help" size={22} color={colors.textSecondary} />
+                    </View>
+                    <Text style={styles.actionText}>Hỗ trợ</Text>
+                  </TouchableOpacity>
+                </CleanCard>
+              </View>
             </View>
-          </View>
+          </Animatable.View>
         </View>
-      </ScrollView>
-    </SafeAreaView>
+        </ScrollView>
+      </SafeAreaView>
+    </AppBackground>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F7FB' },
-  verificationBanner: {
-    backgroundColor: '#FFF3E0',
-    marginHorizontal: 16,
-    marginTop: 8,
-    borderRadius: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: '#FF9800',
-  },
-  bannerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-  },
-  bannerText: {
-    flex: 1,
-    fontSize: 14,
-    color: '#E65100',
-    marginLeft: 8,
-    fontWeight: '500',
-  },
-  bannerButton: {
-    backgroundColor: '#FF9800',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 4,
-  },
-  bannerButtonText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  header: {
-    paddingTop: 20,
-    paddingBottom: 24,
-    paddingHorizontal: 20,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  userInfo: {
-    flex: 1,
-  },
-  greeting: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.8)',
-  },
-  userName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginTop: 4,
-  },
-  notificationButton: {
-    position: 'relative',
-    padding: 8,
-  },
-  notificationBadge: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    backgroundColor: '#F44336',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  badgeText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
+  safe: { flex: 1 },
+  scrollContent: { paddingTop: 8, paddingBottom: 160 },
   content: {
     flex: 1,
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 24,
   },
   section: {
-    marginBottom: 24,
+    marginBottom: 28,
   },
-  sectionTitle: { fontSize: 18, fontWeight: '600', color: '#111827', marginBottom: 16 },
+  sectionTitle: {
+    fontSize: 20,
+    fontFamily: 'Inter_700Bold',
+    color: colors.textPrimary,
+    marginBottom: 18,
+  },
   locationScroll: {
     marginHorizontal: -4,
   },
   locationItem: {
-    width: 280,
-    marginRight: 8,
+    width: 260,
+    marginRight: 12,
   },
-  routeSummary: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+  routeTitle: {
+    fontSize: 17,
+    fontFamily: 'Inter_700Bold',
+    color: colors.textPrimary,
+    marginBottom: 18,
   },
-  routeTitle: { fontSize: 16, fontWeight: '600', color: '#111827', marginBottom: 16 },
   routeContainer: {
-    alignItems: 'flex-start',
+    marginTop: 6,
   },
   routePoint: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 4,
+    marginVertical: 6,
   },
   pickupDot: {
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#4CAF50',
-    marginRight: 12,
+    backgroundColor: colors.accent,
+    marginRight: 14,
   },
   dropoffDot: {
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#F44336',
-    marginRight: 12,
+    backgroundColor: colors.highlight,
+    marginRight: 14,
   },
   routeLine: {
     width: 2,
-    height: 20,
-    backgroundColor: '#ddd',
-    marginLeft: 5,
-    marginVertical: 2,
+    height: 26,
+    backgroundColor: 'rgba(148,163,184,0.35)',
+    marginLeft: 6,
   },
-  routeText: { fontSize: 16, color: '#1f2937', fontWeight: '500' },
+  routeText: { fontSize: 16, color: colors.textPrimary, fontFamily: 'Inter_600SemiBold' },
   buttonContainer: {
-    marginBottom: 24,
+    marginBottom: 16,
   },
   driversSection: {
-    marginBottom: 24,
+    marginBottom: 32,
   },
-  noDrivers: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 32,
+  emptyState: {
     alignItems: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    paddingVertical: 28,
   },
   noDriversText: {
-    fontSize: 16,
-    color: '#666',
-    marginTop: 16,
-    marginBottom: 24,
+    fontSize: 15,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginVertical: 18,
+    fontFamily: 'Inter_400Regular',
   },
   driverCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
     marginBottom: 12,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+  },
+  driverCardContent: {
+    paddingVertical: 16,
   },
   driverInfo: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   driverAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#f0f8f0',
+    width: 52,
+    height: 52,
+    borderRadius: 20,
+    backgroundColor: '#E3EDFF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 14,
   },
   driverDetails: {
     flex: 1,
   },
   driverName: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#1a1a1a',
+    fontFamily: 'Inter_700Bold',
+    color: colors.textPrimary,
     marginBottom: 4,
   },
   driverStats: {
@@ -571,16 +537,18 @@ const styles = StyleSheet.create({
   },
   rating: {
     fontSize: 14,
-    color: '#666',
+    color: colors.textSecondary,
     marginLeft: 4,
+    fontFamily: 'Inter_600SemiBold',
   },
   distance: {
     fontSize: 14,
-    color: '#666',
-    marginLeft: 4,
+    color: colors.textSecondary,
+    marginLeft: 8,
+    fontFamily: 'Inter_400Regular',
   },
   sharingBadge: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: 'rgba(59,130,246,0.16)',
     borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 2,
@@ -588,27 +556,47 @@ const styles = StyleSheet.create({
   },
   sharingText: {
     fontSize: 12,
-    color: '#fff',
-    fontWeight: '500',
+    color: colors.accent,
+    fontWeight: '600',
   },
   estimatedTime: {
     fontSize: 14,
-    color: '#4CAF50',
-    fontWeight: '600',
+    color: colors.accent,
+    fontFamily: 'Inter_700Bold',
   },
   quickActions: {
-    marginTop: 8,
+    marginTop: 12,
   },
   actionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
-  actionItem: { width: '22%', borderRadius: 16, padding: 16, alignItems: 'center', marginBottom: 12 },
+  actionItem: {
+    width: '48%',
+    borderRadius: 24,
+    marginBottom: 14,
+  },
+  actionContent: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  actionButton: {
+    alignItems: 'center',
+  },
+  actionIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
   actionText: {
-    fontSize: 12,
-    color: '#666',
+    fontSize: 13,
+    color: colors.textSecondary,
     marginTop: 8,
+    fontFamily: 'Inter_600SemiBold',
     textAlign: 'center',
   },
 });

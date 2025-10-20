@@ -1,9 +1,9 @@
 import React from 'react';
-import { View, StyleSheet, Pressable, Text, Platform } from 'react-native';
+import { View, StyleSheet, Pressable, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, radii } from '../../theme/designTokens';
+import { colors, radii, gradients } from '../../theme/designTokens';
 
 const iconMap = {
   Home: 'home',
@@ -17,16 +17,16 @@ const GlassTabBar = ({ state, descriptors, navigation }) => {
   return (
     <View style={[styles.outer, { paddingBottom: Math.max(insets.bottom - 6, 8) }]}> 
       <View style={styles.glassWrap}>
-        <LinearGradient colors={['#10412F','#000000']} start={{x:0,y:0}} end={{x:1,y:1}} style={StyleSheet.absoluteFill} />
+        <LinearGradient
+          colors={['rgba(255,255,255,0.92)', 'rgba(255,255,255,0.75)']}
+          start={{x:0,y:0}}
+          end={{x:1,y:1}}
+          style={StyleSheet.absoluteFill}
+        />
+        <View style={styles.glassBorder} />
         <View style={styles.innerRow}>
           {state.routes.map((route, index) => {
             const { options } = descriptors[route.key];
-            const label =
-              options.tabBarLabel !== undefined
-                ? options.tabBarLabel
-                : options.title !== undefined
-                ? options.title
-                : route.name;
             const isFocused = state.index === index;
 
             const onPress = () => {
@@ -46,16 +46,22 @@ const GlassTabBar = ({ state, descriptors, navigation }) => {
                 onPress={onPress}
                 style={({ pressed }) => [styles.tab, pressed && { opacity: 0.85 }]}
               >
-                {isFocused ? (
-                  <View style={styles.activePill}>
-                    <Icon name={iconMap[route.name] || 'circle'} size={18} color="#111827" />
-                    <Text style={styles.activeLabel}>{label}</Text>
-                  </View>
-                ) : (
-                  <View style={styles.inactiveDot}> 
-                    <Icon name={iconMap[route.name] || 'circle'} size={20} color="#FFFFFF" />
-                  </View>
-                )}
+                <LinearGradient
+                  colors={
+                    isFocused
+                      ? gradients.pillActive
+                      : ['rgba(255,255,255,0.6)', 'rgba(255,255,255,0.4)']
+                  }
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[styles.iconWrapper, isFocused && styles.iconWrapperActive]}
+                >
+                  <Icon
+                    name={iconMap[route.name] || 'circle'}
+                    size={20}
+                    color={isFocused ? '#fff' : colors.textMuted}
+                  />
+                </LinearGradient>
               </Pressable>
             );
           })}
@@ -79,15 +85,23 @@ const styles = StyleSheet.create({
     borderRadius: radii.xl,
     overflow: 'hidden',
     backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.85)',
     ...Platform.select({
       ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.08,
-        shadowRadius: 16,
+        shadowColor: 'rgba(15,23,42,0.25)',
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.18,
+        shadowRadius: 22,
       },
-      android: { elevation: 6 },
+      android: { elevation: 10 },
     }),
+  },
+  glassBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   innerRow: {
     flexDirection: 'row',
@@ -97,24 +111,19 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   tab: { flex: 1, alignItems: 'center' },
-  inactiveDot: {
-    width: 44,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
+  iconWrapper: {
+    width: 48,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
-  },
-  activePill: {
-    flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    paddingHorizontal: 14,
-    height: 36,
-    borderRadius: 18,
   },
-  activeLabel: { marginLeft: 8, fontWeight: '700', color: '#111827' },
+  iconWrapperActive: {
+    shadowColor: 'rgba(59,130,246,0.45)',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+  },
 });
 
 export default GlassTabBar;
-
-

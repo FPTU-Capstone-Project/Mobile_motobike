@@ -14,6 +14,7 @@ import {
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Animatable from 'react-native-animatable';
+import { SoftBackHeader } from '../../components/ui/GlassHeader.jsx';
 
 import ModernButton from '../../components/ModernButton.jsx';
 import authService from '../../services/authService';
@@ -181,22 +182,11 @@ const OTPVerificationScreen = ({ navigation, route }) => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardAvoidingView}
       >
-        {/* Header */}
-        <LinearGradient
-          colors={['#10412F', '#000000']}
-          style={styles.header}
-        >
-          <View style={styles.headerContent}>
-            <TouchableOpacity 
-              style={styles.backButton}
-              onPress={() => navigation.goBack()}
-            >
-              <Icon name="arrow-back" size={24} color="#fff" />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>Xác minh OTP</Text>
-            <View style={styles.placeholder} />
-          </View>
-        </LinearGradient>
+        <SoftBackHeader
+          title="Xác minh OTP"
+          subtitle={`Mã OTP để ${getPurposeText()} đã được gửi`}
+          onBackPress={() => navigation.goBack()}
+        />
 
         <View style={styles.content}>
           {/* Instructions */}
@@ -295,30 +285,10 @@ const styles = StyleSheet.create({
   keyboardAvoidingView: {
     flex: 1,
   },
-  header: {
-    paddingTop: 20,
-    paddingBottom: 24,
-    paddingHorizontal: 20,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  placeholder: {
-    width: 40,
-  },
   content: {
     flex: 1,
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 12,
     justifyContent: 'center',
   },
   instructionsContainer: {
