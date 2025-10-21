@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, StyleSheet, Pressable, Text, Platform, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, Pressable, Platform, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radii } from '../../theme/designTokens';
@@ -10,13 +11,6 @@ const iconMap = {
   Wallet: 'account-balance-wallet',
   History: 'history',
   Profile: 'person',
-};
-
-const labelMap = {
-  Home: 'Trang chủ',
-  Wallet: 'Ví tiền',
-  History: 'Lịch sử',
-  Profile: 'Hồ sơ',
 };
 
 const SHOW_FAB = false;
@@ -36,13 +30,14 @@ const GlassTabBar = ({ state, descriptors, navigation }) => {
       style={[
         styles.wrapper,
         {
-          paddingBottom: Math.max(insets.bottom, 18),
+          paddingBottom: Math.max(insets.bottom, 26),
         },
       ]}
     >
       <View style={styles.bar}>
-        <View style={styles.barBackground} />
-        <View style={styles.barStroke} />
+        <BlurView intensity={40} tint="light" style={styles.barBackground}>
+          <View style={styles.barStroke} />
+        </BlurView>
         <View style={styles.tabRow}>
           {state.routes.map((route, index) => {
             const isFabPlaceholder = SHOW_FAB && route.name === 'QRPayment';
@@ -76,25 +71,26 @@ const GlassTabBar = ({ state, descriptors, navigation }) => {
               >
                 <View style={[styles.tabInner, isFocused && styles.tabInnerActive]}>
                   {isFocused ? (
-                    <LinearGradient
-                      colors={['rgba(59,130,246,0.18)', 'rgba(59,130,246,0.08)']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.activeBackground}
-                    >
-                      <View style={styles.activeStroke} />
-                    </LinearGradient>
+                    <BlurView intensity={46} tint="light" style={styles.blurFill}>
+                      <LinearGradient
+                        colors={['rgba(255,255,255,0.7)', 'rgba(59,130,246,0.12)']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.activeBackground}
+                      >
+                        <View style={styles.activeStroke} />
+                      </LinearGradient>
+                    </BlurView>
                   ) : (
-                    <View style={styles.inactiveBackground} />
+                    <BlurView intensity={24} tint="light" style={styles.blurFill}>
+                      <View style={styles.inactiveBackground} />
+                    </BlurView>
                   )}
                   <Icon
                     name={iconMap[route.name] || 'circle'}
                     size={20}
                     color={isFocused ? colors.accent : colors.textSecondary}
                   />
-                  <Text style={[styles.label, isFocused && styles.labelActive]}>
-                    {labelMap[route.name] || options.title || route.name}
-                  </Text>
                 </View>
               </Pressable>
             );
@@ -123,7 +119,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 12,
+    bottom: -2,
     alignItems: 'center',
     pointerEvents: 'box-none',
   },
@@ -143,8 +139,9 @@ const styles = StyleSheet.create({
   },
   barBackground: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255,255,255,0.55)',
     borderRadius: radii.xl,
+    overflow: 'hidden',
   },
   barStroke: {
     ...StyleSheet.absoluteFillObject,
@@ -172,8 +169,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
   },
   tabInner: {
-    minWidth: 76,
-    paddingVertical: 8,
+    minWidth: 54,
+    height: 44,
     paddingHorizontal: 12,
     borderRadius: 26,
     justifyContent: 'center',
@@ -183,9 +180,14 @@ const styles = StyleSheet.create({
   tabInnerActive: {
     borderRadius: 26,
   },
+  blurFill: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 26,
+    overflow: 'hidden',
+  },
   inactiveBackground: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255,255,255,0.55)',
     pointerEvents: 'none',
   },
   activeBackground: {
@@ -200,15 +202,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(59,130,246,0.22)',
     pointerEvents: 'none',
-  },
-  label: {
-    marginTop: 6,
-    fontSize: 11,
-    fontFamily: 'Inter_500Medium',
-    color: colors.textSecondary,
-  },
-  labelActive: {
-    color: colors.accent,
   },
   fabButton: {
     width: 54,
