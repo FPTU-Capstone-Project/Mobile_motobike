@@ -1,9 +1,9 @@
 import React from 'react';
-import { View, StyleSheet, Pressable, Platform } from 'react-native';
+import { View, StyleSheet, Pressable, Text, Platform, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, radii, gradients } from '../../theme/designTokens';
+import { colors, radii } from '../../theme/designTokens';
 
 const iconMap = {
   Home: 'home',
@@ -12,20 +12,44 @@ const iconMap = {
   Profile: 'person',
 };
 
+const labelMap = {
+  Home: 'Trang chủ',
+  Wallet: 'Ví tiền',
+  History: 'Lịch sử',
+  Profile: 'Hồ sơ',
+};
+
+const SHOW_FAB = false;
+
 const GlassTabBar = ({ state, descriptors, navigation }) => {
   const insets = useSafeAreaInsets();
+
+  const handleFabPress = () => {
+    const fabRoute = state.routes.find((r) => r.name === 'QRPayment');
+    if (fabRoute) {
+      navigation.navigate('QRPayment');
+    }
+  };
+
   return (
-    <View style={[styles.outer, { paddingBottom: Math.max(insets.bottom - 6, 8) }]}> 
-      <View style={styles.glassWrap}>
-        <LinearGradient
-          colors={['rgba(255,255,255,0.92)', 'rgba(255,255,255,0.75)']}
-          start={{x:0,y:0}}
-          end={{x:1,y:1}}
-          style={StyleSheet.absoluteFill}
-        />
-        <View style={styles.glassBorder} />
-        <View style={styles.innerRow}>
+    <View
+      style={[
+        styles.wrapper,
+        {
+          paddingBottom: Math.max(insets.bottom, 18),
+        },
+      ]}
+    >
+      <View style={styles.bar}>
+        <View style={styles.barBackground} />
+        <View style={styles.barStroke} />
+        <View style={styles.tabRow}>
           {state.routes.map((route, index) => {
+            const isFabPlaceholder = SHOW_FAB && route.name === 'QRPayment';
+            if (isFabPlaceholder) {
+              return null;
+            }
+
             const { options } = descriptors[route.key];
             const isFocused = state.index === index;
 
@@ -44,27 +68,50 @@ const GlassTabBar = ({ state, descriptors, navigation }) => {
               <Pressable
                 key={route.key}
                 onPress={onPress}
-                style={({ pressed }) => [styles.tab, pressed && { opacity: 0.85 }]}
+                style={({ pressed }) => [
+                  styles.tabButton,
+                  isFocused && styles.tabButtonActive,
+                  pressed && !isFocused && { opacity: 0.7 },
+                ]}
               >
-                <LinearGradient
-                  colors={
-                    isFocused
-                      ? gradients.pillActive
-                      : ['rgba(255,255,255,0.6)', 'rgba(255,255,255,0.4)']
-                  }
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={[styles.iconWrapper, isFocused && styles.iconWrapperActive]}
-                >
+                <View style={[styles.tabInner, isFocused && styles.tabInnerActive]}>
+                  {isFocused ? (
+                    <LinearGradient
+                      colors={['rgba(59,130,246,0.18)', 'rgba(59,130,246,0.08)']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.activeBackground}
+                    >
+                      <View style={styles.activeStroke} />
+                    </LinearGradient>
+                  ) : (
+                    <View style={styles.inactiveBackground} />
+                  )}
                   <Icon
                     name={iconMap[route.name] || 'circle'}
                     size={20}
-                    color={isFocused ? '#fff' : colors.textMuted}
+                    color={isFocused ? colors.accent : colors.textSecondary}
                   />
-                </LinearGradient>
+                  <Text style={[styles.label, isFocused && styles.labelActive]}>
+                    {labelMap[route.name] || options.title || route.name}
+                  </Text>
+                </View>
               </Pressable>
             );
           })}
+          {SHOW_FAB && (
+            <TouchableOpacity style={styles.fabButton} onPress={handleFabPress} activeOpacity={0.85}>
+              <View style={styles.fabShadow} />
+              <LinearGradient
+                colors={['#3B82F6', '#2563EB']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.fabInner}
+              >
+                <Icon name="add" size={26} color="#fff" />
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </View>
@@ -72,7 +119,7 @@ const GlassTabBar = ({ state, descriptors, navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  outer: {
+  wrapper: {
     position: 'absolute',
     left: 0,
     right: 0,
@@ -80,49 +127,116 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     pointerEvents: 'box-none',
   },
-  glassWrap: {
-    width: '90%',
+  bar: {
+    width: '92%',
     borderRadius: radii.xl,
-    overflow: 'hidden',
     backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.85)',
     ...Platform.select({
       ios: {
-        shadowColor: 'rgba(15,23,42,0.25)',
-        shadowOffset: { width: 0, height: 12 },
-        shadowOpacity: 0.18,
-        shadowRadius: 22,
+        shadowColor: 'rgba(0,0,0,0.08)',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 1,
+        shadowRadius: 20,
       },
-      android: { elevation: 10 },
+      android: { elevation: 16 },
     }),
   },
-  glassBorder: {
+  barBackground: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#FFFFFF',
+    borderRadius: radii.xl,
+  },
+  barStroke: {
     ...StyleSheet.absoluteFillObject,
     borderRadius: radii.xl,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: 'rgba(255,255,255,0.68)',
   },
-  innerRow: {
+  tabRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    gap: 10,
   },
-  tab: { flex: 1, alignItems: 'center' },
-  iconWrapper: {
-    width: 48,
-    height: 40,
-    borderRadius: 20,
+  tabButton: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minHeight: 52,
+  },
+  tabButtonActive: {
+    shadowColor: 'rgba(59,130,246,0.28)',
+    shadowOpacity: 1,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+  },
+  tabInner: {
+    minWidth: 76,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 26,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  tabInnerActive: {
+    borderRadius: 26,
+  },
+  inactiveBackground: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#FFFFFF',
+    pointerEvents: 'none',
+  },
+  activeBackground: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 26,
+    overflow: 'hidden',
+    pointerEvents: 'none',
+  },
+  activeStroke: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 26,
+    borderWidth: 1,
+    borderColor: 'rgba(59,130,246,0.22)',
+    pointerEvents: 'none',
+  },
+  label: {
+    marginTop: 6,
+    fontSize: 11,
+    fontFamily: 'Inter_500Medium',
+    color: colors.textSecondary,
+  },
+  labelActive: {
+    color: colors.accent,
+  },
+  fabButton: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    marginLeft: 4,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  iconWrapperActive: {
-    shadowColor: 'rgba(59,130,246,0.45)',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
+  fabShadow: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 27,
+    ...Platform.select({
+      ios: {
+        shadowColor: 'rgba(59,130,246,0.45)',
+        shadowOpacity: 1,
+        shadowRadius: 18,
+        shadowOffset: { width: 0, height: 10 },
+      },
+      android: { elevation: 14 },
+    }),
+  },
+  fabInner: {
+    width: '92%',
+    height: '92%',
+    borderRadius: 27,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 
