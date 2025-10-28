@@ -11,6 +11,8 @@ import {
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import goongService from '../services/goongService';
 import addressValidation from '../utils/addressValidation';
+import poiService from '../services/poiService';
+import { locationStorageService } from '../services/locationStorageService';
 
 const AddressInput = ({
   value,
@@ -34,50 +36,7 @@ const AddressInput = ({
   useEffect(() => {
     // Only search if user is actively typing, not when value is set programmatically
     if (isTyping && value && value.length > 0) {
-      // Always show suggested addresses first
-      const suggestedAddresses = addressValidation.getSuggestedAddresses();
-      
-      if (value.length <= 2) {
-        // Show suggested addresses and current location for short queries
-        const shortSuggestions = suggestedAddresses.map(addr => ({
-          place_id: addr.id,
-          description: addr.title,
-          structured_formatting: {
-            main_text: addr.title,
-            secondary_text: addr.description
-          },
-          coordinates: addr.coordinates,
-          isSuggested: true
-        }));
-
-        // Add current location for pickup input
-        if (isPickupInput && currentLocation) {
-          shortSuggestions.unshift({
-            place_id: 'current_location',
-            description: 'Vị trí hiện tại',
-            structured_formatting: {
-              main_text: 'Vị trí hiện tại',
-              secondary_text: 'Sử dụng GPS để xác định vị trí'
-            },
-            coordinates: currentLocation,
-            isSuggested: true,
-            isCurrentLocation: true
-          });
-        }
-
-        setSuggestions(shortSuggestions);
-        setShowSuggestions(true);
-        return;
-      }
-      
-      // Debounce search
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current);
-      }
-      
-      debounceRef.current = setTimeout(() => {
-        searchPlaces(value);
-      }, 300);
+      loadSuggestions(value);
     } else if (!isTyping) {
       // Don't show suggestions when value is set programmatically
       setSuggestions([]);
@@ -91,8 +50,79 @@ const AddressInput = ({
     };
   }, [value, isTyping]);
 
-  const searchPlaces = async (query) => {
-    
+  const loadSuggestions = async (query) => {
+    try {
+      // Get POI locations from admin
+      const poiLocations = await poiService.getAllLocations();
+      
+      // Get current location with address if it's pickup input
+      let currentLocationSuggestion = null;
+      if (isPickupInput) {
+        try {
+          const locationData = await locationStorageService.getCurrentLocationWithAddress();
+          if (locationData.location && locationData.address) {
+            currentLocationSuggestion = {
+              place_id: 'current_location',
+              description: 'Vị trí hiện tại',
+              structured_formatting: {
+                main_text: 'Vị trí hiện tại',
+                secondary_text: locationData.address.shortAddress || 'Sử dụng GPS để xác định vị trí'
+              },
+              coordinates: locationData.location,
+              isSuggested: true,
+              isCurrentLocation: true,
+              isPOI: false
+            };
+          }
+        } catch (error) {
+          console.warn('Could not load current location:', error);
+        }
+      }
+
+      if (query.length <= 2) {
+        // Show POI locations and current location for short queries
+        const shortSuggestions = poiLocations.map(poi => ({
+          place_id: poi.locationId,
+          description: poi.name,
+          structured_formatting: {
+            main_text: poi.name,
+            secondary_text: 'Địa điểm được đề xuất'
+          },
+          coordinates: {
+            latitude: poi.latitude,
+            longitude: poi.longitude
+          },
+          locationId: poi.locationId,
+          isSuggested: true,
+          isPOI: true
+        }));
+
+        // Add current location at the top for pickup input
+        const finalSuggestions = currentLocationSuggestion 
+          ? [currentLocationSuggestion, ...shortSuggestions]
+          : shortSuggestions;
+
+        setSuggestions(finalSuggestions);
+        setShowSuggestions(true);
+        return;
+      }
+      
+      // Debounce search for longer queries
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+      
+      debounceRef.current = setTimeout(() => {
+        searchPlacesWithPOI(query, poiLocations, currentLocationSuggestion);
+      }, 300);
+    } catch (error) {
+      console.error('Error loading suggestions:', error);
+      setSuggestions([]);
+      setShowSuggestions(false);
+    }
+  };
+
+  const searchPlacesWithPOI = async (query, poiLocations, currentLocationSuggestion) => {
     if (!goongService.isPlacesConfigured()) {
       console.log('Goong Places API not configured');
       return;
@@ -100,67 +130,59 @@ const AddressInput = ({
     
     try {
       setLoading(true);
-      const results = await goongService.searchPlaces(query);
       
-      // Handle both formats: array directly or {predictions: array}
+      // Filter POI locations based on query
+      const filteredPOI = poiLocations.filter(poi =>
+        poi.name.toLowerCase().includes(query.toLowerCase())
+      ).map(poi => ({
+        place_id: poi.locationId,
+        description: poi.name,
+        structured_formatting: {
+          main_text: poi.name,
+          secondary_text: 'Địa điểm được đề xuất'
+        },
+        coordinates: {
+          latitude: poi.latitude,
+          longitude: poi.longitude
+        },
+        locationId: poi.locationId,
+        isSuggested: true,
+        isPOI: true,
+        isValid: true
+      }));
+
+      // Search Goong API
+      const results = await goongService.searchPlaces(query);
       const predictions = Array.isArray(results) ? results : results?.predictions || [];
       
-      if (predictions && predictions.length > 0) {
-        
-        // Show all search results
-        const searchResults = predictions.map(item => ({
-          ...item,
-          place_id: item.place_id || item.placeId, // Handle both field names
-          structured_formatting: item.structured_formatting || item.structuredFormatting, // Handle both field names
-          isValid: true // Treat all results as valid
-        }));
-        
-        // Combine suggested addresses with search results
-        const suggestedAddresses = addressValidation.getSuggestedAddresses();
-        const suggestedItems = suggestedAddresses
-          .filter(addr => 
-            addr.title.toLowerCase().includes(query.toLowerCase()) ||
-            addr.description.toLowerCase().includes(query.toLowerCase())
-          )
-          .map(addr => ({
-            place_id: addr.id,
-            description: addr.title,
-            structured_formatting: {
-              main_text: addr.title,
-              secondary_text: addr.description
-            },
-            coordinates: addr.coordinates,
-            isSuggested: true,
-            isValid: true
-          }));
+      const searchResults = predictions.map(item => ({
+        ...item,
+        place_id: item.place_id || item.placeId,
+        structured_formatting: item.structured_formatting || item.structuredFormatting,
+        isValid: true,
+        isPOI: false
+      }));
 
-        // Add current location for pickup input
-        const currentLocationItems = [];
-        if (isPickupInput && currentLocation && 
-            ('vị trí hiện tại'.includes(query.toLowerCase()) || 
-             'hiện tại'.includes(query.toLowerCase()) ||
-             'current'.includes(query.toLowerCase()))) {
-          currentLocationItems.push({
-            place_id: 'current_location',
-            description: 'Vị trí hiện tại',
-            structured_formatting: {
-              main_text: 'Vị trí hiện tại',
-              secondary_text: 'Sử dụng GPS để xác định vị trí'
-            },
-            coordinates: currentLocation,
-            isSuggested: true,
-            isCurrentLocation: true,
-            isValid: true
-          });
-        }
-        
-        // Combine and limit results
-        const combinedResults = [...currentLocationItems, ...suggestedItems, ...searchResults].slice(0, 8);
-        
-        setSuggestions(combinedResults);
-        setShowSuggestions(true);
+      // Add current location if query matches
+      const currentLocationItems = [];
+      if (currentLocationSuggestion && 
+          ('vị trí hiện tại'.includes(query.toLowerCase()) || 
+           'hiện tại'.includes(query.toLowerCase()) ||
+           'current'.includes(query.toLowerCase()))) {
+        currentLocationItems.push(currentLocationSuggestion);
       }
+      
+      // Combine results: Current Location -> POI -> Goong API results
+      const combinedResults = [
+        ...currentLocationItems,
+        ...filteredPOI,
+        ...searchResults
+      ].slice(0, 8);
+      
+      setSuggestions(combinedResults);
+      setShowSuggestions(true);
     } catch (error) {
+      console.error('Search places error:', error);
       setSuggestions([]);
     } finally {
       setLoading(false);
@@ -171,14 +193,31 @@ const AddressInput = ({
     try {
       setIsTyping(false); // Stop triggering search when setting value programmatically
       
-      // If it's a suggested address or current location, use coordinates directly
-      if (suggestion.isSuggested && suggestion.coordinates) {
+      // If it's a POI location, use POI data directly
+      if (suggestion.isPOI && suggestion.locationId) {
         const displayText = suggestion.structured_formatting?.main_text || suggestion.description;
         onChangeText(displayText);
         onLocationSelect({
           latitude: suggestion.coordinates.latitude,
           longitude: suggestion.coordinates.longitude,
           address: displayText,
+          locationId: suggestion.locationId,
+          isPOI: true,
+        });
+        setShowSuggestions(false);
+        setSuggestions([]);
+        return;
+      }
+      
+      // If it's current location, use coordinates directly
+      if (suggestion.isCurrentLocation && suggestion.coordinates) {
+        const displayText = suggestion.structured_formatting?.main_text || suggestion.description;
+        onChangeText(displayText);
+        onLocationSelect({
+          latitude: suggestion.coordinates.latitude,
+          longitude: suggestion.coordinates.longitude,
+          address: displayText,
+          isCurrentLocation: true,
         });
         setShowSuggestions(false);
         setSuggestions([]);
@@ -237,9 +276,18 @@ const AddressInput = ({
       onPress={() => handleSuggestionPress(item)}
     >
       <Icon 
-        name={item.isCurrentLocation ? "my-location" : item.isSuggested ? "star" : item.isValid === false ? "warning" : "location-on"} 
+        name={
+          item.isCurrentLocation ? "my-location" : 
+          item.isPOI ? "place" : 
+          item.isSuggested ? "star" : 
+          item.isValid === false ? "warning" : "location-on"
+        } 
         size={20} 
-        color={item.isCurrentLocation ? "#4CAF50" : item.isSuggested ? "#FF9800" : "#666"} 
+        color={
+          item.isCurrentLocation ? "#4CAF50" : 
+          item.isPOI ? "#2196F3" : 
+          item.isSuggested ? "#FF9800" : "#666"
+        } 
         style={styles.suggestionIcon} 
       />
       <View style={styles.suggestionContent}>
@@ -253,7 +301,17 @@ const AddressInput = ({
           {item.structured_formatting?.secondary_text || ''}
         </Text>
       </View>
-      {item.isSuggested && (
+      {item.isPOI && (
+        <View style={styles.poiBadge}>
+          <Text style={styles.poiBadgeText}>POI</Text>
+        </View>
+      )}
+      {item.isCurrentLocation && (
+        <View style={styles.currentLocationBadge}>
+          <Text style={styles.currentLocationBadgeText}>GPS</Text>
+        </View>
+      )}
+      {item.isSuggested && !item.isPOI && !item.isCurrentLocation && (
         <View style={styles.suggestedBadge}>
           <Text style={styles.suggestedBadgeText}>Gợi ý</Text>
         </View>
@@ -391,6 +449,32 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   suggestedBadgeText: {
+    fontSize: 10,
+    color: '#fff',
+    fontWeight: '600',
+  },
+  // POI badge styles
+  poiBadge: {
+    backgroundColor: '#2196F3',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginLeft: 8,
+  },
+  poiBadgeText: {
+    fontSize: 10,
+    color: '#fff',
+    fontWeight: '600',
+  },
+  // Current location badge styles
+  currentLocationBadge: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginLeft: 8,
+  },
+  currentLocationBadgeText: {
     fontSize: 10,
     color: '#fff',
     fontWeight: '600',

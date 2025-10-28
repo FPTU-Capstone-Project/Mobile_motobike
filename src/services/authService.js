@@ -69,6 +69,76 @@ class AuthService {
     }
   }
 
+  // Check if token is expired
+  isTokenExpired(token) {
+    if (!token) return true;
+    
+    try {
+      // Decode JWT payload (base64)
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const currentTime = Math.floor(Date.now() / 1000);
+      
+      // Check if token expires within next 5 minutes
+      return payload.exp <= (currentTime + 300);
+    } catch (error) {
+      console.error('Error checking token expiry:', error);
+      return true;
+    }
+  }
+
+  // Get valid token (refresh if needed)
+  async getValidToken() {
+    try {
+      // Load current token from storage if not in memory
+      if (!this.token) {
+        this.token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      }
+
+      // If no token or expired, try to refresh
+      if (!this.token || this.isTokenExpired(this.token)) {
+        console.log('🔄 Token expired or missing, attempting refresh...');
+        await this.refreshAccessToken();
+      }
+
+      return this.token;
+    } catch (error) {
+      console.error('Error getting valid token:', error);
+      throw error;
+    }
+  }
+
+  // Refresh access token
+  async refreshAccessToken() {
+    try {
+      const refreshToken = await AsyncStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
+      if (!refreshToken) {
+        throw new Error('No refresh token available');
+      }
+
+      console.log('🔄 Refreshing access token...');
+      const response = await apiService.post('/auth/refresh', {
+        refresh_token: refreshToken
+      });
+
+      const newAccessToken = response.access_token || response.token;
+      const newRefreshToken = response.refresh_token || refreshToken;
+
+      if (!newAccessToken) {
+        throw new Error('No access token received from refresh');
+      }
+
+      await this.saveTokens(newAccessToken, newRefreshToken);
+      console.log('✅ Token refreshed successfully');
+      
+      return newAccessToken;
+    } catch (error) {
+      console.error('❌ Token refresh failed:', error);
+      // If refresh fails, user needs to login again
+      await this.clearStorage();
+      throw new Error('Session expired. Please login again.');
+    }
+  }
+
   // Clear storage
   async clearStorage() {
     try {

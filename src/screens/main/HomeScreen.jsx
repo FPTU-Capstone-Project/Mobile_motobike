@@ -16,26 +16,121 @@ import * as Animatable from 'react-native-animatable';
 
 import ModernButton from '../../components/ModernButton.jsx';
 import LocationCard from '../../components/LocationCard.jsx';
+import ActiveRideCard from '../../components/ActiveRideCard.jsx';
 import locationService from '../../services/locationService';
 import rideService from '../../services/rideService';
 import authService from '../../services/authService';
-import mockData from '../../data/mockData.json';
+import poiService from '../../services/poiService';
+import { locationStorageService } from '../../services/locationStorageService';
+import permissionService from '../../services/permissionService';
+import websocketService from '../../services/websocketService';
+import fcmService from '../../services/fcmService';
 
 const { width } = Dimensions.get('window');
 
 const HomeScreen = ({ navigation }) => {
   const [currentLocation, setCurrentLocation] = useState(null);
   const [user, setUser] = useState(null);
+  const [isWebSocketConnected, setIsWebSocketConnected] = useState(false);
   const [loading, setLoading] = useState(true);
   const [nearbyRides, setNearbyRides] = useState([]);
   const [loadingRides, setLoadingRides] = useState(false);
-
-  // Mock data fallback
-  const presetLocations = mockData.presetLocations;
-
+  const [presetLocations, setPresetLocations] = useState([]);
   useEffect(() => {
     initializeHome();
+    initializeRiderWebSocket();
+    
+    // Don't disconnect WebSocket on unmount - keep it alive for ride booking
+    return () => {
+      console.log('🧹 HomeScreen unmounting - keeping WebSocket alive...');
+      // websocketService.disconnect(); // Commented out to keep connection alive
+    };
   }, []);
+
+  // Initialize WebSocket for rider
+  const initializeRiderWebSocket = async () => {
+    try {
+      console.log('🔌 Initializing rider WebSocket connection...');
+      
+      // Initialize FCM first
+      try {
+        await fcmService.initialize();
+        await fcmService.registerToken();
+        console.log('FCM initialized and token registered successfully');
+      } catch (fcmError) {
+        console.warn('FCM initialization failed, continuing without push notifications:', fcmError);
+      }
+      
+      // Connect as rider
+      await websocketService.connectAsRider(
+        handleRideMatchingUpdate,
+        handleRiderNotification
+      );
+      
+      setIsWebSocketConnected(true);
+      console.log('✅ Rider WebSocket initialized successfully');
+    } catch (error) {
+      console.error('❌ Failed to initialize rider WebSocket:', error);
+      setIsWebSocketConnected(false);
+      // Don't throw error - app should work without WebSocket
+    }
+  };
+
+  // Handle ride matching updates
+  const handleRideMatchingUpdate = (data) => {
+    console.log('📨 Ride matching update:', data);
+    
+    switch (data.status) {
+      case 'ACCEPTED':
+        Alert.alert(
+          'Chuyến đi được chấp nhận!',
+          `Tài xế ${data.driverName || 'N/A'} đã chấp nhận chuyến đi của bạn.`,
+          [
+            {
+              text: 'Xem chi tiết',
+              onPress: () => navigation.navigate('RideDetails', { rideId: data.rideId })
+            }
+          ]
+        );
+        break;
+      
+      case 'NO_MATCH':
+        Alert.alert(
+          'Không tìm thấy tài xế',
+          'Không có tài xế nào chấp nhận chuyến đi của bạn. Vui lòng thử lại.',
+          [{ text: 'OK' }]
+        );
+        break;
+      
+      case 'JOIN_REQUEST_FAILED':
+        Alert.alert(
+          'Yêu cầu tham gia thất bại',
+          data.reason || 'Không thể tham gia chuyến đi này.',
+          [{ text: 'OK' }]
+        );
+        break;
+      
+      default:
+        console.log('Unknown ride matching status:', data.status);
+    }
+  };
+
+  // Handle rider notifications
+  const handleRiderNotification = (notification) => {
+    console.log('📨 Rider notification:', notification);
+    
+    // Handle different notification types
+    switch (notification.type) {
+      case 'RIDE_UPDATE':
+        // Handle ride status updates
+        break;
+      case 'DRIVER_LOCATION':
+        // Handle driver location updates
+        break;
+      default:
+        console.log('Unknown notification type:', notification.type);
+    }
+  };
 
   const initializeHome = async () => {
     try {
@@ -45,13 +140,28 @@ const HomeScreen = ({ navigation }) => {
       const currentUser = authService.getCurrentUser();
       setUser(currentUser);
 
-      // Get current location
-      const location = await locationService.getCurrentLocation();
-      setCurrentLocation(location);
+      // Check and request location permission first
+      console.log('🔐 Checking location permission on app start...');
+      const locationPermission = await permissionService.requestLocationPermission(true);
+      
+      if (locationPermission.granted) {
+        // Get current location (try cache first)
+        const locationData = await locationStorageService.getCurrentLocationWithAddress();
+        if (locationData.location) {
+          setCurrentLocation(locationData.location);
+        } else {
+          const location = await locationService.getCurrentLocation();
+          setCurrentLocation(location);
+        }
+      } else {
+        console.warn('Location permission denied, using default location');
+        // Set a default location or show appropriate message
+      }
 
       // Load nearby rides if user is a rider
       if (currentUser?.active_profile === 'rider') {
         await loadNearbyRides();
+        await loadPresetLocations();
       }
 
     } catch (error) {
@@ -74,7 +184,18 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
-  const handleBookRide = () => {
+  const handleBookRide = async () => {
+    // Check location permission before booking
+    const locationPermission = await permissionService.requestLocationPermission(true);
+    if (!locationPermission.granted) {
+      Alert.alert(
+        'Cần quyền truy cập vị trí',
+        'Để đặt xe, ứng dụng cần biết vị trí hiện tại của bạn. Vui lòng cấp quyền truy cập vị trí.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    
     navigation.navigate('RideBooking');
   };
 
@@ -82,15 +203,20 @@ const HomeScreen = ({ navigation }) => {
     try {
       if (!currentLocation) {
         Alert.alert('Lỗi', 'Không thể xác định vị trí hiện tại');
-        return;
-      }
+      return;
+    }
 
       console.log(currentLocation);
 
-      // Convert coordinates format if needed
+      // Convert coordinates format and include POI info if available
       const dropoffCoords = {
         latitude: location.coordinates?.latitude || location.coordinates?.lat || 0,
-        longitude: location.coordinates?.longitude || location.coordinates?.lng || 0
+        longitude: location.coordinates?.longitude || location.coordinates?.lng || 0,
+        // Include POI information if available
+        id: location.id,
+        locationId: location.locationId || location.id,
+        name: location.name,
+        isPOI: location.isPOI || true // Preset locations are usually POIs
       };
 
       // Navigate to ride booking with preset destination
@@ -114,48 +240,22 @@ const HomeScreen = ({ navigation }) => {
     <Animatable.View animation="fadeInUp" delay={200} style={styles.quickActionsCard}>
       <Text style={styles.sectionTitle}>Đặt xe nhanh</Text>
       
-      <ModernButton
-        title="Đặt xe ngay"
-        onPress={handleBookRide}
-        icon="directions-car"
-        size="large"
-        style={styles.bookRideButton}
-      />
-
-      <Text style={styles.quickLocationTitle}>Hoặc chọn điểm đến phổ biến:</Text>
+      <View style={styles.buttonContainer}>
+        <ModernButton
+          title="Đặt xe ngay"
+          onPress={handleBookRide}
+          icon="directions-car"
+          size="large"
+          style={[styles.bookRideButton, styles.riderButton]}
+              />
+            </View>
+            
       
       <ScrollView 
         horizontal 
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.locationsList}
       >
-        {(presetLocations || []).map((location, index) => (
-          <TouchableOpacity
-            key={location.id}
-            style={styles.quickLocationCard}
-            onPress={() => handleQuickLocation(location)}
-          >
-            <LinearGradient
-              colors={location.gradient || ['#4CAF50', '#2E7D32']}
-              style={styles.locationGradient}
-            >
-              <Icon name={location.icon} size={24} color="#fff" />
-            </LinearGradient>
-            <Text style={styles.locationName}>{location.name}</Text>
-            <Text style={styles.locationDistance}>
-              {currentLocation ? 
-                locationService.formatDistance(
-                  locationService.calculateDistance(
-                    currentLocation.latitude,
-                    currentLocation.longitude,
-                    location.coordinates?.latitude || location.coordinates?.lat || 0,
-                    location.coordinates?.longitude || location.coordinates?.lng || 0
-                  )
-                ) : '-- km'
-              }
-            </Text>
-          </TouchableOpacity>
-        ))}
       </ScrollView>
     </Animatable.View>
   );
@@ -169,8 +269,8 @@ const HomeScreen = ({ navigation }) => {
           <Text style={styles.sectionTitle}>Chuyến xe gần bạn</Text>
           <TouchableOpacity onPress={loadNearbyRides}>
             <Icon name="refresh" size={20} color="#4CAF50" />
-          </TouchableOpacity>
-        </View>
+            </TouchableOpacity>
+          </View>
 
         {loadingRides ? (
           <ActivityIndicator size="small" color="#4CAF50" style={styles.loadingIndicator} />
@@ -196,7 +296,7 @@ const HomeScreen = ({ navigation }) => {
                   <Text style={styles.ridePrice}>
                     {rideService.formatCurrency(ride.estimatedFare)}
                   </Text>
-                </View>
+        </View>
 
                 <View style={styles.rideRoute}>
                   <View style={styles.routePoint}>
@@ -210,8 +310,8 @@ const HomeScreen = ({ navigation }) => {
                     <Text style={styles.routeText} numberOfLines={1}>
                       {ride.endLocationName}
                     </Text>
-                  </View>
-                </View>
+          </View>
+        </View>
 
                 <View style={styles.rideDetails}>
                   <Text style={styles.rideTime}>
@@ -221,12 +321,41 @@ const HomeScreen = ({ navigation }) => {
                     {ride.availableSeats} chỗ trống
                   </Text>
                 </View>
-              </TouchableOpacity>
+            </TouchableOpacity>
             ))}
           </ScrollView>
         )}
       </Animatable.View>
     );
+  };
+
+  const loadPresetLocations = async () => {
+    try {
+      const locations = await poiService.getPresetLocations();
+      
+      // Transform POI data to match UI format
+      const transformedLocations = locations.map(poi => ({
+        id: poi.locationId,
+        locationId: poi.locationId,
+        name: poi.name,
+        coordinates: {
+          latitude: poi.latitude,
+          longitude: poi.longitude,
+          lat: poi.latitude,
+          lng: poi.longitude
+        },
+        icon: 'location-on', // Default icon
+        gradient: ['#4CAF50', '#2E7D32'], // Default gradient
+        isPOI: true,
+        isAdminDefined: poi.isAdminDefined
+      }));
+      
+      setPresetLocations(transformedLocations);
+      console.log(`Loaded ${transformedLocations.length} preset locations from POI API`);
+    } catch (error) {
+      console.error('Error loading preset locations:', error);
+      setPresetLocations([]); // Set empty array on error
+    }
   };
 
   const renderUserStats = () => {
@@ -268,7 +397,7 @@ const HomeScreen = ({ navigation }) => {
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#4CAF50" />
           <Text style={styles.loadingText}>Đang tải...</Text>
-        </View>
+          </View>
       </SafeAreaView>
     );
   }
@@ -287,16 +416,28 @@ const HomeScreen = ({ navigation }) => {
               <Text style={styles.userName}>{user?.user?.full_name || 'Người dùng'}</Text>
               <Text style={styles.location}>
                 {currentLocation ? '📍 Vị trí hiện tại' : '📍 Đang xác định vị trí...'}
-              </Text>
-            </View>
+                </Text>
+              <View style={styles.connectionStatus}>
+                <View style={[
+                  styles.connectionDot, 
+                  { backgroundColor: isWebSocketConnected ? '#4CAF50' : '#f44336' }
+                ]} />
+                <Text style={styles.connectionText}>
+                  {isWebSocketConnected ? 'Đã kết nối' : 'Mất kết nối'}
+                </Text>
+              </View>
+              </View>
             <TouchableOpacity
               style={styles.profileButton}
               onPress={() => navigation.navigate('Profile')}
             >
               <Icon name="person" size={24} color="#fff" />
             </TouchableOpacity>
-          </View>
+            </View>
         </LinearGradient>
+
+        {/* Active Ride Card */}
+        <ActiveRideCard navigation={navigation} />
 
         {/* Quick Actions */}
         {renderQuickActions()}
@@ -312,7 +453,7 @@ const HomeScreen = ({ navigation }) => {
           <View style={styles.safetyHeader}>
             <Icon name="security" size={24} color="#FF9800" />
             <Text style={styles.safetyTitle}>An toàn là ưu tiên hàng đầu</Text>
-          </View>
+        </View>
           <Text style={styles.safetyText}>
             • Luôn đeo mũ bảo hiểm khi di chuyển{'\n'}
             • Chia sẻ thông tin chuyến đi với người thân{'\n'}
@@ -395,8 +536,20 @@ const styles = StyleSheet.create({
     color: '#1a1a1a',
     marginBottom: 16,
   },
-  bookRideButton: {
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginBottom: 20,
+  },
+  bookRideButton: {
+    flex: 1,
+    marginHorizontal: 6,
+  },
+  riderButton: {
+    // Default gradient will be used
+  },
+  driverButton: {
+    // Custom gradient applied inline
   },
   quickLocationTitle: {
     fontSize: 14,
@@ -587,5 +740,21 @@ const styles = StyleSheet.create({
     color: '#666',
     lineHeight: 20,
   },
+  connectionStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  connectionDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  connectionText: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
 });
 export default HomeScreen;
+

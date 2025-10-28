@@ -3,7 +3,7 @@ export const API_CONFIG = {
   // Development - Use your computer's IP address instead of localhost
   // To find your IP: Windows: ipconfig | Mac/Linux: ifconfig
   DEV: {
-    BASE_URL: 'http://192.168.100.97:8080/api/v1', // Android emulator
+    BASE_URL: 'http://192.168.2.15:8080/api/v1', // Android emulator
     // Alternative IPs to try:
     // BASE_URL: 'http://192.168.1.XXX:8081/api/v1', // Replace XXX with your IP
     // BASE_URL: 'http://172.20.10.2:8081/api/v1', // iOS simulator
@@ -12,11 +12,11 @@ export const API_CONFIG = {
   },
   
   // Production (update when deployed)
-  PROD: {
-    BASE_URL: 'https://your-production-api.com/api/v1',
-    TIMEOUT: 15000,
-    DEMO_MODE: false,
-  },
+  // PROD: {
+  //   BASE_URL: 'https://your-production-api.com/api/v1',
+  //   TIMEOUT: 15000,
+  //   DEMO_MODE: false,
+  // },
   
   // Current environment
   get CURRENT() {
@@ -172,6 +172,7 @@ export const ENDPOINTS = {
     START: '/rides/{rideId}/start',
     COMPLETE: '/rides/{rideId}/complete',
     CANCEL: '/rides/{rideId}',
+    TRACK: '/rides/rides/{rideId}/track', // GPS tracking endpoint
     
     // Rider endpoints
     AVAILABLE: '/rides/available',
@@ -190,11 +191,56 @@ export const ENDPOINTS = {
     // Driver endpoints
     GET_BY_RIDE: '/ride-requests/rides/{rideId}',
     ACCEPT: '/ride-requests/{requestId}/accept',
+    ACCEPT_BROADCAST: '/ride-requests/{requestId}/broadcast/accept',
     REJECT: '/ride-requests/{requestId}/reject',
+  },
+
+  // Shared Rides APIs
+  SHARED_RIDES: {
+    CREATE: '/shared-rides',
+    GET_BY_ID: '/shared-rides/{rideId}',
+    GET_BY_DRIVER: '/shared-rides/driver',
+    UPDATE: '/shared-rides/{rideId}',
+    DELETE: '/shared-rides/{rideId}',
+    COMPLETE: '/shared-rides/{rideId}/complete',
+    CANCEL: '/shared-rides/{rideId}/cancel',
+    START: '/shared-rides/{rideId}/start',
   },
 
   // Quote API
   QUOTES: {
     GET_QUOTE: '/quotes',
+  },
+
+  // Locations/POI API
+  LOCATIONS: {
+    GET_POIS: '/locations/pois', // New POI endpoint from admin
+    GET_BY_ID: '/locations/{id}',
+    SEARCH: '/locations/search',
+  },
+
+  // FCM Push Notifications
+  FCM: {
+    REGISTER: '/fcm/register',
+    DEACTIVATE: '/fcm/deactivate',
+  },
+
+  // Vehicle endpoints
+  VEHICLES: {
+    CREATE: '/vehicles',
+    GET_ALL: '/vehicles',
+    GET_BY_ID: '/vehicles/{vehicleId}',
+    UPDATE: '/vehicles/{vehicleId}',
+    DELETE: '/vehicles/{vehicleId}',
+    GET_BY_DRIVER: '/vehicles/driver',
+    GET_BY_STATUS: '/vehicles/status/{status}',
+  },
+
+  // WebSocket endpoint (not REST)
+  WEBSOCKET: {
+    ENDPOINT: '/ws-native', // WebSocket endpoint
+    FALLBACK_ENDPOINTS: ['/ws/websocket', '/websocket', '/ws'], // Try multiple endpoints
+    DRIVER_QUEUE: '/user/queue/ride-offers',
+    RIDER_QUEUE: '/user/queue/ride-matching',
   },
 };

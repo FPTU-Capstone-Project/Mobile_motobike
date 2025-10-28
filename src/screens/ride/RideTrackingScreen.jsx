@@ -16,25 +16,28 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Animatable from 'react-native-animatable';
 
 import locationService from '../../services/locationService';
+import { locationTrackingService } from '../../services/locationTrackingService';
 import rideService from '../../services/rideService';
 import goongService from '../../services/goongService';
+import activeRideService from '../../services/activeRideService';
 import ModernButton from '../../components/ModernButton.jsx';
 import GoongMap from '../../components/GoongMap.jsx';
 
 const { width, height } = Dimensions.get('window');
 
 const RideTrackingScreen = ({ navigation, route }) => {
-  const { proposals, quote } = route.params || {};
+  const { proposals, quote, rideId, requestId, driverInfo, status } = route.params || {};
   
   // States
   const [currentLocation, setCurrentLocation] = useState(null);
   const [selectedProposal, setSelectedProposal] = useState(null);
-  const [rideStatus, setRideStatus] = useState('PENDING');
+  const [rideStatus, setRideStatus] = useState(status || 'PENDING');
   const [loading, setLoading] = useState(false);
   const [showProposals, setShowProposals] = useState(true);
 
   // Map ref
   const mapRef = useRef(null);
+  const [etaText, setEtaText] = useState(null);
 
   useEffect(() => {
     initializeTracking();
@@ -53,8 +56,47 @@ const RideTrackingScreen = ({ navigation, route }) => {
         setCurrentLocation(newLocation);
       });
 
+      // If we have driverInfo from notification, use it as selectedProposal
+      if (driverInfo && rideId) {
+        setSelectedProposal({
+          driverName: driverInfo.driverName,
+          driverRating: driverInfo.driverRating,
+          vehicleModel: driverInfo.vehicleModel,
+          vehiclePlate: driverInfo.vehiclePlate,
+          estimatedArrival: '5-10',
+          fare: driverInfo.totalFare,
+          rideId: rideId,
+          requestId: requestId
+        });
+        setShowProposals(false);
+        setRideStatus(status || 'CONFIRMED');
+        
+        // Save as active ride
+        console.log('Rider saving active ride with driverInfo:', driverInfo);
+        console.log('Quote data:', quote);
+        
+        activeRideService.saveActiveRide({
+          rideId: rideId,
+          requestId: requestId,
+          status: status || 'CONFIRMED',
+          userType: 'rider',
+          driverInfo: driverInfo,
+          pickupLocation: {
+            lat: driverInfo.pickupLat || driverInfo.pickup_lat || quote?.pickup?.latitude,
+            lng: driverInfo.pickupLng || driverInfo.pickup_lng || quote?.pickup?.longitude,
+            name: driverInfo.pickup_location_name || quote?.pickupAddress || 'Điểm đón'
+          },
+          dropoffLocation: {
+            lat: driverInfo.dropoffLat || driverInfo.dropoff_lat || quote?.dropoff?.latitude,
+            lng: driverInfo.dropoffLng || driverInfo.dropoff_lng || quote?.dropoff?.longitude,
+            name: driverInfo.dropoff_location_name || quote?.dropoffAddress || 'Điểm đến'
+          },
+          totalFare: driverInfo.totalFare,
+          ...driverInfo
+        });
+      }
       // If we have proposals, show them
-      if (proposals && proposals.length > 0) {
+      else if (proposals && proposals.length > 0) {
         setShowProposals(true);
       }
 
@@ -78,6 +120,20 @@ const RideTrackingScreen = ({ navigation, route }) => {
       const region = locationService.getRegionForCoordinates(coordinates, 0.02);
       mapRef.current.animateToRegion(region, 1000);
     }
+  };
+
+  const recenterMap = () => {
+    try {
+      if (!mapRef.current) return;
+      const coords = [];
+      if (quote?.pickup) coords.push(quote.pickup);
+      if (quote?.dropoff) coords.push(quote.dropoff);
+      if (selectedProposal?.driverLocation) coords.push(selectedProposal.driverLocation);
+      if (coords.length) {
+        const region = locationService.getRegionForCoordinates(coords, 0.02);
+        mapRef.current.animateToRegion(region, 600);
+      }
+    } catch {}
   };
 
   const handleCancelRide = () => {
@@ -272,6 +328,34 @@ const RideTrackingScreen = ({ navigation, route }) => {
             icon="cancel"
           />
           
+          {/* Rider-side simulation controls (for demo/testing) */}
+          <ModernButton
+            title="Giả lập tài xế đến"
+            onPress={() => {
+              try {
+                const start = selectedProposal?.driverLocation || quote?.pickup;
+                const end = quote?.dropoff;
+                if (!start || !end) return;
+                locationTrackingService.startSimulation({
+                  start: { lat: start.latitude, lng: start.longitude },
+                  end: { lat: end.latitude, lng: end.longitude },
+                  speedMps: 8.33,
+                  localOnly: true,
+                });
+                Alert.alert('Giả lập', 'Đang giả lập di chuyển…');
+              } catch {}
+            }}
+            size="medium"
+            icon="play-circle-outline"
+          />
+          <ModernButton
+            title="Dừng giả lập"
+            onPress={() => locationTrackingService.stopSimulation()}
+            size="medium"
+            icon="pause-circle-outline"
+            variant="outline"
+          />
+
           {rideStatus === 'COMPLETED' && (
             <ModernButton
               title="Đánh giá"
@@ -302,7 +386,7 @@ const RideTrackingScreen = ({ navigation, route }) => {
 
       {/* Map */}
       <GoongMap
-        onRef={(ref) => (mapRef.current = ref)}
+        onRef={(api) => { mapRef.current = api; }}
         style={styles.map}
         initialRegion={
           currentLocation
@@ -316,23 +400,62 @@ const RideTrackingScreen = ({ navigation, route }) => {
         }
         showsUserLocation={true}
         markers={[
+          // Pickup location
           ...(quote?.pickup ? [{
             coordinate: quote.pickup,
             title: "Điểm đón",
             pinColor: "#4CAF50"
+          }] : driverInfo?.pickupLat && driverInfo?.pickupLng ? [{
+            coordinate: {
+              latitude: driverInfo.pickupLat,
+              longitude: driverInfo.pickupLng
+            },
+            title: "Điểm đón",
+            pinColor: "#4CAF50"
           }] : []),
+          // Dropoff location  
           ...(quote?.dropoff ? [{
             coordinate: quote.dropoff,
             title: "Điểm đến",
             pinColor: "#F44336"
+          }] : driverInfo?.dropoffLat && driverInfo?.dropoffLng ? [{
+            coordinate: {
+              latitude: driverInfo.dropoffLat,
+              longitude: driverInfo.dropoffLng
+            },
+            title: "Điểm đến",
+            pinColor: "#F44336"
           }] : []),
+          // Driver location (if available)
           ...(selectedProposal?.driverLocation ? [{
             coordinate: selectedProposal.driverLocation,
             title: `Tài xế ${selectedProposal.driverName}`,
             pinColor: "#2196F3"
+          }] : []),
+          // Current user location
+          ...(currentLocation ? [{
+            coordinate: {
+              latitude: currentLocation.latitude,
+              longitude: currentLocation.longitude
+            },
+            title: "Vị trí của bạn",
+            pinColor: "#FF9800"
           }] : [])
         ]}
       />
+
+      {/* ETA chip */}
+      {etaText && (
+        <View style={styles.etaChip}>
+          <Icon name="schedule" size={16} color="#fff" />
+          <Text style={styles.etaText}>{etaText}</Text>
+        </View>
+      )}
+
+      {/* Recenter FAB */}
+      <TouchableOpacity style={styles.fab} onPress={recenterMap}>
+        <Icon name="my-location" size={22} color="#333" />
+      </TouchableOpacity>
 
       {/* Bottom Content */}
       {showProposals ? (
@@ -388,6 +511,39 @@ const styles = StyleSheet.create({
   },
   map: {
     flex: 1,
+  },
+  etaChip: {
+    position: 'absolute',
+    top: 12,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  etaText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  fab: {
+    position: 'absolute',
+    right: 12,
+    bottom: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
   },
   driverMarker: {
     width: 40,

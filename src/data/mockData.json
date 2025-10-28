@@ -2,21 +2,37 @@
   "presetLocations": [
     {
       "id": 1,
+      "locationId": 1,
       "name": "Trường Đại học FPT",
       "address": "Lô E2a-7, Đường D1, Khu Công nghệ cao, Quận 9, TP.HCM",
       "type": "university",
       "icon": "school",
-      "coordinates": { "lat": 10.8411, "lng": 106.8098 },
-      "gradient": ["#2196F3", "#1976D2"]
+      "coordinates": { 
+        "lat": 10.8411, 
+        "lng": 106.8098,
+        "latitude": 10.8411,
+        "longitude": 106.8098
+      },
+      "gradient": ["#2196F3", "#1976D2"],
+      "isPOI": true,
+      "isPopular": true
     },
     {
       "id": 2,
+      "locationId": 2,
       "name": "Nhà Văn hóa Sinh viên",
       "address": "01 Phạm Ngọc Thạch, Quận 3, TP.HCM",
       "type": "cultural",
       "icon": "account-balance",
-      "coordinates": { "lat": 10.7769, "lng": 106.6955 },
-      "gradient": ["#FF9800", "#F57C00"]
+      "coordinates": { 
+        "lat": 10.7769, 
+        "lng": 106.6955,
+        "latitude": 10.7769,
+        "longitude": 106.6955
+      },
+      "gradient": ["#FF9800", "#F57C00"],
+      "isPOI": true,
+      "isPopular": true
     }
   ],
   "users": [
