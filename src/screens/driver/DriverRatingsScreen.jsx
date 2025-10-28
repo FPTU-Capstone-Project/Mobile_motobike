@@ -162,7 +162,7 @@ const DriverRatingsScreen = () => {
             <View style={styles.metricsGrid}>
               <View style={styles.metricItem}>
                 <LinearGradient
-                  colors={['#4CAF50', '#2E7D32']}
+                  colors={['#10412F', '#000000']}
                   style={styles.metricIcon}
                 >
                   <Icon name="check-circle" size={20} color="#fff" />

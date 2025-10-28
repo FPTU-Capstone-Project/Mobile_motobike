@@ -238,7 +238,7 @@ const SOSAlertScreen = ({ navigation }) => {
               onPress={() => Alert.alert('Thông báo', 'Đã gửi tin nhắn khẩn cấp')}
             >
               <LinearGradient
-                colors={['#4CAF50', '#2E7D32']}
+                colors={['#34D399', '#059669']}
                 style={styles.quickActionIcon}
               >
                 <Icon name="message" size={20} color="#fff" />

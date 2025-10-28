@@ -39,7 +39,7 @@ export class ImagePickerTest {
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
       });
       
       if (!result.canceled && result.assets[0]) {
@@ -108,7 +108,7 @@ export class ImagePickerTest {
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
       });
       
       if (!result.canceled && result.assets[0]) {

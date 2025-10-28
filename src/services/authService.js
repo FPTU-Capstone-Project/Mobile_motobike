@@ -242,19 +242,19 @@ class AuthService {
   //   }
   // }
 
-  // // Update password
-  // async updatePassword(oldPassword, newPassword) {
-  //   try {
-  //     const response = await apiService.put('/me/update-password', {
-  //       oldPassword,
-  //       newPassword,
-  //     });
-  //     return response;
-  //   } catch (error) {
-  //     console.error('Update password error:', error);
-  //     throw error;
-  //   }
-  // }
+  // Update password
+  async updatePassword(oldPassword, newPassword) {
+    try {
+      const response = await apiService.put('/me/update-password', {
+        oldPassword,
+        newPassword,
+      });
+      return response;
+    } catch (error) {
+      console.error('Update password error:', error);
+      throw error;
+    }
+  }
 
   // // Update avatar
   // async updateAvatar(avatarFile) {
@@ -326,48 +326,48 @@ class AuthService {
   //   }
   // }
 
-  // // Request OTP
-  // async requestOtp(purpose, email = null) {
-  //   try {
-  //     console.log('Request OTP', purpose, email);
-  //     const response = await apiService.post( '/otp', {
-  //       otpFor: purpose,
-  //       email, // Only send if provided (for forgot password)
-  //     });
-  //     return response;
-  //   } catch (error) {
-  //     console.error('Request OTP error:', error);
-  //     throw error;
-  //   }
-  // }
+  // Request OTP
+  async requestOtp(purpose, email = null) {
+    try {
+      console.log('Request OTP', purpose, email);
+      const response = await apiService.post('/otp', {
+        email: email, // Backend expects "email" field
+        otpFor: purpose,
+      });
+      return response;
+    } catch (error) {
+      console.error('Request OTP error:', error);
+      throw error;
+    }
+  }
 
-  // // Verify OTP
-  // async verifyOtp(code, purpose, email = null) {
-  //   try {
-  //     const response = await apiService.post('/otp/verify', {
-  //       code,
-  //       otpFor: purpose,
-  //       email, // Only send if provided (for forgot password)
-  //     });
-  //     return response;
-  //   } catch (error) {
-  //     console.error('Verify OTP error:', error);
-  //     throw error;
-  //   }
-  // }
+  // Verify OTP
+  async verifyOtp(code, purpose, email = null) {
+    try {
+      const response = await apiService.post('/otp/verify', {
+        email: email, // Backend expects "email" field
+        otpFor: purpose,
+        code: code,
+      });
+      return response;
+    } catch (error) {
+      console.error('Verify OTP error:', error);
+      throw error;
+    }
+  }
 
-  // // Forgot password
-  // async forgotPassword(emailOrPhone) {
-  //   try {
-  //     const response = await apiService.post('/auth/forgot-password', {
-  //       emailOrPhone,
-  //     });
-  //     return response;
-  //   } catch (error) {
-  //     console.error('Forgot password error:', error);
-  //     throw error;
-  //   }
-  // }
+  // Forgot password
+  async forgotPassword(emailOrPhone) {
+    try {
+      const response = await apiService.post('/auth/forgot-password', {
+        emailOrPhone,
+      });
+      return response;
+    } catch (error) {
+      console.error('Forgot password error:', error);
+      throw error;
+    }
+  }
 
   // Check if user is authenticated
   isAuthenticated() {

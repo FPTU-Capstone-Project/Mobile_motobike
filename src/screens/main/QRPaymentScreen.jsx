@@ -214,7 +214,7 @@ const QRPaymentScreen = ({ navigation, route }) => {
         {/* Total Amount Display */}
         <View style={styles.totalAmountCard}>
           <LinearGradient
-            colors={['#4CAF50', '#2E7D32']}
+            colors={['#34D399', '#059669']}
             style={styles.totalAmountGradient}
           >
             <Text style={styles.totalAmountLabel}>Số tiền nạp</Text>
@@ -381,7 +381,7 @@ const QRPaymentScreen = ({ navigation, route }) => {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <LinearGradient
-        colors={['#4CAF50', '#2E7D32']}
+        colors={['#10412F', '#000000']}
         style={styles.header}
       >
         <TouchableOpacity 
@@ -394,7 +394,7 @@ const QRPaymentScreen = ({ navigation, route }) => {
         <View style={styles.placeholder} />
       </LinearGradient>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
         {renderAmountInput()}
         {renderPaymentContent()}
         

@@ -2,6 +2,8 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import * as Animatable from 'react-native-animatable';
+import CleanCard from './ui/CleanCard.jsx';
+import { colors } from '../theme/designTokens';
 
 const ModeSelector = ({ mode, onModeChange, userType = 'user' }) => {
   const modes = [
@@ -10,14 +12,14 @@ const ModeSelector = ({ mode, onModeChange, userType = 'user' }) => {
       title: userType === 'driver' ? 'Tìm thủ công' : 'Tìm tài xế',
       subtitle: userType === 'driver' ? 'Tự chọn khách hàng' : 'Chọn tài xế xung quanh',
       icon: 'search',
-      color: '#2196F3'
+      color: colors.primary
     },
     {
       key: 'auto',
       title: 'Tự động',
       subtitle: userType === 'driver' ? 'Hệ thống tìm khách' : 'Hệ thống tìm xe',
       icon: 'auto-fix-high',
-      color: '#4CAF50'
+      color: colors.accent
     }
   ];
 
@@ -25,49 +27,51 @@ const ModeSelector = ({ mode, onModeChange, userType = 'user' }) => {
     <View style={styles.container}>
       <Text style={styles.title}>Chế độ tìm kiếm</Text>
       <View style={styles.modesContainer}>
-        {modes.map((modeOption) => (
+        {modes.map((modeOption, index) => (
           <TouchableOpacity
             key={modeOption.key}
-            style={[
-              styles.modeCard,
-              mode === modeOption.key && styles.selectedMode
-            ]}
+            style={[styles.touchWrapper, index === modes.length - 1 && styles.touchWrapperLast]}
             onPress={() => onModeChange(modeOption.key)}
             activeOpacity={0.8}
           >
-            <Animatable.View
-              animation={mode === modeOption.key ? 'pulse' : undefined}
-              iterationCount={mode === modeOption.key ? 'infinite' : 1}
-              direction="alternate"
-              style={[
-                styles.iconContainer,
-                { backgroundColor: mode === modeOption.key ? modeOption.color : '#f5f5f5' }
-              ]}
+            <CleanCard
+              style={[styles.modeCard, mode === modeOption.key && styles.selectedMode]}
+              contentStyle={styles.modeContent}
             >
-              <Icon 
-                name={modeOption.icon} 
-                size={24} 
-                color={mode === modeOption.key ? '#fff' : modeOption.color} 
-              />
-            </Animatable.View>
-            
-            <View style={styles.textContainer}>
-              <Text style={[
-                styles.modeTitle,
-                mode === modeOption.key && { color: modeOption.color }
-              ]}>
-                {modeOption.title}
-              </Text>
-              <Text style={styles.modeSubtitle}>
-                {modeOption.subtitle}
-              </Text>
-            </View>
-            
-            {mode === modeOption.key && (
-              <View style={[styles.selectedIndicator, { backgroundColor: modeOption.color }]}>
-                <Icon name="check" size={16} color="#fff" />
+              <Animatable.View
+                animation={mode === modeOption.key ? 'pulse' : undefined}
+                iterationCount={mode === modeOption.key ? 'infinite' : 1}
+                direction="alternate"
+                style={[
+                  styles.iconContainer,
+                  { backgroundColor: mode === modeOption.key ? modeOption.color : 'rgba(248,250,252,0.95)' }
+                ]}
+              >
+                <Icon 
+                  name={modeOption.icon} 
+                  size={24} 
+                  color={mode === modeOption.key ? '#fff' : colors.textSecondary} 
+                />
+              </Animatable.View>
+              
+              <View style={styles.textContainer}>
+                <Text style={[
+                  styles.modeTitle,
+                  mode === modeOption.key && { color: modeOption.color }
+                ]}>
+                  {modeOption.title}
+                </Text>
+                <Text style={styles.modeSubtitle}>
+                  {modeOption.subtitle}
+                </Text>
               </View>
-            )}
+              
+              {mode === modeOption.key && (
+                <View style={[styles.selectedIndicator, { backgroundColor: modeOption.color }]}>
+                  <Icon name="check" size={16} color="#fff" />
+                </View>
+              )}
+            </CleanCard>
           </TouchableOpacity>
         ))}
       </View>
@@ -81,38 +85,38 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#1a1a1a',
+    fontFamily: 'Inter_700Bold',
+    color: colors.textPrimary,
     marginBottom: 16,
     marginLeft: 4,
   },
   modesContainer: {
     flexDirection: 'row',
-    gap: 12,
   },
+  touchWrapper: { flex: 1, marginRight: 12 },
+  touchWrapperLast: { marginRight: 0 },
   modeCard: {
     flex: 1,
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderRadius: 24,
+    shadowColor: 'transparent',
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 0,
+  },
+  modeContent: {
+    padding: 20,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
   },
   selectedMode: {
-    borderColor: '#4CAF50',
-    borderWidth: 2,
-    elevation: 4,
-    shadowOpacity: 0.15,
+    borderColor: 'rgba(59,130,246,0.35)',
+    borderWidth: 1.4,
   },
   iconContainer: {
     width: 48,
     height: 48,
-    borderRadius: 12,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
@@ -122,13 +126,14 @@ const styles = StyleSheet.create({
   },
   modeTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#1a1a1a',
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.textPrimary,
     marginBottom: 4,
   },
   modeSubtitle: {
     fontSize: 13,
-    color: '#666',
+    color: colors.textSecondary,
+    fontFamily: 'Inter_400Regular',
     lineHeight: 18,
   },
   selectedIndicator: {

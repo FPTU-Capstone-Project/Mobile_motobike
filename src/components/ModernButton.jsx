@@ -2,6 +2,7 @@ import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { colors, gradients, radii } from '../theme/designTokens';
 
 const ModernButton = ({ 
   title, 
@@ -62,13 +63,13 @@ const ModernButton = ({
       <TouchableOpacity
         onPress={onPress}
         disabled={disabled || loading}
-        style={[getSizeStyle(), style]}
+        style={[styles.primaryWrapper, getSizeStyle(), style]}
         {...props}
       >
         <LinearGradient
-          colors={disabled ? ['#ccc', '#999'] : ['#4CAF50', '#2E7D32']}
+          colors={disabled ? ['rgba(148,163,184,0.4)', 'rgba(148,163,184,0.25)'] : gradients.pillActive}
           start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
+          end={{ x: 1, y: 1 }}
           style={[styles.gradientButton, getSizeStyle()]}
         >
           <View style={styles.buttonContent}>
@@ -102,32 +103,37 @@ const ModernButton = ({
 };
 
 const styles = StyleSheet.create({
-  primaryButton: {
-    borderRadius: 12,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+  primaryWrapper: {
+    borderRadius: radii.lg,
+    overflow: 'hidden',
+    shadowColor: 'rgba(163,177,198,0.65)',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.4,
+    shadowRadius: 18,
+    elevation: 6,
   },
   secondaryButton: {
-    backgroundColor: '#f5f5f5',
-    borderRadius: 12,
+    backgroundColor: colors.glassLight,
+    borderRadius: radii.lg,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: colors.border,
+    shadowColor: 'rgba(163,177,198,0.45)',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
   },
   outlineButton: {
     backgroundColor: 'transparent',
-    borderRadius: 12,
+    borderRadius: radii.lg,
     borderWidth: 2,
-    borderColor: '#4CAF50',
+    borderColor: colors.primary,
   },
   ghostButton: {
     backgroundColor: 'transparent',
-    borderRadius: 12,
+    borderRadius: radii.lg,
   },
   gradientButton: {
-    borderRadius: 12,
+    borderRadius: radii.lg,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -158,19 +164,19 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   secondaryText: {
-    color: '#333',
+    color: colors.textPrimary,
     fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
   },
   outlineText: {
-    color: '#4CAF50',
+    color: colors.primary,
     fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
   },
   ghostText: {
-    color: '#4CAF50',
+    color: colors.primary,
     fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',

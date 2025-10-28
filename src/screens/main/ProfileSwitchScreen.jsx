@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -7,18 +7,22 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
-  ActivityIndicator
+  ActivityIndicator,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialIcons';
-import { LinearGradient } from 'expo-linear-gradient';
-import * as Animatable from 'react-native-animatable';
+import Feather from 'react-native-vector-icons/Feather';
 
+import AppBackground from '../../components/layout/AppBackground.jsx';
+import CleanCard from '../../components/ui/CleanCard.jsx';
+import { SoftBackHeader } from '../../components/ui/GlassHeader.jsx';
 import ModernButton from '../../components/ModernButton.jsx';
 import authService from '../../services/authService';
 import verificationService from '../../services/verificationService';
 import { ApiError } from '../../services/api';
+import { colors } from '../../theme/designTokens';
+import useSoftHeaderSpacing from '../../hooks/useSoftHeaderSpacing.js';
 
 const ProfileSwitchScreen = ({ navigation }) => {
+  const { headerOffset, contentPaddingTop } = useSoftHeaderSpacing({ contentExtra: 28 });
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [switchLoading, setSwitchLoading] = useState(false);
@@ -28,7 +32,6 @@ const ProfileSwitchScreen = ({ navigation }) => {
     loadUserProfile();
   }, []);
 
-  // Refresh verification status when screen comes into focus
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       refreshVerificationStatus();
@@ -39,10 +42,8 @@ const ProfileSwitchScreen = ({ navigation }) => {
 
   const refreshVerificationStatus = async () => {
     try {
-      console.log('Refreshing verification status...');
       const verification = await verificationService.getCurrentStudentVerification();
       setCurrentStudentVerification(verification);
-      console.log('Updated verification status:', verification);
     } catch (error) {
       console.log('Could not refresh verification status:', error);
     }
@@ -58,14 +59,8 @@ const ProfileSwitchScreen = ({ navigation }) => {
         setUser(profile);
       }
 
-      // Load current student verification status from user profile
-      try {
-        const verification = await verificationService.getCurrentStudentVerification();
-        setCurrentStudentVerification(verification);
-      } catch (error) {
-        console.log('No current verification found or error:', error);
-        setCurrentStudentVerification(null);
-      }
+      const verification = await verificationService.getCurrentStudentVerification();
+      setCurrentStudentVerification(verification);
     } catch (error) {
       console.error('Error loading profile:', error);
       Alert.alert('Lỗi', 'Không thể tải thông tin hồ sơ');
@@ -74,662 +69,520 @@ const ProfileSwitchScreen = ({ navigation }) => {
     }
   };
 
+  const studentStatus = getStudentVerificationStatus(currentStudentVerification);
+  const driverStatus = getDriverVerificationStatus(user, studentStatus);
+
   const handleSwitchProfile = async (targetRole) => {
     if (!user) return;
 
-    // Check if user can switch to driver
     if (targetRole === 'driver' && !user.driver_profile) {
       Alert.alert(
         'Chưa thể chuyển đổi',
         'Bạn cần xác minh tài khoản tài xế trước. Vui lòng gửi giấy tờ để admin duyệt.',
         [
           { text: 'Hủy', style: 'cancel' },
-          { text: 'Gửi giấy tờ', onPress: () => navigation.navigate('DriverVerification') }
+          { text: 'Gửi giấy tờ', onPress: () => navigation.navigate('DriverVerification') },
         ]
       );
       return;
     }
 
     setSwitchLoading(true);
-    
+
     try {
       await authService.switchProfile(targetRole);
-      
       Alert.alert(
         'Thành công',
         `Đã chuyển sang chế độ ${targetRole === 'driver' ? 'Tài xế' : 'Hành khách'}`,
         [
-          { text: 'OK', onPress: () => {
-            // Navigate to appropriate main screen
-            if (targetRole === 'driver') {
-              navigation.replace('DriverMain');
-            } else {
-              navigation.replace('Main');
-            }
-          }}
+          {
+            text: 'OK',
+            onPress: () => {
+              if (targetRole === 'driver') {
+                navigation.replace('DriverMain');
+              } else {
+                navigation.replace('Main');
+              }
+            },
+          },
         ]
       );
     } catch (error) {
       console.error('Switch profile error:', error);
-      
       let errorMessage = 'Không thể chuyển đổi chế độ';
       if (error instanceof ApiError) {
         errorMessage = error.message || errorMessage;
       }
-      
       Alert.alert('Lỗi', errorMessage);
     } finally {
       setSwitchLoading(false);
     }
   };
 
-  // Get student verification status (only for rider)
-  const getStudentVerificationStatus = () => {
-    if (!currentStudentVerification) return { status: 'not_verified', text: 'Chưa xác minh', color: '#999' };
-    
-    const status = currentStudentVerification.status?.toLowerCase();
-    if (status === 'active' || status === 'verified' || status === 'approved') {
-      return { status: 'verified', text: 'Đã xác minh', color: '#4CAF50' };
-    } else if (status === 'pending') {
-      return { status: 'pending', text: 'Đang xác minh', color: '#FF9800' };
-    } else if (status === 'rejected' || status === 'suspended') {
-      return { status: 'rejected', text: 'Bị từ chối', color: '#F44336' };
-    } else {
-      return { status: 'not_verified', text: 'Chưa xác minh', color: '#999' };
-    }
-  };
-
-  // Get driver verification status (requires rider verification first)
-  const getDriverVerificationStatus = (driverProfile) => {
-    // Check if rider is verified first
-    const riderStatus = getStudentVerificationStatus();
-    if (riderStatus.status !== 'verified') {
-      return { 
-        status: 'locked', 
-        text: 'Cần xác minh rider trước', 
-        color: '#999',
-        disabled: true 
-      };
-    }
-    
-    if (!driverProfile) return { status: 'not_verified', text: 'Chưa xác minh', color: '#999' };
-    
-    // Driver verification is based on driver profile status
-    const status = driverProfile.status?.toLowerCase();
-    if (status === 'active' || status === 'verified' || status === 'approved') {
-      return { status: 'verified', text: 'Đã xác minh', color: '#4CAF50' };
-    } else if (status === 'pending') {
-      return { status: 'pending', text: 'Đang xác minh', color: '#FF9800' };
-    } else if (status === 'rejected' || status === 'suspended') {
-      return { status: 'rejected', text: 'Bị từ chối', color: '#F44336' };
-    } else {
-      return { status: 'not_verified', text: 'Chưa xác minh', color: '#999' };
-    }
-  };
-
   const handleStudentVerificationPress = () => {
-    // Check if there's a pending verification
-    if (currentStudentVerification?.status?.toLowerCase() === 'pending') {
-      Alert.alert(
-        'Đang xác minh',
-        'Yêu cầu xác minh sinh viên của bạn đang được admin xem xét. Vui lòng chờ kết quả.',
-        [{ text: 'OK' }]
-      );
+    const status = currentStudentVerification?.status?.toLowerCase();
+
+    if (status === 'pending') {
+      Alert.alert('Đang xác minh', 'Yêu cầu của bạn đang được admin xem xét.');
       return;
     }
 
-    // Check if there's a rejected verification
-    if (currentStudentVerification?.status?.toLowerCase() === 'rejected') {
-      const rejectionReason = currentStudentVerification.rejection_reason || 'Không rõ lý do';
+    if (status === 'rejected') {
+      const reason = currentStudentVerification?.rejection_reason || 'Không rõ lý do';
       Alert.alert(
         'Giấy tờ bị từ chối',
-        `Giấy tờ sinh viên của bạn đã bị từ chối với lý do: ${rejectionReason}\n\nBạn có thể gửi lại giấy tờ mới.`,
+        `Giấy tờ đã bị từ chối với lý do: ${reason}\n\nBạn có thể gửi lại giấy tờ mới.`,
         [
           { text: 'Hủy', style: 'cancel' },
-          { text: 'Gửi lại', onPress: () => navigation.navigate('StudentVerification') }
+          { text: 'Gửi lại', onPress: () => navigation.navigate('StudentVerification') },
         ]
       );
       return;
     }
 
-    // If verified, show success message
-    if (currentStudentVerification?.status?.toLowerCase() === 'approved') {
-      Alert.alert(
-        'Đã xác minh',
-        'Tài khoản sinh viên của bạn đã được xác minh thành công.',
-        [{ text: 'OK' }]
-      );
+    if (['approved', 'verified', 'active'].includes(status)) {
+      Alert.alert('Đã xác minh', 'Tài khoản sinh viên của bạn đã được xác minh.');
       return;
     }
 
-    // Navigate to verification screen for new submission
     navigation.navigate('StudentVerification');
-  };
-
-  const handleDriverVerificationPress = () => {
-    // Check if rider is verified first
-    const riderStatus = getStudentVerificationStatus();
-    if (riderStatus.status !== 'verified') {
-      Alert.alert(
-        'Cần xác minh rider trước',
-        'Bạn cần xác minh tài khoản sinh viên trước khi có thể trở thành tài xế.',
-        [
-          { text: 'OK', style: 'cancel' },
-          { text: 'Xác minh rider', onPress: () => handleStudentVerificationPress() }
-        ]
-      );
-      return;
-    }
-
-    // If rider is verified, allow driver verification
-    navigation.navigate('DriverVerification');
   };
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4CAF50" />
-          <Text style={styles.loadingText}>Đang tải thông tin...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (!user) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.errorContainer}>
-          <Icon name="error" size={48} color="#ccc" />
-          <Text style={styles.errorText}>Không thể tải thông tin hồ sơ</Text>
-          <ModernButton
-            title="Thử lại"
-            onPress={loadUserProfile}
+      <AppBackground>
+        <SafeAreaView style={styles.safe}>
+          <SoftBackHeader
+            floating
+            topOffset={headerOffset}
+            title=""
+            subtitle=""
+            onBackPress={() => navigation.goBack()}
           />
-        </View>
-      </SafeAreaView>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.accent} />
+          </View>
+        </SafeAreaView>
+      </AppBackground>
     );
   }
-
-  const currentUserType = user.user?.user_type;
-  const riderStatus = getStudentVerificationStatus(); // Student verification for rider
-  const driverStatus = getDriverVerificationStatus(user.driver_profile); // Driver verification for driver
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <LinearGradient
-          colors={['#4CAF50', '#2E7D32']}
-          style={styles.header}
+    <AppBackground>
+      <SafeAreaView style={styles.safe}>
+        <SoftBackHeader
+          floating
+          topOffset={headerOffset}
+          title=""
+          subtitle=""
+          onBackPress={() => navigation.goBack()}
+        />
+
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[styles.scrollContent, { paddingTop: contentPaddingTop }]}
         >
-          <View style={styles.headerContent}>
-            <TouchableOpacity 
-              style={styles.backButton}
-              onPress={() => navigation.goBack()}
-            >
-              <Icon name="arrow-back" size={24} color="#fff" />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>Chuyển đổi chế độ</Text>
-            <View style={styles.placeholder} />
-          </View>
-        </LinearGradient>
-
-        <View style={styles.content}>
-          {/* Current Mode */}
-          <Animatable.View animation="fadeInUp" style={styles.currentModeCard}>
-            <Text style={styles.cardTitle}>Chế độ hiện tại</Text>
-            <View style={styles.currentModeInfo}>
-              <LinearGradient
-                colors={currentUserType === 'driver' ? ['#FF9800', '#F57C00'] : ['#2196F3', '#1976D2']}
-                style={styles.currentModeIcon}
-              >
-                <Icon 
-                  name={currentUserType === 'driver' ? 'directions-car' : 'person'} 
-                  size={32} 
-                  color="#fff" 
-                />
-              </LinearGradient>
-              <View style={styles.currentModeDetails}>
-                <Text style={styles.currentModeTitle}>
-                  {currentUserType === 'driver' ? 'Tài xế' : 'Hành khách'}
-                </Text>
-                <Text style={styles.currentModeSubtitle}>
-                  {currentUserType === 'driver' 
-                    ? 'Bạn có thể chia sẻ chuyến đi và kiếm tiền' 
-                    : 'Bạn có thể đặt chuyến đi với tài xế'}
-                </Text>
-              </View>
+          <CleanCard contentStyle={styles.heroCard}>
+            <View style={styles.heroIconWrap}>
+              <Feather name="git-branch" size={22} color={colors.accent} />
             </View>
-          </Animatable.View>
+            <View style={{ gap: 6 }}>
+              <Text style={styles.heroTitle}>Chuyển đổi chế độ</Text>
+              <Text style={styles.heroSubtitle}>
+                Chọn chế độ hoạt động phù hợp với nhu cầu sử dụng Campus Ride của bạn.
+              </Text>
+            </View>
+          </CleanCard>
 
-          {/* Available Modes */}
-          <View style={styles.modesSection}>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Chế độ hiện tại</Text>
+            <CleanCard contentStyle={styles.cardPadding}>
+              <View style={styles.currentRow}>
+                <View style={[styles.roundIcon, { backgroundColor: authService.isDriver() ? '#E7F2FF' : '#E6F6EF' }]}>
+                  <Feather
+                    name={authService.isDriver() ? 'truck' : 'user'}
+                    size={22}
+                    color={authService.isDriver() ? colors.accent : colors.primary}
+                  />
+                </View>
+                <View style={{ flex: 1, gap: 6 }}>
+                  <Text style={styles.modeHeading}>{authService.isDriver() ? 'Tài xế' : 'Hành khách'}</Text>
+                  <Text style={styles.modeDescription}>
+                    {authService.isDriver()
+                      ? 'Nhận chuyến đi từ sinh viên khác và kiếm thêm thu nhập.'
+                      : 'Đặt chuyến đi và tìm tài xế chia sẻ trong khuôn viên.'}
+                  </Text>
+                </View>
+              </View>
+            </CleanCard>
+          </View>
+
+          <View style={styles.section}>
             <Text style={styles.sectionTitle}>Chế độ có thể chuyển</Text>
-
-            {/* Rider Mode */}
-            <TouchableOpacity
-              style={[
-                styles.modeCard,
-                currentUserType === 'rider' && styles.modeCardActive
-              ]}
+            <ModeOption
+              title="Hành khách"
+              description="Đặt chuyến đi, tìm tài xế xung quanh"
+              icon="user"
+              tint={colors.primary}
+              active={!authService.isDriver()}
+              status={!authService.isDriver() ? 'Đang sử dụng' : undefined}
               onPress={() => handleSwitchProfile('rider')}
-              disabled={currentUserType === 'rider' || switchLoading}
-            >
-              <LinearGradient
-                colors={['#2196F3', '#1976D2']}
-                style={styles.modeIcon}
-              >
-                <Icon name="person" size={24} color="#fff" />
-              </LinearGradient>
-              
-              <View style={styles.modeInfo}>
-                <Text style={styles.modeTitle}>Hành khách</Text>
-                <Text style={styles.modeDescription}>
-                  Đặt chuyến đi, tìm tài xế chia sẻ
-                </Text>
-                <View style={styles.statusContainer}>
-                  <Icon 
-                    name={riderStatus.status === 'verified' ? 'check-circle' : 
-                          riderStatus.status === 'pending' ? 'schedule' : 'cancel'} 
-                    size={16} 
-                    color={riderStatus.color} 
-                  />
-                  <Text style={[styles.statusText, { color: riderStatus.color }]}>
-                    {riderStatus.text}
-                  </Text>
-                </View>
-              </View>
-
-              {currentUserType === 'rider' ? (
-                <View style={styles.activeIndicator}>
-                  <Text style={styles.activeText}>Đang sử dụng</Text>
-                </View>
-              ) : (
-                <Icon name="chevron-right" size={24} color="#666" />
-              )}
-            </TouchableOpacity>
-
-            {/* Driver Mode */}
-            <TouchableOpacity
-              style={[
-                styles.modeCard,
-                currentUserType === 'driver' && styles.modeCardActive,
-                !user.driver_profile && styles.modeCardDisabled
-              ]}
+            />
+            <ModeOption
+              title="Tài xế"
+              description="Chia sẻ chuyến đi, kiếm thêm thu nhập"
+              icon="truck"
+              tint={colors.accent}
+              active={authService.isDriver()}
+              status={!user?.driver_profile ? 'Cần xác minh' : authService.isDriver() ? 'Đang sử dụng' : undefined}
+              disabled={!user?.driver_profile}
               onPress={() => handleSwitchProfile('driver')}
-              disabled={currentUserType === 'driver' || switchLoading || !user.driver_profile}
-            >
-              <LinearGradient
-                colors={['#FF9800', '#F57C00']}
-                style={styles.modeIcon}
-              >
-                <Icon name="directions-car" size={24} color="#fff" />
-              </LinearGradient>
-              
-              <View style={styles.modeInfo}>
-                <Text style={styles.modeTitle}>Tài xế</Text>
-                <Text style={styles.modeDescription}>
-                  Chia sẻ chuyến đi, kiếm tiền từ việc chở khách
-                </Text>
-                <View style={styles.statusContainer}>
-                  <Icon 
-                    name={driverStatus.status === 'verified' ? 'check-circle' : 
-                          driverStatus.status === 'pending' ? 'schedule' : 'cancel'} 
-                    size={16} 
-                    color={driverStatus.color} 
-                  />
-                  <Text style={[styles.statusText, { color: driverStatus.color }]}>
-                    {driverStatus.text}
-                  </Text>
-                </View>
-              </View>
-
-              {currentUserType === 'driver' ? (
-                <View style={styles.activeIndicator}>
-                  <Text style={styles.activeText}>Đang sử dụng</Text>
-                </View>
-              ) : user.driver_profile ? (
-                <Icon name="chevron-right" size={24} color="#666" />
-              ) : (
-                <Icon name="lock" size={24} color="#ccc" />
-              )}
-            </TouchableOpacity>
+            />
           </View>
 
-          {/* Verification Section */}
-          <View style={styles.verificationSection}>
+          <View style={styles.section}>
             <Text style={styles.sectionTitle}>Xác minh tài khoản</Text>
-            
-            {/* Student Verification */}
-            <View style={styles.verificationCard}>
-              <Icon name="school" size={24} color="#2196F3" />
-              <View style={styles.verificationInfo}>
-                <Text style={styles.verificationTitle}>Xác minh sinh viên</Text>
-                <Text style={styles.verificationDescription}>
-                  Gửi thẻ sinh viên để xác minh bạn là sinh viên trường
-                </Text>
-                <View style={styles.statusContainer}>
-                  <Icon 
-                    name={riderStatus.status === 'verified' ? 'check-circle' : 
-                          riderStatus.status === 'pending' ? 'schedule' : 
-                          riderStatus.status === 'rejected' ? 'cancel' : 'help'} 
-                    size={16} 
-                    color={riderStatus.color} 
-                  />
-                  <Text style={[styles.statusText, { color: riderStatus.color }]}>
-                    {riderStatus.text}
-                  </Text>
-                </View>
-              </View>
-              <ModernButton
-                title={riderStatus.status === 'verified' ? "Đã xác minh" : 
-                       riderStatus.status === 'pending' ? "Đang xác minh" : 
-                       riderStatus.status === 'rejected' ? "Gửi lại" : "Gửi giấy tờ"}
-                size="small"
-                variant={riderStatus.status === 'verified' ? "outline" : "primary"}
-                disabled={riderStatus.status === 'verified' || riderStatus.status === 'pending'}
-                onPress={handleStudentVerificationPress}
+            <CleanCard contentStyle={styles.cardPadding}>
+              <VerificationRow
+                title="Xác minh sinh viên"
+                description="Gửi thẻ sinh viên để xác nhận bạn thuộc trường."
+                icon="book-open"
+                status={studentStatus.text}
+                statusColor={studentStatus.color}
+                buttonTitle={studentStatus.status === 'verified' ? undefined : 'Gửi giấy tờ'}
+                buttonDisabled={studentStatus.status === 'pending'}
+                onButtonPress={handleStudentVerificationPress}
               />
-            </View>
-
-            {/* Driver Verification */}
-            <View style={styles.verificationCard}>
-              <Icon name="directions-car" size={24} color="#FF9800" />
-              <View style={styles.verificationInfo}>
-                <Text style={styles.verificationTitle}>Xác minh tài xế</Text>
-                <Text style={styles.verificationDescription}>
-                  Gửi giấy tờ xe và bằng lái để trở thành tài xế
-                </Text>
-                <View style={styles.statusContainer}>
-                  <Icon 
-                    name={driverStatus.status === 'verified' ? 'check-circle' : 
-                          driverStatus.status === 'pending' ? 'schedule' : 
-                          driverStatus.status === 'rejected' ? 'cancel' : 
-                          driverStatus.status === 'locked' ? 'lock' : 'help'} 
-                    size={16} 
-                    color={driverStatus.color} 
-                  />
-                  <Text style={[styles.statusText, { color: driverStatus.color }]}>
-                    {driverStatus.text}
-                  </Text>
-                </View>
-              </View>
-              <ModernButton
-                title={driverStatus.status === 'verified' ? "Đã xác minh" : 
-                       driverStatus.status === 'pending' ? "Đang chờ" : 
-                       driverStatus.status === 'locked' ? "Bị khóa" : "Gửi giấy tờ"}
-                size="small"
-                variant={driverStatus.status === 'verified' ? "outline" : 
-                        driverStatus.status === 'locked' ? "outline" : "primary"}
-                disabled={driverStatus.status === 'verified' || driverStatus.status === 'locked'}
-                onPress={handleDriverVerificationPress}
+              <VerificationRow
+                title="Xác minh tài xế"
+                description="Gửi giấy tờ xe và bằng lái để trở thành tài xế chia sẻ."
+                icon="clipboard"
+                status={driverStatus.status === 'verified' ? driverStatus.text : undefined}
+                statusColor={driverStatus.color}
+                buttonTitle={driverStatus.status === 'verified' ? undefined : 'Gửi giấy tờ'}
+                buttonDisabled={driverStatus.disabled || driverStatus.status === 'pending'}
+                onButtonPress={() => navigation.navigate('DriverVerification')}
               />
-            </View>
-          </View>
-
-          {/* Info Section */}
-          <View style={styles.infoSection}>
-            <View style={styles.infoCard}>
-              <Icon name="info" size={24} color="#4CAF50" />
-              <Text style={styles.infoText}>
-                Bạn có thể chuyển đổi giữa chế độ Hành khách và Tài xế bất cứ lúc nào sau khi đã được xác minh.
+            </CleanCard>
+            <View style={styles.infoBanner}>
+              <Feather name="info" size={16} color={colors.textSecondary} />
+              <Text style={styles.infoBannerText}>
+                Sau khi hoàn tất xác minh tài xế, bạn có thể chuyển đổi giữa hai chế độ bất kỳ lúc nào.
               </Text>
             </View>
           </View>
-        </View>
-      </ScrollView>
 
-      {/* Loading Overlay */}
-      {switchLoading && (
-        <View style={styles.loadingOverlay}>
-          <View style={styles.loadingContent}>
-            <ActivityIndicator size="large" color="#4CAF50" />
-            <Text style={styles.loadingOverlayText}>Đang chuyển đổi...</Text>
+          <View style={styles.section}>
+            <CleanCard contentStyle={styles.actionsCard}>
+              <ModernButton
+                variant="secondary"
+                title="Trở về hồ sơ"
+                onPress={() => navigation.goBack()}
+              />
+              <ModernButton
+                title={switchLoading ? 'Đang chuyển...' : authService.isDriver() ? 'Sử dụng chế độ hành khách' : 'Sử dụng chế độ tài xế'}
+                onPress={() => handleSwitchProfile(authService.isDriver() ? 'rider' : 'driver')}
+                disabled={switchLoading || (!authService.isDriver() && !user?.driver_profile)}
+              />
+            </CleanCard>
           </View>
-        </View>
-      )}
-    </SafeAreaView>
+        </ScrollView>
+      </SafeAreaView>
+    </AppBackground>
   );
 };
 
+const ModeOption = ({ title, description, icon, tint, status, active, disabled, onPress }) => (
+  <TouchableOpacity
+    onPress={onPress}
+    activeOpacity={0.85}
+    disabled={disabled}
+    style={[styles.modeOption, active && { borderColor: tint, borderWidth: 1.5 }, disabled && styles.modeOptionDisabled]}
+  >
+    <View style={[styles.modeIcon, { backgroundColor: active ? tint : 'rgba(17,24,39,0.06)' }]}>
+      <Feather name={icon} size={20} color={active ? '#FFFFFF' : tint} />
+    </View>
+    <View style={styles.modeInfo}>
+      <Text style={[styles.modeTitle, active && { color: '#111827' }]}>{title}</Text>
+      <Text style={styles.modeSubtitle}>{description}</Text>
+    </View>
+    {status && (
+      <View style={[styles.modeStatusBadge, { backgroundColor: `${tint}1A` }]}>
+        <Text style={[styles.modeStatusText, { color: tint }]}>{status}</Text>
+      </View>
+    )}
+  </TouchableOpacity>
+);
+
+const VerificationRow = ({
+  title,
+  description,
+  icon,
+  status,
+  statusColor,
+  buttonTitle,
+  buttonDisabled,
+  onButtonPress,
+}) => (
+  <View style={styles.verificationRow}>
+    <View style={styles.verificationIcon}>
+      <Feather name={icon} size={18} color={colors.accent} />
+    </View>
+    <View style={styles.verificationInfo}>
+      <Text style={styles.verificationTitle}>{title}</Text>
+      <Text style={styles.verificationDescription}>{description}</Text>
+    </View>
+    {buttonTitle ? (
+      <TouchableOpacity
+        onPress={onButtonPress}
+        disabled={buttonDisabled}
+        style={[styles.inlineButton, buttonDisabled && styles.inlineButtonDisabled]}
+      >
+        <Text style={[styles.inlineButtonText, buttonDisabled && { color: '#9CA3AF' }]}>{buttonTitle}</Text>
+      </TouchableOpacity>
+    ) : (
+      <Text style={[styles.verificationStatusText, { color: statusColor }]}>{status}</Text>
+    )}
+  </View>
+);
+
+const getStudentVerificationStatus = (verification) => {
+  if (!verification) {
+    return { status: 'not_verified', text: 'Chưa xác minh', color: '#9CA3AF' };
+  }
+
+  const status = verification.status?.toLowerCase();
+  if (['active', 'verified', 'approved'].includes(status)) {
+    return { status: 'verified', text: 'Đã xác minh', color: '#22C55E' };
+  }
+  if (status === 'pending') {
+    return { status: 'pending', text: 'Đang xác minh', color: '#F59E0B' };
+  }
+  if (['rejected', 'suspended'].includes(status)) {
+    return { status: 'rejected', text: 'Bị từ chối', color: '#EF4444' };
+  }
+  return { status: 'not_verified', text: 'Chưa xác minh', color: '#9CA3AF' };
+};
+
+const getDriverVerificationStatus = (user, studentStatus) => {
+  if (studentStatus.status !== 'verified') {
+    return {
+      status: 'locked',
+      text: 'Cần xác minh sinh viên trước',
+      color: '#9CA3AF',
+      disabled: true,
+    };
+  }
+
+  const driverProfile = user?.driver_profile;
+  if (!driverProfile) {
+    return { status: 'not_verified', text: 'Chưa xác minh', color: '#9CA3AF' };
+  }
+
+  const status = driverProfile.status?.toLowerCase();
+  if (['active', 'verified', 'approved'].includes(status)) {
+    return { status: 'verified', text: 'Đã xác minh', color: '#22C55E' };
+  }
+  if (status === 'pending') {
+    return { status: 'pending', text: 'Đang xác minh', color: '#F59E0B', disabled: true };
+  }
+  if (['rejected', 'suspended'].includes(status)) {
+    return { status: 'rejected', text: 'Bị từ chối', color: '#EF4444' };
+  }
+  return { status: 'not_verified', text: 'Chưa xác minh', color: '#9CA3AF' };
+};
+
 const styles = StyleSheet.create({
-  container: {
+  safe: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
-  },
-  header: {
-    paddingTop: 20,
-    paddingBottom: 24,
-    paddingHorizontal: 20,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  placeholder: {
-    width: 40,
-  },
-  content: {
-    flex: 1,
-    padding: 20,
-  },
-  currentModeCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 16,
-  },
-  currentModeInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  currentModeIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  currentModeDetails: {
-    flex: 1,
-  },
-  currentModeTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginBottom: 4,
-  },
-  currentModeSubtitle: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
-  },
-  modesSection: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 16,
-  },
-  modeCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-  },
-  modeCardActive: {
-    borderWidth: 2,
-    borderColor: '#4CAF50',
-  },
-  modeCardDisabled: {
-    opacity: 0.6,
-  },
-  modeIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  modeInfo: {
-    flex: 1,
-  },
-  modeTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 4,
-  },
-  modeDescription: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
-  },
-  statusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statusText: {
-    fontSize: 12,
-    marginLeft: 4,
-    fontWeight: '500',
-  },
-  activeIndicator: {
-    backgroundColor: '#4CAF50',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  activeText: {
-    fontSize: 12,
-    color: '#fff',
-    fontWeight: '500',
-  },
-  verificationSection: {
-    marginBottom: 24,
-  },
-  verificationCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-  },
-  verificationInfo: {
-    flex: 1,
-    marginLeft: 16,
-  },
-  verificationTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 4,
-  },
-  verificationDescription: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 18,
-  },
-  infoSection: {
-    marginBottom: 20,
-  },
-  infoCard: {
-    backgroundColor: '#E8F5E8',
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  infoText: {
-    flex: 1,
-    fontSize: 14,
-    color: '#2E7D32',
-    marginLeft: 12,
-    lineHeight: 20,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
   },
-  loadingText: {
-    marginTop: 10,
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+    gap: 24,
+  },
+  heroCard: {
+    paddingVertical: 24,
+    paddingHorizontal: 22,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  heroIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: 'rgba(59,130,246,0.12)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  heroTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  heroSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    lineHeight: 20,
+  },
+  section: {
+    gap: 16,
+  },
+  sectionTitle: {
     fontSize: 16,
-    color: '#666',
+    fontWeight: '700',
+    color: '#0A0A0A',
   },
-  errorContainer: {
+  cardPadding: {
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    gap: 18,
+  },
+  currentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 18,
+  },
+  roundIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modeHeading: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  modeDescription: {
+    fontSize: 14,
+    color: '#6B7280',
+    lineHeight: 20,
+  },
+  modeOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 18,
+    paddingHorizontal: 18,
+    borderRadius: 18,
+    gap: 16,
+    shadowColor: 'rgba(0,0,0,0.05)',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+  },
+  modeOptionDisabled: {
+    opacity: 0.55,
+  },
+  modeIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modeInfo: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
+    gap: 4,
   },
-  errorText: {
+  modeTitle: {
     fontSize: 16,
-    color: '#666',
-    marginTop: 16,
-    marginBottom: 24,
-    textAlign: 'center',
+    fontWeight: '600',
+    color: '#6B7280',
   },
-  loadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+  modeSubtitle: {
+    fontSize: 13,
+    color: '#8A8A93',
+  },
+  modeStatusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+  },
+  modeStatusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.accent,
+  },
+  verificationRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 14,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(148,163,184,0.25)',
+  },
+  verificationIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: '#EEF2FF',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  loadingContent: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 24,
-    alignItems: 'center',
-    minWidth: 150,
+  verificationInfo: {
+    flex: 1,
+    gap: 4,
   },
-  loadingOverlayText: {
+  verificationTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  verificationDescription: {
+    fontSize: 13,
+    color: '#8A8A93',
+    lineHeight: 20,
+  },
+  verificationStatusText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  inlineButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 16,
+    backgroundColor: colors.accent,
+  },
+  inlineButtonDisabled: {
+    backgroundColor: 'rgba(148,163,184,0.28)',
+  },
+  inlineButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  infoBanner: {
     marginTop: 12,
-    fontSize: 16,
-    color: '#666',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    shadowColor: 'rgba(0,0,0,0.04)',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+  },
+  infoBannerText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#6B7280',
+    lineHeight: 20,
+  },
+  actionsCard: {
+    padding: 18,
+    gap: 12,
   },
 });
 
