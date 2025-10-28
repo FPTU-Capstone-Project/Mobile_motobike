@@ -14,7 +14,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Animatable from "react-native-animatable";
 
 import rideService from "../services/rideService";
-import locationService from "../services/locationService";
+import locationService from "../services/LocationService";
 
 const { width, height } = Dimensions.get("window");
 

@@ -23,7 +23,7 @@ import LocationCard from '../../components/LocationCard.jsx';
 import ModeSelector from '../../components/ModeSelector.jsx';
 import ActiveRideCard from '../../components/ActiveRideCard.jsx';
 
-import locationService from '../../services/locationService';
+import locationService from '../../services/LocationService';
 import rideService from '../../services/rideService';
 import authService from '../../services/authService';
 import poiService from '../../services/poiService';

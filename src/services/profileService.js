@@ -89,7 +89,7 @@ class ProfileService {
   // Submit student verification - Delegate to verificationService
   async submitStudentVerification(documentFile) {
     try {
-      const verificationService = await import('./verificationService');
+      const verificationService = await import('./services/verificationService');
       const response = await verificationService.default.submitStudentVerification(documentFile);
       await this.getCurrentUserProfile(); // Refresh profile after submission
       return response;

@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import locationService from './locationService';
+import locationService from './LocationService';
 import goongService from './goongService';
 
 class LocationStorageService {
