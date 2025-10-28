@@ -389,9 +389,8 @@ const RideBookingScreen = ({ navigation, route }) => {
 
     try {
       setLoading(true);
-      console.log('Booking ride with quoteId:', quote.quoteId);
       const result = await rideService.bookRide(quote.quoteId);
-      console.log('Book ride result:', result);
+      
       
       // Navigate to rider matching screen
       navigation.navigate('RiderMatching', {

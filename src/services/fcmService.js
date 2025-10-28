@@ -51,7 +51,6 @@ this.expoToken = expoToken;
   
       this.setupNotificationListeners();
       this.isInitialized = true;
-      console.log('FCM Service initialized successfully');
       return true;
     } catch (error) {
       console.error('Failed to initialize FCM:', error);
@@ -69,8 +68,6 @@ this.expoToken = expoToken;
   
     // Android => FCM ; iOS => APNs
     const { data, type } = await Notifications.getDevicePushTokenAsync();
-    // Trên Android, type sẽ là 'fcm'
-    console.log('Native device push token:', type, data);
     return { deviceToken: data, deviceType: Platform.OS === 'ios' ? 'IOS' : 'ANDROID' };
   }
 
@@ -128,7 +125,6 @@ this.expoToken = expoToken;
   setupNotificationListeners() {
     // Listen for token updates
     this.tokenListener = Notifications.addPushTokenListener(async (token) => {
-      console.log('Push token updated:', token.data);
       this.fcmToken = token.data;
       
       // Re-register with backend when token changes
@@ -153,6 +149,46 @@ this.expoToken = expoToken;
     });
   }
 
+  handleNotification(notification) {
+    try {
+      const data = notification?.request?.content?.data || notification?.data || {};
+      // Normalize type for rider accepted/matched
+      const type = data?.type || data?.eventType;
+      if (type === 'RIDE_MATCHED' || data?.status === 'ACCEPTED' || data?.status === 'CONFIRMED') {
+        this.handleRideMatched(data);
+        return;
+      }
+      if (type === 'RIDE_CANCELLED') {
+        this.handleRideCancelled(data);
+        return;
+      }
+      if (type === 'RIDE_OFFER') {
+        this.handleRideOffer(data);
+        return;
+      }
+      if (type === 'START_TRACKING') {
+        this.handleStartTracking(data);
+        return;
+      }
+      if (type === 'STOP_TRACKING') {
+        this.handleStopTracking(data);
+        return;
+      }
+      console.log('Unhandled notification data:', data);
+    } catch (e) {
+      console.warn('handleNotification error:', e);
+    }
+  }
+
+  handleNotificationResponse(response) {
+    try {
+      const data = response?.notification?.request?.content?.data || {};
+      this.handleNotification({ request: { content: { data } } });
+    } catch (e) {
+      console.warn('handleNotificationResponse error:', e);
+    }
+  }
+
   // Register FCM token with backend
   async registerToken() {
     try {
@@ -163,15 +199,12 @@ this.expoToken = expoToken;
       }
       const deviceType = Platform.OS === 'ios' ? 'IOS' : 'ANDROID';
   
-      console.log('Registering FCM token:', { token: token.substring(0, 20) + '...', deviceType });
-  
       const res = await apiService.post(ENDPOINTS.FCM.REGISTER, {
         token,
         deviceType,
         // (tuỳ chọn) gửi kèm expoToken nếu backend thích lưu:
         // expoToken: this.expoToken ?? null
       });
-      console.log('FCM token registered successfully:', res);
       return res;
     } catch (e) {
       console.error('Failed to register FCM token:', e);
@@ -273,7 +306,26 @@ this.expoToken = expoToken;
   // Handle ride matched notification (for riders)
   handleRideMatched(data) {
     console.log('Ride matched notification:', data);
-    // TODO: Navigate to ride tracking screen
+    try {
+      // expected: data.status === 'ACCEPTED' | 'CONFIRMED', data.rideId, pickup/dropoff info
+      const rideId = Number(data.rideId || data.shared_ride_id || data.sharedRideId);
+      const initialRideData = data;
+      if (rideId) {
+        // Lazy import to avoid circular deps
+        const { navigationRef } = require('../utils/navigationRef');
+        if (navigationRef?.current) {
+          console.log('🚗 Navigating rider to tracking screen:', { rideId });
+          navigationRef.current.navigate('RideTracking', {
+            rideId,
+            rideData: initialRideData,
+            startTracking: false,
+            status: 'CONFIRMED'
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to navigate on ride matched:', e);
+    }
   }
 
   // Handle ride cancelled notification

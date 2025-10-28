@@ -171,7 +171,6 @@ const SimpleAddressInput = ({
 
   const handleSuggestionPress = async (suggestion) => {
     try {
-      console.log('🔥 Suggestion pressed:', suggestion);
       setIsTyping(false);
       setShowModal(false);
       setShowSuggestions(false);
@@ -185,7 +184,6 @@ const SimpleAddressInput = ({
           locationId: suggestion.locationId,
           isPOI: true,
         };
-        console.log('📍 POI location data:', locationData);
         onChangeText(displayText);
         onLocationSelect(locationData);
         setSuggestions([]);
@@ -208,11 +206,9 @@ const SimpleAddressInput = ({
       }
       
       const placeId = suggestion.place_id || suggestion.id;
-      console.log('🔍 Getting place details for:', placeId);
       
       try {
         const placeDetails = await goongService.getPlaceDetails(placeId);
-        console.log('📋 Place details response:', placeDetails);
         
         if (placeDetails && placeDetails.geometry && placeDetails.geometry.location) {
           const location = placeDetails.geometry.location;
@@ -223,7 +219,6 @@ const SimpleAddressInput = ({
             longitude: location.longitude,
             address: fullAddress,
           };
-          console.log('📍 Goong place details data:', locationData);
           onChangeText(displayText);
           onLocationSelect(locationData);
         } else {

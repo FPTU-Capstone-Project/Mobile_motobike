@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
+import { navigationRef } from './src/utils/navigationRef';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { PaperProvider } from 'react-native-paper';
@@ -39,7 +40,7 @@ import DriverHomeScreen from './src/screens/driver/DriverHomeScreen.jsx';
 import DriverTestScreen from './src/screens/driver/DriverTestScreen.jsx';
 import CreateSharedRideScreen from './src/screens/driver/CreateSharedRideScreen.jsx';
 import VehicleManagementScreen from './src/screens/driver/VehicleManagementScreen.jsx';
-import DriverRideTrackingScreen from './src/screens/driver/RideTrackingScreen.jsx';
+import DriverRideTrackingScreen from './src/screens/driver/DriverRideTrackingScreen.jsx';
 import DriverDashboardScreen from './src/screens/driver/DriverDashboardScreen.jsx';
 import DriverEarningsScreen from './src/screens/driver/DriverEarningsScreen.jsx';
 import DriverRatingsScreen from './src/screens/driver/DriverRatingsScreen.jsx';
@@ -115,7 +116,7 @@ export default function App() {
 
   return (
     <PaperProvider>
-      <NavigationContainer>
+      <NavigationContainer ref={navigationRef}>
         <Stack.Navigator initialRouteName={isAuthenticated ? (authService.isDriver() ? "DriverMain" : "Main") : "Login"}>
           <Stack.Screen 
             name="Login" 

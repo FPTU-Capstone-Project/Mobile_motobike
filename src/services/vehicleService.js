@@ -26,7 +26,6 @@ class VehicleService {
         sortDir = 'desc'
       } = params;
 
-      console.log('Fetching driver vehicles with params:', { page, size, sortBy, sortDir });
 
       const endpoint = ENDPOINTS.VEHICLES.GET_BY_DRIVER;
       const queryParams = {

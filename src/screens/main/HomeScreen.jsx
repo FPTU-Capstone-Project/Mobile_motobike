@@ -16,6 +16,7 @@ import * as Animatable from 'react-native-animatable';
 
 import ModernButton from '../../components/ModernButton.jsx';
 import LocationCard from '../../components/LocationCard.jsx';
+import ActiveRideCard from '../../components/ActiveRideCard.jsx';
 import locationService from '../../services/locationService';
 import rideService from '../../services/rideService';
 import authService from '../../services/authService';
@@ -434,6 +435,9 @@ const HomeScreen = ({ navigation }) => {
             </TouchableOpacity>
             </View>
         </LinearGradient>
+
+        {/* Active Ride Card */}
+        <ActiveRideCard navigation={navigation} />
 
         {/* Quick Actions */}
         {renderQuickActions()}

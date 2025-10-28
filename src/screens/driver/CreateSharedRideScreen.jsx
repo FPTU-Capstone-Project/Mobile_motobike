@@ -74,7 +74,6 @@ const [timePart, setTimePart] = React.useState(() => {
   const loadVehicles = async () => {
     try {
       setLoadingVehicles(true);
-      console.log("Loading driver vehicles...");
 
       const response = await vehicleService.getDriverVehicles({
         page: 0,
@@ -150,14 +149,6 @@ const [timePart, setTimePart] = React.useState(() => {
   }
 
   const handleCreateRide = async () => {
-    // Debug logs
-    console.log("🚀 Creating ride with:");
-    console.log("📍 Start Address:", startAddress);
-    console.log("📍 End Address:", endAddress);
-    console.log("📍 Start Location:", startLocation);
-    console.log("📍 End Location:", endLocation);
-    console.log("⏰ Scheduled Time:", scheduledTime);
-    console.log("⏰ Scheduled Time ISO VN:", scheduledTimeIsoVN);
 
     // Validation
     if (!vehicles || vehicles.length === 0) {
@@ -235,7 +226,6 @@ const [timePart, setTimePart] = React.useState(() => {
 
       // Prepare request body to match expected format
       const rideData = {
-        vehicleId: vehicles[0].id || vehicles[0].vehicleId,
         scheduledDepartureTime: scheduledTimeIsoVN || formatDateTimeForBackend(scheduledTime),
       };
 
@@ -396,7 +386,6 @@ const [timePart, setTimePart] = React.useState(() => {
               value={startAddress}
               onChangeText={setStartAddress}
               onLocationSelect={(location) => {
-                console.log("🎯 Start location selected:", location);
                 setStartLocation(location);
                 setStartAddress(location.address);
               }}
@@ -418,7 +407,6 @@ const [timePart, setTimePart] = React.useState(() => {
               value={endAddress}
               onChangeText={setEndAddress}
               onLocationSelect={(location) => {
-                console.log("🎯 End location selected:", location);
                 setEndLocation(location);
                 setEndAddress(location.address);
               }}

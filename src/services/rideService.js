@@ -106,7 +106,6 @@ class RideService {
       }
 
       const response = await this.apiService.post(ENDPOINTS.RIDE_REQUESTS.BOOK_RIDE, body);
-      console.log('Book ride response:', response);
       return response;
     } catch (error) {
       console.error('Book ride error:', error);
@@ -199,18 +198,58 @@ class RideService {
     }
   }
 
-  async acceptRideRequest(requestId, rideId) {
-    try {
-      const endpoint = ENDPOINTS.RIDE_REQUESTS.ACCEPT.replace('{requestId}', requestId);
-      const response = await this.apiService.post(endpoint, {
-        rideId: rideId
-      });
-      return response;
-    } catch (error) {
-      console.error('Accept ride request error:', error);
-      throw error;
-    }
+async acceptRideRequest(requestId, rideId) {
+  try {
+    console.log('📞 Accepting ride request:', { requestId, rideId });
+    
+    const endpoint = ENDPOINTS.RIDE_REQUESTS.ACCEPT.replace('{requestId}', requestId);
+    const requestBody = { rideId };
+    
+    console.log('📤 Sending request to:', endpoint);
+    console.log('📤 Request body:', requestBody);
+    
+    const response = await this.apiService.post(endpoint, requestBody);
+    
+    console.log('✅ Accept ride request success:', response);
+    return response;
+  } catch (error) {
+    console.error('❌ Accept ride request error:', error);
+    throw error;
   }
+}
+
+async acceptBroadcastRequest(requestId, vehicleId, currentLocation = null) {
+  try {
+    console.log('📞 Accepting broadcast request:', { requestId, vehicleId, currentLocation });
+    
+    const endpoint = ENDPOINTS.RIDE_REQUESTS.ACCEPT_BROADCAST.replace('{requestId}', requestId);
+    
+    // Build request body - at least one of startLocationId or startLatLng must be provided
+    const requestBody = {};
+    
+    if (currentLocation?.latitude && currentLocation?.longitude) {
+      requestBody.startLatLng = {
+        latitude: currentLocation.latitude,
+        longitude: currentLocation.longitude
+      };
+    } else {
+      // Fallback: send with null location if not available
+      requestBody.startLatLng = null;
+    }
+    
+    console.log('📤 Sending request to:', endpoint);
+    console.log('📤 Request body:', requestBody);
+    
+    const response = await this.apiService.post(endpoint, requestBody);
+    
+    console.log('✅ Accept broadcast request success:', response);
+    return response;
+  } catch (error) {
+    console.error('❌ Accept broadcast request error:', error);
+    throw error;
+  }
+}
+
 
   async rejectRideRequest(requestId, reason = null) {
     try {

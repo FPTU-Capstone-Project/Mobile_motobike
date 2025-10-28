@@ -191,6 +191,7 @@ export const ENDPOINTS = {
     // Driver endpoints
     GET_BY_RIDE: '/ride-requests/rides/{rideId}',
     ACCEPT: '/ride-requests/{requestId}/accept',
+    ACCEPT_BROADCAST: '/ride-requests/{requestId}/broadcast/accept',
     REJECT: '/ride-requests/{requestId}/reject',
   },
 

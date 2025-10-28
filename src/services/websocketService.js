@@ -256,11 +256,23 @@ class WebSocketService {
 
     const subscription = this.client.subscribe(destination, (message) => {
       try {
+        console.log('🎯 [WebSocket] Raw message received:', message);
+        console.log('🎯 [WebSocket] Message body:', message.body);
+        
         const data = JSON.parse(message.body);
         console.log('📨 Received driver offer:', data);
-        callback(data);
+        console.log('📨 Offer data type:', typeof data);
+        console.log('📨 Offer data keys:', Object.keys(data));
+        
+        if (callback) {
+          console.log('📨 Calling driver offer callback');
+          callback(data);
+        } else {
+          console.log('⚠️ No callback provided for driver offer');
+        }
       } catch (error) {
         console.error('❌ Error parsing driver offer message:', error);
+        console.error('❌ Raw message:', message);
       }
     });
 

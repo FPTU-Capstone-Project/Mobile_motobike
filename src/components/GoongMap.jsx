@@ -296,11 +296,19 @@ const GoongMap = ({
 
   // Expose methods to parent component
   useEffect(() => {
-    if (props.onRef) {
-      props.onRef({
-        animateToRegion,
-        fitToCoordinates
-      });
+    if (!props.onRef) return;
+
+    const api = { animateToRegion, fitToCoordinates };
+
+    // Support both callback ref and object ref
+    if (typeof props.onRef === 'function') {
+      props.onRef(api);
+    } else if (typeof props.onRef === 'object') {
+      try {
+        props.onRef.current = api;
+      } catch (_) {
+        // noop: prevent crashing if a non-function, non-ref is passed
+      }
     }
   }, [mapReady]);
 

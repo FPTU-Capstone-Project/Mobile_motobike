@@ -30,7 +30,6 @@ const RiderMatchingScreen = ({ navigation, route }) => {
     const requestData = route.params?.rideRequest;
     if (requestData) {
       setRideRequest(requestData);
-      console.log('Rider matching started for request:', requestData);
     }
   }, [route.params]);
 
@@ -76,7 +75,11 @@ const RiderMatchingScreen = ({ navigation, route }) => {
     console.log('📨 Received ride matching update:', matchingData);
     
     try {
-      switch (matchingData.type) {
+      // Check both 'type' field and 'status' field for compatibility
+      const updateType = matchingData.type || matchingData.status;
+      console.log('📨 Processing update type:', updateType);
+      
+      switch (updateType) {
         case 'DRIVER_MATCHED':
           setMatchingStatus('matched');
           setCurrentMatch(matchingData);
@@ -84,6 +87,7 @@ const RiderMatchingScreen = ({ navigation, route }) => {
           break;
           
         case 'RIDE_ACCEPTED':
+        case 'ACCEPTED':
           setMatchingStatus('accepted');
           setCurrentMatch(matchingData);
           addNotification('✅ Tài xế đã chấp nhận chuyến đi!', 'success');
@@ -92,8 +96,10 @@ const RiderMatchingScreen = ({ navigation, route }) => {
           setTimeout(() => {
             navigation.replace('RideTracking', {
               rideId: matchingData.rideId,
-              driverInfo: matchingData.driver,
-              isRider: true
+              requestId: matchingData.requestId,
+              driverInfo: matchingData,
+              isRider: true,
+              status: 'CONFIRMED'
             });
           }, 2000);
           break;
@@ -115,8 +121,25 @@ const RiderMatchingScreen = ({ navigation, route }) => {
           break;
           
         default:
-          console.log('Unknown matching update type:', matchingData.type);
-          addNotification(`📱 ${matchingData.message || 'Cập nhật trạng thái'}`, 'info');
+          console.log('Unknown matching update type:', updateType);
+          // Fallback: if we have rideId and status, treat as accepted
+          if (matchingData.rideId && matchingData.status === 'ACCEPTED') {
+            setMatchingStatus('accepted');
+            setCurrentMatch(matchingData);
+            addNotification('✅ Tài xế đã chấp nhận chuyến đi!', 'success');
+            
+            setTimeout(() => {
+              navigation.replace('RideTracking', {
+                rideId: matchingData.rideId,
+                requestId: matchingData.requestId,
+                driverInfo: matchingData,
+                isRider: true,
+                status: 'CONFIRMED'
+              });
+            }, 2000);
+          } else {
+            addNotification(`📱 ${matchingData.message || 'Cập nhật trạng thái'}`, 'info');
+          }
       }
     } catch (error) {
       console.error('Error handling ride matching:', error);

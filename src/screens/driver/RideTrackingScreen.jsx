@@ -12,13 +12,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import GoongMap from '../../components/GoongMap.jsx';
-import locationTrackingService from '../../services/locationTrackingService';
+import { locationTrackingService } from '../../services/locationTrackingService';
 import rideService from '../../services/rideService';
 
 const { width, height } = Dimensions.get('window');
 
 const RideTrackingScreen = ({ route, navigation }) => {
-  const { rideId, startTracking = false } = route.params || {};
+  const { rideId, startTracking = false, rideData: initialRideData } = route.params || {};
   
   const [isTracking, setIsTracking] = useState(false);
   const [currentLocation, setCurrentLocation] = useState(null);
@@ -29,13 +29,34 @@ const RideTrackingScreen = ({ route, navigation }) => {
 
   useEffect(() => {
     if (rideId) {
-      loadRideData();
+      if (initialRideData) {
+        // Use data from accept response
+        console.log('Using initial ride data:', initialRideData);
+        setRideData(initialRideData);
+        setLoading(false);
+        
+        // Fit map to show both pickup and dropoff points
+        if (initialRideData?.pickup_lat && initialRideData?.pickup_lng && 
+            initialRideData?.dropoff_lat && initialRideData?.dropoff_lng) {
+          setTimeout(() => {
+            if (mapRef.current) {
+              mapRef.current.fitToCoordinates([
+                { latitude: initialRideData.pickup_lat, longitude: initialRideData.pickup_lng },
+                { latitude: initialRideData.dropoff_lat, longitude: initialRideData.dropoff_lng }
+              ], { edgePadding: 50 });
+            }
+          }, 1000);
+        }
+      } else {
+        // Fallback: try to load from API (may fail)
+        loadRideData();
+      }
     }
     
     if (startTracking) {
       startTrackingService();
     }
-  }, [rideId, startTracking]);
+  }, [rideId, startTracking, initialRideData]);
 
   const loadRideData = async () => {
     try {
@@ -104,6 +125,39 @@ const RideTrackingScreen = ({ route, navigation }) => {
     } catch (error) {
       console.error('Failed to stop tracking:', error);
       Alert.alert('Lỗi', 'Không thể dừng GPS tracking.', [{ text: 'OK' }]);
+    }
+  };
+
+  const startRide = async () => {
+    try {
+      Alert.alert(
+        'Bắt đầu chuyến đi',
+        'Bạn có chắc chắn muốn bắt đầu chuyến đi này?',
+        [
+          { text: 'Hủy', style: 'cancel' },
+          {
+            text: 'Xác nhận',
+            onPress: async () => {
+              try {
+                await rideService.startRide(rideId);
+                Alert.alert(
+                  'Thành công',
+                  'Chuyến đi đã được bắt đầu.',
+                  [{ text: 'OK' }]
+                );
+                // Reload ride data to update status
+                loadRideData();
+              } catch (error) {
+                console.error('Failed to start ride:', error);
+                Alert.alert('Lỗi', 'Không thể bắt đầu chuyến đi.', [{ text: 'OK' }]);
+              }
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Failed to start ride:', error);
+      Alert.alert('Lỗi', 'Không thể bắt đầu chuyến đi.', [{ text: 'OK' }]);
     }
   };
 
@@ -196,8 +250,7 @@ const RideTrackingScreen = ({ route, navigation }) => {
       {/* Map */}
       <View style={styles.mapContainer}>
         <GoongMap
-          ref={mapRef}
-          onRef={mapRef}
+          onRef={(api) => { mapRef.current = api; }}
           style={styles.map}
           initialRegion={{
             latitude: rideData?.pickupLat || 10.7769,
@@ -286,6 +339,16 @@ const RideTrackingScreen = ({ route, navigation }) => {
             >
               <Icon name="stop" size={24} color="white" />
               <Text style={styles.actionButtonText}>Dừng theo dõi</Text>
+            </TouchableOpacity>
+          )}
+
+          {rideData?.status === 'SCHEDULED' && (
+            <TouchableOpacity
+              style={[styles.actionButton, styles.startRideButton]}
+              onPress={startRide}
+            >
+              <Icon name="directions-car" size={24} color="white" />
+              <Text style={styles.actionButtonText}>Bắt đầu chuyến đi</Text>
             </TouchableOpacity>
           )}
 
@@ -471,6 +534,9 @@ const styles = StyleSheet.create({
   },
   stopButton: {
     backgroundColor: '#f44336',
+  },
+  startRideButton: {
+    backgroundColor: '#FF9800',
   },
   completeButton: {
     backgroundColor: '#2196F3',

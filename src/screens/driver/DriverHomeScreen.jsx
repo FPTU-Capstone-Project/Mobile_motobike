@@ -17,6 +17,7 @@ import * as Animatable from 'react-native-animatable';
 import websocketService from '../../services/websocketService';
 import fcmService from '../../services/fcmService';
 import authService from '../../services/authService';
+import vehicleService from '../../services/vehicleService';
 import { locationStorageService } from '../../services/locationStorageService';
 import { locationTrackingService } from '../../services/locationTrackingService';
 import RideOfferModal from '../../components/RideOfferModal';
@@ -34,6 +35,7 @@ const DriverHomeScreen = ({ navigation }) => {
   const [currentOffer, setCurrentOffer] = useState(null);
   const [showOfferModal, setShowOfferModal] = useState(false);
   const [offerCountdown, setOfferCountdown] = useState(0);
+  const [vehicleId, setVehicleId] = useState(null);
   
   const countdownInterval = useRef(null);
 
@@ -51,7 +53,6 @@ const DriverHomeScreen = ({ navigation }) => {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      console.log('🧹 DriverHomeScreen unmounting - cleaning up...');
       websocketService.disconnect();
       if (countdownInterval.current) {
         clearInterval(countdownInterval.current);
@@ -73,11 +74,13 @@ const DriverHomeScreen = ({ navigation }) => {
         setCurrentLocation(locationData.location);
       }
       
+      // Load driver vehicles
+      await loadVehicles();
+      
       // Initialize and register FCM for driver notifications
       try {
         await fcmService.initialize();
         await fcmService.registerToken();
-        console.log('FCM initialized and token registered successfully');
       } catch (fcmError) {
         console.warn('FCM initialization failed, continuing without push notifications:', fcmError);
       }
@@ -90,27 +93,39 @@ const DriverHomeScreen = ({ navigation }) => {
     }
   };
 
+  const loadVehicles = async () => {
+    try {
+      const response = await vehicleService.getDriverVehicles({
+        page: 0,
+        size: 50,
+        sortBy: "createdAt",
+        sortDir: "desc",
+      });
+
+      if (response && response.data) {
+        const formattedVehicles = vehicleService.formatVehicles(response.data);
+        
+        // Set the first vehicle as default
+        if (formattedVehicles && formattedVehicles.length > 0) {
+          const firstVehicle = formattedVehicles[0];
+          const vehicleId = firstVehicle.id || firstVehicle.vehicleId;
+          setVehicleId(vehicleId);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load vehicles:', error);
+    }
+  };
 
   const handleRideOffer = (offer) => {
-    console.log('📨 Received driver offer:', offer);
-    console.log('Processing ride offer:', offer);
-    
     // Check if this is a tracking start signal
     if (offer.type === 'TRACKING_START') {
-      console.log('📍 Tracking start signal received:', offer);
       handleTrackingStart(offer);
       return;
     }
     
-    // This is a ride offer
-    console.log('🚗 Ride offer received, showing modal...');
-    console.log('📊 Offer data:', JSON.stringify(offer, null, 2));
-    console.log('🔍 Offer keys:', Object.keys(offer));
-    
     setCurrentOffer(offer);
     setShowOfferModal(true);
-    
-    console.log('✅ Modal should be visible now');
     
     // Start countdown timer
     if (offer.offerExpiresAt) {
@@ -141,8 +156,6 @@ const DriverHomeScreen = ({ navigation }) => {
   };
 
   const handleNotification = (notification) => {
-    console.log('🔔 Driver received notification:', notification);
-    
     // Show notification as alert or toast
     if (notification.message) {
       Alert.alert('Thông báo', notification.message);
@@ -150,9 +163,9 @@ const DriverHomeScreen = ({ navigation }) => {
   };
 
   const handleTrackingStart = async (trackingSignal) => {
-    console.log('Tracking start signal received:', trackingSignal);
-    
     try {
+      console.log('🎯 Received TRACKING_START signal for ride:', trackingSignal.rideId);
+      
       // Start GPS tracking service
       await locationTrackingService.startTracking(trackingSignal.rideId);
       
@@ -163,8 +176,8 @@ const DriverHomeScreen = ({ navigation }) => {
           {
             text: 'Xem chuyến đi',
             onPress: () => {
-              // Navigate to ride tracking screen
-              navigation.navigate('RideTracking', {
+              // Navigate to DRIVER tracking screen, not rider screen
+              navigation.navigate('DriverRideTracking', {
                 rideId: trackingSignal.rideId,
                 startTracking: true
               });
@@ -198,8 +211,7 @@ const DriverHomeScreen = ({ navigation }) => {
     
     try {
       if (value) {
-        // Going online - connect WebSocket
-        console.log('🟢 Going online - connecting WebSocket...');
+        // Going online - chỉ connect WebSocket để nhận offers
         setConnectionStatus('connecting');
         
         await websocketService.connectAsDriver(
@@ -208,14 +220,10 @@ const DriverHomeScreen = ({ navigation }) => {
         );
         
         setConnectionStatus('connected');
-        console.log('✅ Driver is now online and ready for rides');
-        
-        // Force UI update
-        setIsOnline(true);
+        console.log('✅ Driver is now online and ready for broadcast offers');
         
       } else {
         // Going offline - disconnect WebSocket
-        console.log('🔴 Going offline - disconnecting WebSocket...');
         setConnectionStatus('disconnecting');
         
         websocketService.disconnect();
@@ -320,8 +328,8 @@ const DriverHomeScreen = ({ navigation }) => {
             </TouchableOpacity>
             <TouchableOpacity style={styles.settingsButton}>
               <Icon name="settings" size={24} color="#fff" />
-            </TouchableOpacity>
-          </View>
+          </TouchableOpacity>
+        </View>
         </View>
       </LinearGradient>
 
@@ -342,13 +350,13 @@ const DriverHomeScreen = ({ navigation }) => {
               </Text>
             </View>
             
-            <Switch
-              value={isOnline}
-              onValueChange={handleToggleOnline}
+              <Switch
+                value={isOnline}
+                onValueChange={handleToggleOnline}
               trackColor={{ false: '#E0E0E0', true: '#C8E6C9' }}
               thumbColor={isOnline ? '#4CAF50' : '#9E9E9E'}
-            />
-          </View>
+              />
+            </View>
           
           <Text style={styles.statusDescription}>
             {isOnline 
@@ -391,54 +399,49 @@ const DriverHomeScreen = ({ navigation }) => {
         )}
 
         {/* Stats Cards */}
-        <View style={styles.statsContainer}>
+          <View style={styles.statsContainer}>
           <View style={styles.statCard}>
             <Icon name="directions-car" size={24} color="#2196F3" />
             <Text style={styles.statNumber}>0</Text>
             <Text style={styles.statLabel}>Chuyến hôm nay</Text>
-          </View>
-          
+        </View>
+
           <View style={styles.statCard}>
             <Icon name="star" size={24} color="#FF9800" />
             <Text style={styles.statNumber}>5.0</Text>
             <Text style={styles.statLabel}>Đánh giá</Text>
-          </View>
-          
+                  </View>
+                  
           <View style={styles.statCard}>
             <Icon name="account-balance-wallet" size={24} color="#4CAF50" />
             <Text style={styles.statNumber}>0đ</Text>
             <Text style={styles.statLabel}>Thu nhập</Text>
-          </View>
-        </View>
+                    </View>
+                  </View>
 
         {/* Action Buttons */}
         <View style={styles.actionsContainer}>
-          <TouchableOpacity 
+                      <TouchableOpacity 
             style={styles.actionButton}
             onPress={() => navigation.navigate('RideHistory')}
           >
-            <Icon name="history" size={24} color="#666" />
-            <Text style={styles.actionText}>Lịch sử chuyến đi</Text>
-          </TouchableOpacity>
+              <Icon name="history" size={24} color="#666" />
+              <Text style={styles.actionText}>Lịch sử chuyến đi</Text>
+            </TouchableOpacity>
           
           <TouchableOpacity 
             style={styles.actionButton}
             onPress={() => navigation.navigate('Earnings')}
           >
             <Icon name="trending-up" size={24} color="#666" />
-            <Text style={styles.actionText}>Thu nhập</Text>
-          </TouchableOpacity>
+              <Text style={styles.actionText}>Thu nhập</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
 
       {/* Ride Offer Modal */}
       {showOfferModal && currentOffer && (
         <>
-          {console.log('🎭 Rendering RideOfferModal with:', {
-            showOfferModal,
-            currentOffer: currentOffer ? Object.keys(currentOffer) : null,
-            offerCountdown
-          })}
           <RideOfferModal
             visible={showOfferModal}
             offer={currentOffer}
@@ -446,6 +449,9 @@ const DriverHomeScreen = ({ navigation }) => {
             onAccept={() => handleOfferResponse(true)}
             onReject={(reason) => handleOfferResponse(false, reason)}
             onClose={() => handleOfferResponse(false)}
+            vehicleId={vehicleId}
+            navigation={navigation}
+            currentLocation={currentLocation}
           />
         </>
       )}

@@ -5,7 +5,7 @@
     "slug": "mssus-iat-rs",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/motorcycle-vector.jpg",
+    "icon": "./assets/motorcycle-vector.png",
     "userInterfaceStyle": "light",
     "splash": {
       "resizeMode": "contain",
@@ -15,7 +15,7 @@
       "**/*"
     ],
     "notification": {
-      "icon": "./assets/motorcycle-vector.jpg",
+      "icon": "./assets/motorcycle-vector.png",
       "color": "#4CAF50"
     },
     "ios": {
@@ -32,13 +32,15 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/motorcycle-vector.jpg",
+        "foregroundImage": "./assets/motorcycle-vector.png",
         "backgroundColor": "#4CAF50"
       },
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
         "CALL_PHONE",
         "READ_CONTACTS",
         "CAMERA",
@@ -53,7 +55,7 @@
       "googleServicesFile": "./google-services.json"
     },
     "web": {
-      "favicon": "./assets/motorcycle-vector.jpg"
+      "favicon": "./assets/motorcycle-vector.png"
     },
     "extra": {
       "eas": {
@@ -61,7 +63,7 @@
       }
     },
     "plugins": [
-      "expo-font", "expo-dev-client", "expo-notifications"
+      "expo-font", "expo-dev-client", "expo-notifications", ["expo-location", { "isAndroidBackgroundLocationEnabled": true }]
     ]
   }
 }
