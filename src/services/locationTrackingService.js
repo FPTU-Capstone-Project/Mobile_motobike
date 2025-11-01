@@ -5,6 +5,7 @@ import { AppState, Platform } from 'react-native';
 import apiService from './api';
 import { ENDPOINTS } from '../config/api';
 import permissionService from './permissionService';
+import websocketService from './websocketService';
 
 const LOCATION_TASK_NAME = 'background-location-task';
 
@@ -519,14 +520,34 @@ class LocationTrackingService {
         return;
       }
 
-      const endpoint = ENDPOINTS.RIDES.TRACK.replace('{rideId}', this.currentRideId);
-      const payload = this.locationBuffer.slice(); // copy an toàn
-      const response = await apiService.post(endpoint, payload);
+      // Convert location buffer to LocationPoint format (with ZonedDateTime timestamp)
+      const points = this.locationBuffer.map(loc => ({
+        lat: loc.lat,
+        lng: loc.lng,
+        timestamp: loc.timestamp // ISO string - backend will parse to ZonedDateTime
+      }));
 
-      console.log(`Sent ${payload.length} location points for ride ${this.currentRideId}`);
-      this.locationBuffer = [];
-      this.lastSendTime = Date.now();
-      return response;
+      // Send via WebSocket to /app/ride.track.{rideId}
+      const wsDestination = `/app/ride.track.${this.currentRideId}`;
+      
+      if (websocketService.isConnected && websocketService.client) {
+        websocketService.client.publish({
+          destination: wsDestination,
+          body: JSON.stringify(points),
+        });
+        console.log(`📍 Sent ${points.length} location points via WebSocket to ${wsDestination}`);
+        this.locationBuffer = [];
+        this.lastSendTime = Date.now();
+      } else {
+        // Fallback: try REST API if WebSocket not available
+        console.warn('WebSocket not connected, trying REST API fallback...');
+        const endpoint = ENDPOINTS.RIDES.TRACK.replace('{rideId}', this.currentRideId);
+        const response = await apiService.post(endpoint, points);
+        console.log(`📍 Sent ${points.length} location points via REST API for ride ${this.currentRideId}`);
+        this.locationBuffer = [];
+        this.lastSendTime = Date.now();
+        return response;
+      }
     } catch (error) {
       console.error('Failed to send location batch:', error);
       // Giữ nguyên buffer để retry lần sau

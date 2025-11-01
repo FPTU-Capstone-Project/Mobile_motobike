@@ -17,7 +17,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Animatable from 'react-native-animatable';
 
-import locationService from '../../services/LocationService';
+import locationService from '../../services/locationService';
 import rideService from '../../services/rideService';
 import authService from '../../services/authService';
 import goongService from '../../services/goongService';
