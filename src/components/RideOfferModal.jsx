@@ -14,7 +14,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Animatable from "react-native-animatable";
 
 import rideService from "../services/rideService";
-import locationService from "../services/LocationService";
+import locationService from "../services/locationService";
 
 const { width, height } = Dimensions.get("window");
 
@@ -74,7 +74,8 @@ const RideOfferModal = ({
         console.log('📞 This is a regular request, using acceptRideRequest');
         response = await rideService.acceptRideRequest(
           offer.requestId,
-          offer.rideId
+          offer.rideId,
+          currentLocation
         );
       }
 

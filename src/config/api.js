@@ -3,7 +3,7 @@ export const API_CONFIG = {
   // Development - Use your computer's IP address instead of localhost
   // To find your IP: Windows: ipconfig | Mac/Linux: ifconfig
   DEV: {
-    BASE_URL: 'http://192.168.1.2:8080/api/v1', // Android emulator
+    BASE_URL: 'http://192.168.2.15:8080/api/v1', // Android emulator
     // Alternative IPs to try:
     // BASE_URL: 'http://192.168.1.XXX:8081/api/v1', // Replace XXX with your IP
     // BASE_URL: 'http://172.20.10.2:8081/api/v1', // iOS simulator
@@ -193,12 +193,14 @@ export const ENDPOINTS = {
     ACCEPT: '/ride-requests/{requestId}/accept',
     ACCEPT_BROADCAST: '/ride-requests/{requestId}/broadcast/accept',
     REJECT: '/ride-requests/{requestId}/reject',
+    START_REQUEST: '/rides/start-ride-request', // Start a ride request (CONFIRMED -> ONGOING)
+    COMPLETE_REQUEST: '/rides/complete-ride-request', // Complete a ride request (ONGOING -> COMPLETED)
   },
 
   // Shared Rides APIs
   SHARED_RIDES: {
     CREATE: '/shared-rides',
-    GET_BY_ID: '/shared-rides/{rideId}',
+    GET_BY_ID: '/rides/{rideId}',
     GET_BY_DRIVER: '/shared-rides/driver',
     UPDATE: '/shared-rides/{rideId}',
     DELETE: '/shared-rides/{rideId}',

@@ -198,12 +198,18 @@ class RideService {
     }
   }
 
-async acceptRideRequest(requestId, rideId) {
+async acceptRideRequest(requestId, rideId, currentLocation = null) {
   try {
     console.log('📞 Accepting ride request:', { requestId, rideId });
     
     const endpoint = ENDPOINTS.RIDE_REQUESTS.ACCEPT.replace('{requestId}', requestId);
-    const requestBody = { rideId };
+    const requestBody = { 
+      rideId,
+      // Backend requires currentDriverLocation (LatLng)
+      currentDriverLocation: currentLocation?.latitude && currentLocation?.longitude
+        ? { latitude: currentLocation.latitude, longitude: currentLocation.longitude }
+        : null
+    };
     
     console.log('📤 Sending request to:', endpoint);
     console.log('📤 Request body:', requestBody);
@@ -218,14 +224,17 @@ async acceptRideRequest(requestId, rideId) {
   }
 }
 
-async acceptBroadcastRequest(requestId, vehicleId, currentLocation = null) {
+async acceptBroadcastRequest(requestId, vehicleId, currentLocation = null, startLocationId = null) {
   try {
-    console.log('📞 Accepting broadcast request:', { requestId, vehicleId, currentLocation });
+    console.log('📞 Accepting broadcast request:', { requestId, vehicleId, currentLocation, startLocationId });
     
     const endpoint = ENDPOINTS.RIDE_REQUESTS.ACCEPT_BROADCAST.replace('{requestId}', requestId);
     
     // Build request body - at least one of startLocationId or startLatLng must be provided
     const requestBody = {};
+    if (startLocationId) {
+      requestBody.startLocationId = startLocationId;
+    }
     
     if (currentLocation?.latitude && currentLocation?.longitude) {
       requestBody.startLatLng = {
@@ -275,11 +284,28 @@ async acceptBroadcastRequest(requestId, vehicleId, currentLocation = null) {
     }
   }
 
-  // Complete ride
+  // Complete ride - will auto-complete all ride requests first
   async completeRide(rideId) {
     try {
+      // First, get all ride requests to check their status
+      const requests = await this.getRideRequests(rideId);
+      const requestList = Array.isArray(requests) ? requests : (requests?.data || requests?.content || []);
+      
+      // Complete any ONGOING requests first
+      const ongoingRequests = requestList.filter(req => req.status === 'ONGOING');
+      for (const req of ongoingRequests) {
+        try {
+          console.log(`Completing ride request ${req.sharedRideRequestId || req.rideRequestId} before completing ride...`);
+          await this.completeRideRequestOfRide(rideId, req.sharedRideRequestId || req.rideRequestId);
+        } catch (err) {
+          console.warn(`Failed to complete request ${req.sharedRideRequestId || req.rideRequestId}:`, err);
+        }
+      }
+      
+      // Now complete the ride
       const endpoint = ENDPOINTS.SHARED_RIDES.COMPLETE.replace('{rideId}', rideId);
-      const response = await this.apiService.post(endpoint);
+      // Backend expects body: { "rideId": 123 }
+      const response = await this.apiService.post(endpoint, { rideId });
       return response;
     } catch (error) {
       console.error('Complete ride error:', error);
@@ -301,16 +327,10 @@ async acceptBroadcastRequest(requestId, vehicleId, currentLocation = null) {
   }
 
   // Ride management APIs
-  async startRide(rideId, currentDriverLocation) {
+  async startRide(rideId) {
     try {
       const endpoint = ENDPOINTS.RIDES.START.replace('{rideId}', rideId);
-      const response = await this.apiService.post(endpoint, {
-        rideId: rideId,
-        currentDriverLocation: {
-          latitude: currentDriverLocation.latitude,
-          longitude: currentDriverLocation.longitude
-        }
-      });
+      const response = await this.apiService.post(endpoint, { rideId });
       return response;
     } catch (error) {
       console.error('Start ride error:', error);
@@ -318,16 +338,36 @@ async acceptBroadcastRequest(requestId, vehicleId, currentLocation = null) {
     }
   }
 
-  async completeRide(rideId) {
+  // Start a ride request (CONFIRMED -> ONGOING) - called when driver picks up passenger
+  async startRideRequestOfRide(rideId, rideRequestId) {
     try {
-      const endpoint = ENDPOINTS.RIDES.COMPLETE.replace('{rideId}', rideId);
-      const response = await this.apiService.post(endpoint);
+      const endpoint = ENDPOINTS.RIDE_REQUESTS.START_REQUEST;
+      const response = await this.apiService.post(endpoint, {
+        rideId,
+        rideRequestId
+      });
       return response;
     } catch (error) {
-      console.error('Complete ride error:', error);
+      console.error('Start ride request error:', error);
       throw error;
     }
   }
+
+  // Complete a ride request (ONGOING -> COMPLETED) - called when driver drops off passenger
+  async completeRideRequestOfRide(rideId, rideRequestId) {
+    try {
+      const endpoint = ENDPOINTS.RIDE_REQUESTS.COMPLETE_REQUEST;
+      const response = await this.apiService.post(endpoint, {
+        rideId,
+        rideRequestId
+      });
+      return response;
+    } catch (error) {
+      console.error('Complete ride request error:', error);
+      throw error;
+    }
+  }
+
 
   // GPS tracking API
   async trackRide(rideId, locationPoints) {
@@ -382,32 +422,6 @@ async acceptBroadcastRequest(requestId, vehicleId, currentLocation = null) {
     }
   }
 
-  async startRide(rideId) {
-    try {
-      const endpoint = ENDPOINTS.RIDES.START.replace('{rideId}', rideId);
-      const response = await this.apiService.post(endpoint);
-      return response;
-    } catch (error) {
-      console.error('Start ride error:', error);
-      throw error;
-    }
-  }
-
-  async completeRide(rideId, actualDistance, actualDuration) {
-    try {
-      const endpoint = ENDPOINTS.RIDES.COMPLETE.replace('{rideId}', rideId);
-      const params = new URLSearchParams({
-        actualDistance: actualDistance.toString(),
-        actualDuration: actualDuration.toString()
-      });
-      
-      const response = await this.apiService.post(`${endpoint}?${params.toString()}`);
-      return response;
-    } catch (error) {
-      console.error('Complete ride error:', error);
-      throw error;
-    }
-  }
 
   async cancelRide(rideId, reason) {
     try {

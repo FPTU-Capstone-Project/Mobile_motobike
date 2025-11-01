@@ -20,7 +20,7 @@ import poiService from "../../services/poiService";
 import authService from "../../services/authService";
 import vehicleService from "../../services/vehicleService";
 import SimpleAddressInput from "../../components/SimpleAddressInput";
-import locationService from "../../services/LocationService";
+import locationService from "../../services/locationService";
 import goongService from "../../services/goongService";
 
 const CreateSharedRideScreen = ({ navigation }) => {

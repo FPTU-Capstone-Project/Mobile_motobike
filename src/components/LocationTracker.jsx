@@ -10,7 +10,7 @@ import {
   Linking
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import LocationService from '../services/LocationService';
+import LocationService from '../services/locationService';
 
 const { width, height } = Dimensions.get('window');
 
