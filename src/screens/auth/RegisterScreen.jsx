@@ -95,9 +95,20 @@ const RegisterScreen = (props) => {
         phone: formData.phone,
         password: formData.password,
       });
-      Alert.alert('Đăng ký thành công!', 'Hãy đăng nhập để tiếp tục sử dụng Campus Ride.', [
-        { text: 'Đăng nhập', onPress: navigateToLogin },
-      ]);
+      // After registration success, navigate to Login screen with pre-filled email
+      Alert.alert(
+        'Đăng ký thành công!', 
+        'Vui lòng đăng nhập bằng tài khoản vừa tạo. Bạn sẽ cần xác minh email trước khi có thể sử dụng ứng dụng.',
+        [
+          { 
+            text: 'Đăng nhập ngay', 
+            onPress: () => {
+              // Navigate to Login and pass email to pre-fill
+              navigation.navigate('Login', { prefillEmail: formData.email });
+            }
+          }
+        ]
+      );
     } catch (err) {
       Alert.alert('Đăng ký thất bại', err?.message || 'Có lỗi xảy ra, vui lòng thử lại.');
     } finally {

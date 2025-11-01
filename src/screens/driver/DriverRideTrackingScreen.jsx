@@ -15,7 +15,7 @@ import GoongMap from '../../components/GoongMap.jsx';
 import { locationTrackingService } from '../../services/locationTrackingService';
 import activeRideService from '../../services/activeRideService';
 import rideService from '../../services/rideService';
-import locationService from '../../services/locationService';
+import locationService from '../../services/LocationService';
 import * as Animatable from 'react-native-animatable';
 
 const { width, height } = Dimensions.get('window');

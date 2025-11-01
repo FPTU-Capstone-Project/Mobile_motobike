@@ -10,7 +10,7 @@ import {
   Linking
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import LocationService from '../services/locationService';
+import locationService from '../services/LocationService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -47,7 +47,7 @@ const LocationTracker = ({
 
     return () => {
       if (isTracking) {
-        LocationService.stopLocationTracking();
+        locationService.stopLocationTracking();
       }
     };
   }, [trackingEnabled]);
@@ -57,7 +57,7 @@ const LocationTracker = ({
     setError(null);
 
     try {
-      const currentLocation = await LocationService.getCurrentLocation();
+      const currentLocation = await locationService.getCurrentLocation();
       setLocation(currentLocation);
       
       if (showMap) {
@@ -85,7 +85,7 @@ const LocationTracker = ({
     setError(null);
 
     try {
-      await LocationService.startLocationTracking((newLocation) => {
+      await locationService.startLocationTracking((newLocation) => {
         setLocation(newLocation);
         
         if (showMap) {

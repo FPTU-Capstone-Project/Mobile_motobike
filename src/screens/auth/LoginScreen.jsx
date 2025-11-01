@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, KeyboardAvoidingView, Platform, Alert, Image, StatusBar } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { FontAwesome } from '@expo/vector-icons'; // icon cho Google/Facebook
@@ -10,12 +10,29 @@ import AppBackground from '../../components/layout/AppBackground.jsx';
 import CleanCard from '../../components/ui/CleanCard.jsx';
 import { colors } from '../../theme/designTokens';
 
-const LoginScreen = ({ navigation }) => {
-  const [email, setEmail] = useState('');
+const LoginScreen = ({ navigation, route }) => {
+  // Pre-fill email if coming from registration
+  const prefillEmail = route?.params?.prefillEmail || '';
+  const [email, setEmail] = useState(prefillEmail);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [targetProfile, setTargetProfile] = useState('rider'); // Default to rider
+  
+  // Update email when route params change
+  useEffect(() => {
+    if (prefillEmail) {
+      setEmail(prefillEmail);
+    }
+    // Show success message if email was just verified
+    if (route?.params?.verifiedEmail) {
+      Alert.alert(
+        'Xác minh thành công!',
+        'Email của bạn đã được xác minh. Bây giờ bạn có thể đăng nhập.',
+        [{ text: 'OK' }]
+      );
+    }
+  }, [prefillEmail, route?.params?.verifiedEmail]);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -27,31 +44,24 @@ const LoginScreen = ({ navigation }) => {
     try {
       const result = await authService.login(email, password, targetProfile);
       if (result.success) {
-        // Always go to Main screen first, verification check will be done in Main screen
+        // After email verification, user should have profile and can login
+        // Phone verification is separate and not required for login
         navigation.replace(targetProfile === 'driver' ? 'DriverMain' : 'Main');
       }
     } catch (error) {
       console.error('Login error:', error);
       
-      // Check for email verification pending
-      if (error.message === "Email verification is pending" || 
-          error.data?.error?.id === "auth.unauthorized.email-verification-pending") {
-        Alert.alert(
-          'Cần xác minh email',
-          'Email của bạn chưa được xác minh. Chúng tôi sẽ gửi mã OTP để xác minh.',
-          [
-            { text: 'Hủy', style: 'cancel' },
-            { 
-              text: 'Xác minh ngay', 
-              onPress: () => {
-                navigation.navigate('OTPVerification', {
-                  email: email,
-                  purpose: 'VERIFY_EMAIL'
-                });
-              }
-            }
-          ]
-        );
+      // Check for email verification pending - auto navigate to OTP screen
+      if (error.message?.includes("Email verification is pending") || 
+          error.data?.error?.id === "auth.unauthorized.email-verification-pending" ||
+          error.message?.includes("email-verification-pending") ||
+          error.data?.error?.id === "user.validation.profile-not-exists") {
+        // Automatically navigate to OTP verification screen for email verification
+        navigation.navigate('OTPVerification', {
+          email: email,
+          purpose: 'VERIFY_EMAIL',
+          fromLogin: true, // Flag to indicate coming from login
+        });
         return;
       }
       

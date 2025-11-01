@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import PhoneService from '../services/PhoneService';
-import LocationService from '../services/locationService';
+import locationService from '../services/LocationService';
 
 const DriverContactCard = ({ 
   driver, 

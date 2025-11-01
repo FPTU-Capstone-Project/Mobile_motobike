@@ -22,7 +22,7 @@ import { colors } from '../../theme/designTokens';
 import ModernButton from '../../components/ModernButton.jsx';
 import ActiveRideCard from '../../components/ActiveRideCard.jsx';
 
-import locationService from '../../services/locationService';
+import locationService from '../../services/LocationService';
 import rideService from '../../services/rideService';
 import authService from '../../services/authService';
 import permissionService from '../../services/permissionService';
@@ -279,11 +279,13 @@ const HomeScreen = ({ navigation }) => {
             {/* CTA đặt xe đơn giản */}
             <Animatable.View animation="fadeInUp" duration={420} useNativeDriver>
               <CleanCard style={styles.card} contentStyle={[styles.cardBody, styles.ctaCard]}>
-                <View style={{ gap: 6 }}>
+                <View style={styles.ctaTextContainer}>
                   <Text style={styles.cardTitle}>Đặt xe</Text>
                   <Text style={styles.cardSubtitle}>Bấm để chuyển đến trang đặt xe</Text>
                 </View>
-                <ModernButton title="Đặt xe ngay" icon="directions-car" onPress={handleBookRide} />
+                <View style={styles.ctaButtonContainer}>
+                  <ModernButton title="Đặt xe ngay" icon="directions-car" onPress={handleBookRide} />
+                </View>
               </CleanCard>
             </Animatable.View>
 
@@ -303,7 +305,10 @@ const HomeScreen = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  scrollContent: { paddingBottom: 160 },
+  scrollContent: { 
+    paddingBottom: 160,
+    paddingTop: 24, // Add padding top to avoid header sticking to status bar
+  },
   content: {
     paddingTop: 8,
     paddingHorizontal: 20,
@@ -311,7 +316,21 @@ const styles = StyleSheet.create({
   },
   card: { marginBottom: 12 },
   cardBody: { padding: 20, gap: 18 },
-  ctaCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  ctaCard: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  ctaTextContainer: { 
+    flex: 1, 
+    flexShrink: 1,
+    gap: 6,
+    marginRight: 12,
+  },
+  ctaButtonContainer: {
+    flexShrink: 0,
+  },
   cardTitle: { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   cardSubtitle: { fontSize: 14, color: colors.textSecondary, marginTop: -8 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },

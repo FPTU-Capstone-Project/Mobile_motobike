@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import apiService, { ApiError } from './api';
+import { ENDPOINTS } from '../config/api';
 
 // Storage keys
 const STORAGE_KEYS = {
@@ -177,10 +178,16 @@ class AuthService {
       // Get user profile
       const userProfile = await this.getCurrentUserProfile();
       
+      // Check if user has active profile
+      const activeProfile = response.active_profile || response.activeProfile;
+      console.log('📋 Active profile from login:', activeProfile);
+      
       return {
         success: true,
         user: userProfile,
         token: accessToken,
+        activeProfile: activeProfile, // null if user doesn't have profile yet
+        needsProfile: !activeProfile, // true if user needs to verify to get profile
       };
     } catch (error) {
       console.error('Login error:', error);
@@ -327,31 +334,47 @@ class AuthService {
   // }
 
   // Request OTP
+  // Backend endpoint: POST /api/v1/otp
+  // Request body: { email: string, otpFor: "VERIFY_EMAIL" | "VERIFY_PHONE" | "FORGOT_PASSWORD" }
   async requestOtp(purpose, email = null) {
     try {
-      console.log('Request OTP', purpose, email);
-      const response = await apiService.post('/otp', {
-        email: email, // Backend expects "email" field
+      if (!email) {
+        throw new Error('Email is required to request OTP');
+      }
+      console.log('📧 Request OTP for:', purpose, 'email:', email);
+      const response = await apiService.post(ENDPOINTS.OTP.REQUEST, {
+        email: email,
         otpFor: purpose,
       });
+      console.log('✅ OTP requested successfully');
       return response;
     } catch (error) {
-      console.error('Request OTP error:', error);
+      console.error('❌ Request OTP error:', error);
       throw error;
     }
   }
 
   // Verify OTP
+  // Backend endpoint: POST /api/v1/otp/verify
+  // Request body: { email: string, otpFor: string, code: string }
   async verifyOtp(code, purpose, email = null) {
     try {
-      const response = await apiService.post('/otp/verify', {
-        email: email, // Backend expects "email" field
+      if (!email) {
+        throw new Error('Email is required to verify OTP');
+      }
+      if (!code || code.length !== 6) {
+        throw new Error('OTP code must be 6 digits');
+      }
+      console.log('🔐 Verifying OTP for:', purpose, 'email:', email);
+      const response = await apiService.post(ENDPOINTS.OTP.VERIFY, {
+        email: email,
         otpFor: purpose,
         code: code,
       });
+      console.log('✅ OTP verified successfully');
       return response;
     } catch (error) {
-      console.error('Verify OTP error:', error);
+      console.error('❌ Verify OTP error:', error);
       throw error;
     }
   }
