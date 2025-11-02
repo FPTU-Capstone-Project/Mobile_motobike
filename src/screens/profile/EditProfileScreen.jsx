@@ -10,22 +10,23 @@ import {
   Alert,
   Image,
   ActivityIndicator,
+  StatusBar,
+  Platform,
 } from 'react-native';
 import Feather from 'react-native-vector-icons/Feather';
 import * as ImagePicker from 'expo-image-picker';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import AppBackground from '../../components/layout/AppBackground.jsx';
 import CleanCard from '../../components/ui/CleanCard.jsx';
-import { SoftBackHeader } from '../../components/ui/GlassHeader.jsx';
 import ModernButton from '../../components/ModernButton.jsx';
 import authService from '../../services/authService';
 import profileService from '../../services/profileService.js';
 import { ApiError } from '../../services/api';
 import { colors } from '../../theme/designTokens';
-import useSoftHeaderSpacing from '../../hooks/useSoftHeaderSpacing.js';
 
 const EditProfileScreen = ({ navigation }) => {
-  const { headerOffset, contentPaddingTop } = useSoftHeaderSpacing({ contentExtra: 36 });
+  const insets = useSafeAreaInsets();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -192,18 +193,15 @@ const EditProfileScreen = ({ navigation }) => {
 
   return (
     <AppBackground>
+      <StatusBar barStyle="dark-content" />
       <SafeAreaView style={styles.safe}>
-        <SoftBackHeader
-          floating
-          topOffset={headerOffset}
-          title="Chỉnh sửa hồ sơ"
-          subtitle="Cập nhật thông tin của bạn"
-          onBackPress={() => navigation.goBack()}
-          rightIcon="check"
-          rightIconColor={colors.accent}
-          rightLoading={saving}
-          onRightPress={saveProfile}
-        />
+        {/* Floating back button */}
+        <TouchableOpacity 
+          style={[styles.floatingBackButton, { top: insets.top + 12 }]} 
+          onPress={() => navigation.goBack()}
+        >
+          <Feather name="arrow-left" size={20} color={colors.textPrimary} />
+        </TouchableOpacity>
 
         {loading ? (
           <View style={styles.loadingContainer}>
@@ -212,8 +210,13 @@ const EditProfileScreen = ({ navigation }) => {
         ) : (
           <ScrollView
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={[styles.scrollContent, { paddingTop: contentPaddingTop }]}
+            contentContainerStyle={styles.scrollContent}
           >
+            {/* Header text as part of content */}
+            <View style={styles.headerTextSection}>
+              <Text style={styles.headerSubtitle}>Cập nhật thông tin của bạn</Text>
+              <Text style={styles.headerTitle}>Chỉnh sửa hồ sơ</Text>
+            </View>
             <CleanCard contentStyle={styles.avatarCard}>
               <TouchableOpacity style={styles.avatarWrapper} onPress={promptAvatarOptions}>
                 {avatarUri ? (
@@ -320,9 +323,45 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   scrollContent: {
+    paddingTop: 24,
     paddingHorizontal: 24,
     paddingBottom: 40,
     gap: 24,
+  },
+  floatingBackButton: {
+    position: 'absolute',
+    left: 16,
+    zIndex: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: 'rgba(148,163,184,0.25)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: 'rgba(15,23,42,0.12)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  headerTextSection: {
+    alignItems: 'center',
+    marginBottom: 8,
+    paddingTop: 12,
+    paddingBottom: 12,
+  },
+  headerSubtitle: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+    color: colors.textMuted,
+    marginBottom: 4,
+  },
+  headerTitle: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 18,
+    color: colors.textPrimary,
   },
   avatarCard: {
     alignItems: 'center',

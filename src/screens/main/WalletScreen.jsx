@@ -282,9 +282,10 @@ const WalletScreen = ({ navigation }) => {
           <Animatable.View animation="fadeInUp" duration={500}>
             <CleanCard style={styles.cardSpacing} contentStyle={styles.balanceCardContent}>
               <LinearGradient
-                colors={['#EEF7FF', '#E0EDFF']}
+                colors={['#F0F9FF', '#E6F7FF', '#E0F7FA', '#B2EBF2', '#E1BEE7']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
+                locations={[0, 0.3, 0.5, 0.7, 1]}
                 style={styles.balanceGradient}
               >
                 <View style={styles.balanceHeader}>
