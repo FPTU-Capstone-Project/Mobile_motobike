@@ -324,18 +324,18 @@ const StudentVerificationScreen = ({ navigation }) => {
       <StatusBar barStyle="dark-content" />
       <SafeAreaView style={styles.safe}>
         {/* Floating back button */}
-        <TouchableOpacity 
+            <TouchableOpacity 
           style={[styles.floatingBackButton, { top: insets.top + 12 }]} 
-          onPress={() => {
-            if (navigation.canGoBack()) {
-              navigation.goBack();
-            } else {
-              navigation.replace('Main');
-            }
-          }}
-        >
+              onPress={() => {
+                if (navigation.canGoBack()) {
+                  navigation.goBack();
+                } else {
+                  navigation.replace('Main');
+                }
+              }}
+            >
           <Feather name="arrow-left" size={20} color={colors.textPrimary} />
-        </TouchableOpacity>
+            </TouchableOpacity>
 
         <ScrollView
           showsVerticalScrollIndicator={false}

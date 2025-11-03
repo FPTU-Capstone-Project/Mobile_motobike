@@ -265,15 +265,17 @@ const HomeScreen = ({ navigation }) => {
       <StatusBar barStyle="dark-content" />
       <SafeAreaView style={styles.safe}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-          <GlassHeader
-            title={currentUserName || 'Người dùng'}
-            subtitle="Xin chào,"
-            onBellPress={() => {}}
-            statusChip={{
-              label: isWebSocketConnected ? 'Đã kết nối máy chủ' : 'Đang ngoại tuyến',
-              color: isWebSocketConnected ? 'success' : 'warning',
-            }}
-          />
+          <View style={styles.headerSpacing}>
+            <GlassHeader
+              title={currentUserName || 'Người dùng'}
+              subtitle="Xin chào,"
+              onBellPress={() => {}}
+              statusChip={{
+                label: isWebSocketConnected ? 'Đã kết nối máy chủ' : 'Đang ngoại tuyến',
+                color: isWebSocketConnected ? 'success' : 'warning',
+              }}
+            />
+          </View>
 
           <View style={styles.content}>
             {/* CTA đặt xe đơn giản */}
@@ -284,7 +286,7 @@ const HomeScreen = ({ navigation }) => {
                   <Text style={styles.cardSubtitle}>Bấm để chuyển đến trang đặt xe</Text>
                 </View>
                 <View style={styles.ctaButtonContainer}>
-                  <ModernButton title="Đặt xe ngay" icon="directions-car" onPress={handleBookRide} />
+                <ModernButton title="Đặt xe ngay" icon="directions-car" onPress={handleBookRide} />
                 </View>
               </CleanCard>
             </Animatable.View>
@@ -307,10 +309,13 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   scrollContent: { 
     paddingBottom: 160,
-    paddingTop: 24, // Add padding top to avoid header sticking to status bar
+    paddingTop: 24,
+  },
+  headerSpacing: {
+    marginBottom: 24,
   },
   content: {
-    paddingTop: 8,
+    paddingTop: 12,
     paddingHorizontal: 20,
     gap: 20,
   },
