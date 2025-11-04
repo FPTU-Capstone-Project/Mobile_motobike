@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import AppBackground from '../../components/layout/AppBackground.jsx';
 import CleanCard from '../../components/ui/CleanCard.jsx';
@@ -22,23 +22,25 @@ const ConversationsScreen = ({ navigation }) => {
         const data = await chatService.getConversations();
         const list = Array.isArray(data) ? data : [];
 
-        // Ensure Admin conversation is always present and pinned
-        const adminId = 0; // conventional id used in demo and backend mapping
-        const hasAdmin = list.some((c) => (c.otherUserId === adminId) || /admin/i.test(String(c.otherUserName || '')));
-        const adminThread = hasAdmin
-          ? null
-          : {
-              conversationId: 'admin-support',
-              otherUserId: adminId,
-              otherUserName: 'Admin',
-              lastMessage: 'Bấm để chat với Admin',
-              lastMessageTime: new Date().toISOString(),
-              unreadCount: 0,
-              rideRequestId: 'admin',
-            };
-
-        const normalized = adminThread ? [adminThread, ...list] : list;
-        setItems(normalized);
+        // Pin Admin on top; if not exists from backend, inject placeholder (non-navigable)
+        const isAdmin = (c) => /admin/i.test(String(c.otherUserName || '')) || c.otherUserId === 0;
+        const admin = list.find(isAdmin);
+        const others = list.filter((c) => !isAdmin(c));
+        const withAdmin = admin
+          ? [admin, ...others]
+          : [
+              {
+                conversationId: 'admin-placeholder',
+                otherUserId: null,
+                otherUserName: 'Admin',
+                lastMessage: 'Bấm để chat với Admin',
+                lastMessageTime: null,
+                unreadCount: 0,
+                rideRequestId: null,
+              },
+              ...others,
+            ];
+        setItems(withAdmin);
         const u = authService.getCurrentUser();
         const fullName = u?.user?.full_name || u?.user?.fullName || '';
         setDisplayName(fullName);
@@ -70,13 +72,22 @@ const ConversationsScreen = ({ navigation }) => {
     })();
   }, []);
 
-  const openConversation = (c) => {
+  const openConversation = async (c) => {
+    if (c?.rideRequestId && c?.otherUserId) {
+      navigation.navigate('ChatRoom', {
+        rideRequestId: c.rideRequestId,
+        receiverId: c.otherUserId,
+        title: c.otherUserName || 'Tin nhắn',
+      });
+      chatService.markRead(c.conversationId);
+      return;
+    }
+
+    // Placeholder Admin tapped → open chat immediately in support mode; send will resolve
     navigation.navigate('ChatRoom', {
-      rideRequestId: c.rideRequestId || 'admin',
-      receiverId: c.otherUserId ?? 0,
-      title: c.otherUserName || 'Admin',
+      title: 'Admin',
+      isSupport: true,
     });
-    chatService.markRead(c.conversationId);
   };
 
   const renderItem = ({ item }) => (

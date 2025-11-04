@@ -19,11 +19,6 @@ class ChatService {
     try {
       return await apiService.get(CHAT_ENDPOINTS.CONVERSATIONS);
     } catch (err) {
-      if (API_CONFIG.DEV?.DEMO_MODE) {
-        return [
-          { conversationId: 'demo-ride-1', otherUserId: 0, otherUserName: 'Admin', lastMessage: 'Xin chào!', lastMessageTime: new Date().toISOString(), unreadCount: 1, rideRequestId: 1 },
-        ];
-      }
       throw err;
     }
   }
@@ -33,7 +28,6 @@ class ChatService {
     try {
       return await apiService.get(CHAT_ENDPOINTS.MESSAGES(rideRequestId));
     } catch (err) {
-      if (API_CONFIG.DEV?.DEMO_MODE) return [];
       throw err;
     }
   }

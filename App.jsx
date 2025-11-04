@@ -31,6 +31,11 @@ import EditProfileScreen from './src/screens/profile/EditProfileScreen.jsx';
 import ChangePasswordScreen from './src/screens/profile/ChangePasswordScreen.jsx';
 // import ResetPasswordScreen from './src/screens/profile/ResetPasswordScreen.jsx';
 
+// Ride Screens
+import RideBookingScreen from './src/screens/ride/RideBookingScreen.jsx';
+import RiderMatchingScreen from './src/screens/ride/RiderMatchingScreen.jsx';
+import RideTrackingScreen from './src/screens/ride/RideTrackingScreen.jsx';
+
 // Driver Screens
 import DriverHomeScreen from './src/screens/driver/DriverHomeScreen.jsx';
 import DriverDashboardScreen from './src/screens/driver/DriverDashboardScreen.jsx';
@@ -227,6 +232,21 @@ export default function App() {
           <Stack.Screen 
             name="ChangePassword" 
             component={ChangePasswordScreen} 
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="RideBooking" 
+            component={RideBookingScreen} 
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="RiderMatching" 
+            component={RiderMatchingScreen} 
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="RideTracking" 
+            component={RideTrackingScreen} 
             options={{ headerShown: false }}
           />
         </Stack.Navigator>

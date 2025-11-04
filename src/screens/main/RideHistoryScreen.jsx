@@ -6,358 +6,371 @@ import {
   SafeAreaView,
   TouchableOpacity,
   ScrollView,
-  TextInput,
-  RefreshControl,
-  StatusBar,
+  TextInput
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import * as Animatable from 'react-native-animatable';
 import mockData from '../../data/mockData.json';
-import AppBackground from '../../components/layout/AppBackground.jsx';
-import GlassHeader from '../../components/ui/GlassHeader.jsx';
-import CleanCard from '../../components/ui/CleanCard.jsx';
-import { colors } from '../../theme/designTokens';
-
-const filterOptions = [
-  { key: 'all', label: 'Tất cả' },
-  { key: 'completed', label: 'Hoàn thành' },
-  { key: 'cancelled', label: 'Đã hủy' },
-];
-
-const statusSettings = {
-  completed: { color: '#22C55E', label: 'Hoàn thành' },
-  cancelled: { color: '#EF4444', label: 'Đã hủy' },
-  ongoing: { color: '#F97316', label: 'Đang diễn ra' },
-};
 
 const RideHistoryScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedFilter, setSelectedFilter] = useState('all');
-  const [refreshing, setRefreshing] = useState(false);
+  const [selectedFilter, setSelectedFilter] = useState('all'); // all, completed, cancelled
 
-  const rides = mockData.rides || [];
+  const rides = mockData.rides;
 
-  const filteredRides = rides.filter((ride) => {
-    const matchesSearch =
-      ride.dropoffLocation.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      ride.pickupLocation.toLowerCase().includes(searchQuery.toLowerCase());
-
+  const filteredRides = rides.filter(ride => {
+    const matchesSearch = ride.dropoffLocation.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         ride.pickupLocation.toLowerCase().includes(searchQuery.toLowerCase());
+    
     if (selectedFilter === 'all') return matchesSearch;
     return matchesSearch && ride.status === selectedFilter;
   });
 
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'completed':
+        return '#4CAF50';
+      case 'cancelled':
+        return '#F44336';
+      case 'ongoing':
+        return '#FF9800';
+      default:
+        return '#666';
+    }
+  };
+
+  const getStatusText = (status) => {
+    switch (status) {
+      case 'completed':
+        return 'Hoàn thành';
+      case 'cancelled':
+        return 'Đã hủy';
+      case 'ongoing':
+        return 'Đang diễn ra';
+      default:
+        return 'Không xác định';
+    }
+  };
+
   const formatDate = (dateString) => {
     const date = new Date(dateString);
-    return `${date.toLocaleDateString('vi-VN')} ${date.toLocaleTimeString('vi-VN', {
-      hour: '2-digit',
-      minute: '2-digit',
-    })}`;
+    return date.toLocaleDateString('vi-VN') + ' ' + date.toLocaleTimeString('vi-VN', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
   };
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 600);
-  };
+  const filterOptions = [
+    { key: 'all', label: 'Tất cả' },
+    { key: 'completed', label: 'Hoàn thành' },
+    { key: 'cancelled', label: 'Đã hủy' }
+  ];
 
   return (
-    <AppBackground>
-      <SafeAreaView style={styles.safe}>
-        <StatusBar barStyle="dark-content" />
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        >
-          <View style={styles.headerSpacing}>
-            <GlassHeader title="Lịch sử chuyến đi" subtitle="Theo dõi các chuyến đã thực hiện" />
-          </View>
+    <SafeAreaView style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Lịch sử chuyến đi</Text>
+      </View>
 
-          <Animatable.View animation="fadeInUp" duration={480} delay={40}>
-            <CleanCard style={styles.cardSpacing} contentStyle={styles.searchSection}>
-              <View style={styles.searchBar}>
-                <Icon name="search" size={20} color={colors.textMuted} />
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="Tìm kiếm theo địa điểm..."
-                  placeholderTextColor={colors.textMuted}
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                />
-                {searchQuery.length > 0 && (
-                  <TouchableOpacity onPress={() => setSearchQuery('')}>
-                    <Icon name="clear" size={18} color={colors.textMuted} />
-                  </TouchableOpacity>
-                )}
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <View style={styles.searchBar}>
+          <Icon name="search" size={20} color="#666" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Tìm kiếm theo địa điểm..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Icon name="clear" size={20} color="#666" />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
+      {/* Filter Tabs */}
+      <View style={styles.filterContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {filterOptions.map((option) => (
+            <TouchableOpacity
+              key={option.key}
+              style={[
+                styles.filterTab,
+                selectedFilter === option.key && styles.filterTabActive
+              ]}
+              onPress={() => setSelectedFilter(option.key)}
+            >
+              <Text style={[
+                styles.filterTabText,
+                selectedFilter === option.key && styles.filterTabTextActive
+              ]}>
+                {option.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
+      {/* Rides List */}
+      <ScrollView style={styles.ridesList} showsVerticalScrollIndicator={false}>
+        {filteredRides.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Icon name="history" size={64} color="#ccc" />
+            <Text style={styles.emptyStateText}>Không có chuyến đi nào</Text>
+            <Text style={styles.emptyStateSubtext}>
+              {searchQuery ? 'Không tìm thấy kết quả phù hợp' : 'Bạn chưa có chuyến đi nào'}
+            </Text>
+          </View>
+        ) : (
+          filteredRides.map((ride) => (
+            <TouchableOpacity key={ride.id} style={styles.rideCard}>
+              <View style={styles.rideHeader}>
+                <View style={styles.rideStatus}>
+                  <View style={[
+                    styles.statusDot,
+                    { backgroundColor: getStatusColor(ride.status) }
+                  ]} />
+                  <Text style={[
+                    styles.statusText,
+                    { color: getStatusColor(ride.status) }
+                  ]}>
+                    {getStatusText(ride.status)}
+                  </Text>
+                </View>
+                <Text style={styles.rideDate}>
+                  {formatDate(ride.date)}
+                </Text>
               </View>
 
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.filterRow}
-              >
-                {filterOptions.map((option) => {
-                  const active = selectedFilter === option.key;
-                  return (
-                    <TouchableOpacity
-                      key={option.key}
-                      onPress={() => setSelectedFilter(option.key)}
-                      style={[styles.filterChip, active && styles.filterChipActive]}
-                    >
-                      <Text style={[styles.filterText, active && styles.filterTextActive]}>
-                        {option.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            </CleanCard>
-          </Animatable.View>
+              <View style={styles.rideRoute}>
+                <View style={styles.routePoint}>
+                  <View style={styles.pickupDot} />
+                  <Text style={styles.locationText}>{ride.pickupLocation}</Text>
+                </View>
+                
+                <View style={styles.routeLine} />
+                
+                <View style={styles.routePoint}>
+                  <View style={styles.dropoffDot} />
+                  <Text style={styles.locationText}>{ride.dropoffLocation}</Text>
+                </View>
+              </View>
 
-          <Animatable.View animation="fadeInUp" duration={520} delay={120}>
-            {filteredRides.length === 0 ? (
-              <CleanCard style={styles.cardSpacing} contentStyle={styles.emptyState}>
-                <Icon name="history" size={48} color={colors.textMuted} />
-                <Text style={styles.emptyText}>Không có chuyến đi nào</Text>
-                <Text style={styles.emptySubtext}>
-                  {searchQuery ? 'Không tìm thấy kết quả phù hợp' : 'Bạn chưa có chuyến đi nào'}
+              <View style={styles.rideFooter}>
+                <View style={styles.rideInfo}>
+                  <View style={styles.infoItem}>
+                    <Icon name="schedule" size={16} color="#666" />
+                    <Text style={styles.infoText}>{ride.duration} phút</Text>
+                  </View>
+                  <View style={styles.infoItem}>
+                    <Icon name="motorcycle" size={16} color="#666" />
+                    <Text style={styles.infoText}>Xe máy</Text>
+                  </View>
+                </View>
+                <Text style={styles.fareText}>
+                  {ride.fare.toLocaleString()} VNĐ
                 </Text>
-              </CleanCard>
-            ) : (
-              filteredRides.map((ride) => {
-                const status = statusSettings[ride.status] || statusSettings.completed;
-                return (
-                  <CleanCard key={ride.id} style={styles.cardSpacing} contentStyle={styles.rideCard}>
-                    <View style={styles.rideHeader}>
-                      <View style={styles.rideStatus}>
-                        <View style={[styles.statusDot, { backgroundColor: status.color }]} />
-                        <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
-                      </View>
-                      <Text style={styles.rideDate}>{formatDate(ride.date)}</Text>
-                    </View>
+              </View>
 
-                    <View style={styles.route}>
-                      <View style={styles.routePoint}>
-                        <View style={styles.pickupDot} />
-                        <Text style={styles.locationText}>{ride.pickupLocation}</Text>
-                      </View>
-                      <View style={styles.routeLine} />
-                      <View style={styles.routePoint}>
-                        <View style={styles.dropoffDot} />
-                        <Text style={styles.locationText}>{ride.dropoffLocation}</Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.rideFooter}>
-                      <View style={styles.infoRow}>
-                        <View style={styles.infoItem}>
-                          <Icon name="schedule" size={16} color={colors.textMuted} />
-                          <Text style={styles.infoText}>{ride.duration} phút</Text>
-                        </View>
-                        <View style={styles.infoSeparator} />
-                        <View style={styles.infoItem}>
-                          <Icon name="motorcycle" size={16} color={colors.textMuted} />
-                          <Text style={styles.infoText}>Xe máy</Text>
-                        </View>
-                      </View>
-                      <Text style={styles.fareText}>{ride.fare.toLocaleString()} VNĐ</Text>
-                    </View>
-
-                    <TouchableOpacity style={styles.detailsButton}>
-                      <Text style={styles.detailsText}>Xem chi tiết</Text>
-                      <Icon name="chevron-right" size={16} color={colors.accent} />
-                    </TouchableOpacity>
-                  </CleanCard>
-                );
-              })
-            )}
-          </Animatable.View>
-        </ScrollView>
-      </SafeAreaView>
-    </AppBackground>
+              <TouchableOpacity style={styles.detailsButton}>
+                <Text style={styles.detailsButtonText}>Xem chi tiết</Text>
+                <Icon name="chevron-right" size={16} color="#666" />
+              </TouchableOpacity>
+            </TouchableOpacity>
+          ))
+        )}
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  safe: { flex: 1 },
-  scrollContent: {
-    paddingBottom: 140,
-    paddingTop: 24,
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
   },
-  headerSpacing: {
-    marginBottom: 24,
+  header: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    alignItems: 'center',
   },
-  cardSpacing: {
-    marginHorizontal: 20,
-    marginBottom: 18,
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#000',
   },
-  searchSection: {
-    paddingVertical: 18,
-    paddingHorizontal: 18,
+  searchContainer: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 20,
+    paddingBottom: 15,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.glassLight,
-    borderRadius: 18,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(148,163,184,0.25)',
+    backgroundColor: '#f8f8f8',
+    borderRadius: 10,
+    paddingHorizontal: 15,
+    height: 45,
   },
   searchInput: {
     flex: 1,
     marginLeft: 10,
-    fontFamily: 'Inter_500Medium',
-    fontSize: 14,
-    color: colors.textPrimary,
+    fontSize: 16,
   },
-  filterRow: {
-    marginTop: 16,
-    gap: 10,
+  filterContainer: {
+    backgroundColor: '#fff',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
-  filterChip: {
-    paddingHorizontal: 16,
+  filterTab: {
+    paddingHorizontal: 20,
     paddingVertical: 8,
-    borderRadius: 16,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: 'rgba(148,163,184,0.25)',
+    marginHorizontal: 5,
+    borderRadius: 20,
+    backgroundColor: '#f8f8f8',
   },
-  filterChipActive: {
-    backgroundColor: 'rgba(59,130,246,0.12)',
-    borderColor: 'rgba(59,130,246,0.35)',
+  filterTabActive: {
+    backgroundColor: '#000',
   },
-  filterText: {
-    fontSize: 13,
-    fontFamily: 'Inter_500Medium',
-    color: colors.textSecondary,
+  filterTabText: {
+    fontSize: 14,
+    color: '#666',
   },
-  filterTextActive: {
-    color: colors.accent,
+  filterTabTextActive: {
+    color: '#fff',
+  },
+  ridesList: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 15,
   },
   emptyState: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 36,
-    gap: 10,
+    paddingVertical: 100,
   },
-  emptyText: {
-    fontSize: 15,
-    fontFamily: 'Inter_600SemiBold',
-    color: colors.textPrimary,
+  emptyStateText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#666',
+    marginTop: 15,
   },
-  emptySubtext: {
-    fontSize: 13,
-    fontFamily: 'Inter_400Regular',
-    color: colors.textSecondary,
+  emptyStateSubtext: {
+    fontSize: 14,
+    color: '#999',
+    marginTop: 5,
     textAlign: 'center',
   },
   rideCard: {
-    paddingVertical: 20,
-    paddingHorizontal: 18,
-    gap: 16,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 15,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   rideHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 15,
   },
   rideStatus: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 14,
-    backgroundColor: 'rgba(148,163,184,0.12)',
   },
   statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
   },
   statusText: {
-    fontSize: 12,
-    fontFamily: 'Inter_600SemiBold',
+    fontSize: 14,
+    fontWeight: '500',
   },
   rideDate: {
     fontSize: 12,
-    fontFamily: 'Inter_400Regular',
-    color: colors.textMuted,
+    color: '#666',
   },
-  route: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
+  rideRoute: {
+    marginBottom: 15,
   },
   routePoint: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    flex: 1,
+    marginVertical: 5,
   },
   pickupDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.accent,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#4CAF50',
+    marginRight: 12,
   },
   dropoffDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#F97316',
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#F44336',
+    marginRight: 12,
   },
   routeLine: {
     width: 2,
-    height: 42,
-    backgroundColor: 'rgba(148,163,184,0.25)',
-    alignSelf: 'center',
+    height: 20,
+    backgroundColor: '#ddd',
+    marginLeft: 5,
+    marginVertical: 2,
   },
   locationText: {
-    fontSize: 14,
-    fontFamily: 'Inter_600SemiBold',
-    color: colors.textPrimary,
+    fontSize: 16,
+    color: '#000',
+    flex: 1,
   },
   rideFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 15,
   },
-  infoRow: {
+  rideInfo: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
   },
   infoItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-  },
-  infoSeparator: {
-    width: 1,
-    height: 14,
-    backgroundColor: 'rgba(148,163,184,0.25)',
+    marginRight: 15,
   },
   infoText: {
     fontSize: 12,
-    fontFamily: 'Inter_500Medium',
-    color: colors.textSecondary,
+    color: '#666',
+    marginLeft: 4,
   },
   fareText: {
-    fontSize: 16,
-    fontFamily: 'Inter_700Bold',
-    color: colors.textPrimary,
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#000',
   },
   detailsButton: {
     flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 4,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
   },
-  detailsText: {
-    fontSize: 13,
-    fontFamily: 'Inter_600SemiBold',
-    color: colors.accent,
+  detailsButtonText: {
+    fontSize: 14,
+    color: '#666',
+    marginRight: 5,
   },
 });
 

@@ -4,20 +4,57 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
 const ChatScreen = ({ route, navigation }) => {
-  const { title = 'Admin' } = route?.params || {};
+  const { title = 'Admin', receiverId: initReceiverId, rideRequestId: initRideRequestId, isSupport } = route?.params || {};
   const [input, setInput] = useState('');
-  const [messages, setMessages] = useState([
-    { id: '1', sender: 'other', text: 'Hi' },
-  ]);
+  const [messages, setMessages] = useState([]);
   const listRef = useRef(null);
   const insets = useSafeAreaInsets();
+  const [receiverId, setReceiverId] = useState(initReceiverId || null);
+  const [rideRequestId, setRideRequestId] = useState(initRideRequestId || null);
 
-  const send = () => {
+  const send = async () => {
     const text = input.trim();
     if (!text) return;
     setInput('');
     setMessages((prev) => [...prev, { id: String(Date.now()), sender: 'me', text }]);
     setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 0);
+
+    try {
+      // Resolve support conversation lazily
+      let targetReceiverId = receiverId;
+      let targetRideRequestId = rideRequestId;
+
+      if ((!targetReceiverId || !targetRideRequestId) && isSupport) {
+        const chatService = (await import('../../services/chatService')).default;
+        const refreshed = await chatService.getConversations();
+        const list = Array.isArray(refreshed) ? refreshed : [];
+        const admin = list.find((it) => /admin/i.test(String(it.otherUserName || '')) || it.otherUserId === 0);
+        if (admin?.otherUserId && admin?.rideRequestId) {
+          targetReceiverId = admin.otherUserId;
+          targetRideRequestId = admin.rideRequestId;
+          setReceiverId(targetReceiverId);
+          setRideRequestId(targetRideRequestId);
+        }
+      }
+
+      if (targetReceiverId && targetRideRequestId) {
+        const chatService = (await import('../../services/chatService')).default;
+        await chatService.sendMessage({ receiverId: targetReceiverId, rideRequestId: targetRideRequestId, content: text, messageType: 'TEXT' });
+        console.log('Message sent successfully to backend');
+      } else {
+        console.error('Cannot send message: missing receiverId or rideRequestId', { targetReceiverId, targetRideRequestId, isSupport });
+        // Remove the optimistic message since it failed
+        setMessages((prev) => prev.slice(0, -1));
+        setInput(text); // Restore input text
+        alert('Không thể gửi tin nhắn. Vui lòng thử lại sau.');
+      }
+    } catch (e) {
+      console.error('Error sending message:', e);
+      // Remove the optimistic message since it failed
+      setMessages((prev) => prev.slice(0, -1));
+      setInput(text); // Restore input text
+      alert('Lỗi khi gửi tin nhắn: ' + (e.message || 'Vui lòng thử lại sau.'));
+    }
   };
 
   const renderItem = ({ item }) => {
