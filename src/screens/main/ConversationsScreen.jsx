@@ -20,7 +20,25 @@ const ConversationsScreen = ({ navigation }) => {
     (async () => {
       try {
         const data = await chatService.getConversations();
-        setItems(Array.isArray(data) ? data : []);
+        const list = Array.isArray(data) ? data : [];
+
+        // Ensure Admin conversation is always present and pinned
+        const adminId = 0; // conventional id used in demo and backend mapping
+        const hasAdmin = list.some((c) => (c.otherUserId === adminId) || /admin/i.test(String(c.otherUserName || '')));
+        const adminThread = hasAdmin
+          ? null
+          : {
+              conversationId: 'admin-support',
+              otherUserId: adminId,
+              otherUserName: 'Admin',
+              lastMessage: 'Bấm để chat với Admin',
+              lastMessageTime: new Date().toISOString(),
+              unreadCount: 0,
+              rideRequestId: 'admin',
+            };
+
+        const normalized = adminThread ? [adminThread, ...list] : list;
+        setItems(normalized);
         const u = authService.getCurrentUser();
         const fullName = u?.user?.full_name || u?.user?.fullName || '';
         setDisplayName(fullName);
@@ -54,9 +72,9 @@ const ConversationsScreen = ({ navigation }) => {
 
   const openConversation = (c) => {
     navigation.navigate('ChatRoom', {
-      rideRequestId: c.rideRequestId,
-      receiverId: c.otherUserId,
-      title: c.otherUserName || 'Tin nhắn',
+      rideRequestId: c.rideRequestId || 'admin',
+      receiverId: c.otherUserId ?? 0,
+      title: c.otherUserName || 'Admin',
     });
     chatService.markRead(c.conversationId);
   };
@@ -90,6 +108,7 @@ const ConversationsScreen = ({ navigation }) => {
             contentContainerStyle={styles.list}
           />
         )}
+
       </SafeAreaView>
     </AppBackground>
   );

@@ -1,210 +1,180 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
-import Feather from 'react-native-vector-icons/Feather';
-import AppBackground from '../../components/layout/AppBackground.jsx';
-import CleanCard from '../../components/ui/CleanCard.jsx';
-import chatService from '../../services/chatService';
-import { colors } from '../../theme/designTokens';
-import authService from '../../services/authService';
-import { SoftBackHeader } from '../../components/ui/GlassHeader.jsx';
+import React, { useState, useRef } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, FlatList, TextInput, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-const POLL_INTERVAL_MS = 4000;
+import Icon from 'react-native-vector-icons/MaterialIcons';
 
 const ChatScreen = ({ route, navigation }) => {
-  const { rideRequestId, receiverId, title } = route?.params || {};
-  const [messages, setMessages] = useState([]);
+  const { title = 'Admin' } = route?.params || {};
   const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [roleLabel, setRoleLabel] = useState('');
-  const insets = useSafeAreaInsets();
+  const [messages, setMessages] = useState([
+    { id: '1', sender: 'other', text: 'Hi' },
+  ]);
   const listRef = useRef(null);
-  const lastId = useMemo(() => (messages.length ? messages[messages.length - 1].id : undefined), [messages]);
+  const insets = useSafeAreaInsets();
 
-  useEffect(() => {
-    // compute role label once on mount
-    const u = authService.getCurrentUser();
-    const userType = (u?.user?.user_type || '').toLowerCase();
-    const userStatus = (u?.user?.status || '').toLowerCase();
-    const hasDriverProfile = !!u?.driver_profile;
-    const hasRiderProfile = !!u?.rider_profile;
-    const isPending = userStatus === 'pending';
-    const missingRequiredProfile =
-      (userType === 'driver' && !hasDriverProfile) ||
-      (userType === 'rider' && !hasRiderProfile);
-
-    let label = 'Chưa xác minh';
-    if (!isPending && !missingRequiredProfile) {
-      if (userType === 'driver' || hasDriverProfile) {
-        label = 'Tài xế';
-      } else if (userType === 'rider' || hasRiderProfile) {
-        label = 'Hành khách';
-      }
-    }
-    setRoleLabel(label);
-
-    let timer;
-    const load = async () => {
-      try {
-        const data = await chatService.listMessages(rideRequestId);
-        const dedup = new Map();
-        data.forEach((m) => {
-          const key = m.id ?? `${m.createdAt}-${m.sender}`;
-          dedup.set(key, { ...m, id: key });
-        });
-        setMessages(Array.from(dedup.values()).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)));
-      } finally {
-        setLoading(false);
-      }
-    };
-    const poll = async () => {
-      try {
-        const delta = await chatService.listMessages(rideRequestId);
-        if (Array.isArray(delta) && delta.length) {
-          setMessages((prev) => {
-            const map = new Map(prev.map((m) => [m.id, m]));
-            delta.forEach((m) => {
-              const key = m.id ?? `${m.createdAt}-${m.sender}`;
-              map.set(key, { ...m, id: key });
-            });
-            return Array.from(map.values()).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-          });
-        }
-      } catch {}
-      timer = setTimeout(poll, POLL_INTERVAL_MS);
-    };
-    load().then(() => {
-      timer = setTimeout(poll, POLL_INTERVAL_MS);
-    });
-    return () => timer && clearTimeout(timer);
-  }, []);
-
-  const handleSend = async () => {
+  const send = () => {
     const text = input.trim();
     if (!text) return;
     setInput('');
-    const optimistic = { id: `tmp-${Date.now()}`, senderId: 'me', content: text, sentAt: new Date().toISOString(), _optimistic: true };
-    setMessages((prev) => [...prev, optimistic]);
-    try {
-      const saved = await chatService.sendMessage({ receiverId, rideRequestId, content: text });
-      if (saved) {
-        setMessages((prev) => prev.map((m) => (m.id === optimistic.id ? saved : m)));
-      }
-    } catch (e) {
-      // revert optimistic
-      setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
-    }
+    setMessages((prev) => [...prev, { id: String(Date.now()), sender: 'me', text }]);
+    setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 0);
   };
 
   const renderItem = ({ item }) => {
-    const isUser = !item.senderId || item.senderId === 'me' || item.senderId === receiverId ? false : true; // best-effort
-    const text = item.text ?? item.content;
+    const isOther = item.sender === 'other';
     return (
-      <View style={[styles.msgRow, isUser ? styles.rowEnd : styles.rowStart]}>
-        <View style={[styles.bubble, isUser ? styles.userBubble : styles.adminBubble]}>
-          <Text style={[styles.bubbleText, isUser ? styles.userText : styles.adminText]}>{text}</Text>
+      <View style={[styles.msgRow, isOther ? styles.rowStart : styles.rowEnd]}>
+        {isOther && (
+          <View style={styles.avatarSmall}>
+            <Icon name="person" size={18} color="#374151" />
+          </View>
+        )}
+        <View style={[styles.bubble, isOther ? styles.otherBubble : styles.meBubble]}>
+          <Text style={[styles.bubbleText, isOther ? styles.otherText : styles.meText]}>{item.text}</Text>
         </View>
       </View>
     );
   };
 
+  const hasText = !!input.trim();
+
   return (
-    <AppBackground>
-      <SafeAreaView style={styles.safe}>
-        <View style={{ paddingTop: Math.max(insets.top || 0, 8) }}>
-          <SoftBackHeader title={title || 'Tin nhắn'} subtitle={roleLabel || ' '} onBackPress={() => navigation.goBack()} />
-        </View>
-
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex} keyboardVerticalOffset={84}>
-          <CleanCard style={styles.flex} contentStyle={styles.messagesCard}>
-            <FlatList
-              ref={listRef}
-              data={messages}
-              keyExtractor={(item) => String(item.id)}
-              renderItem={renderItem}
-              contentContainerStyle={styles.listContent}
-              onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
-            />
-          </CleanCard>
-
-          <View style={styles.inputRow}>
-            <TextInput
-              placeholder="Nhập tin nhắn..."
-              value={input}
-              onChangeText={setInput}
-              style={styles.input}
-              placeholderTextColor={colors.textMuted}
-            />
-            <TouchableOpacity style={styles.sendBtn} onPress={handleSend} disabled={!input.trim()}>
-              <Feather name="send" size={18} color="#fff" />
-            </TouchableOpacity>
+    <SafeAreaView style={styles.safe}>
+      {/* Header */}
+      <View style={[styles.header, { paddingTop: Math.max(insets.top || 0, 12) }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBtn}>
+          <Icon name="arrow-back" size={22} color="#111827" />
+        </TouchableOpacity>
+        <View style={styles.headerCenter}>
+          <View style={styles.avatar}>
+            <Icon name="person" size={24} color="#fff" />
           </View>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
-    </AppBackground>
+          <Text style={styles.headerTitle}>{title}</Text>
+        </View>
+        {/* Right-side actions removed per design */}
+      </View>
+      {/* List */}
+      <FlatList
+        ref={listRef}
+        data={messages}
+        keyExtractor={(it) => it.id}
+        renderItem={renderItem}
+        contentContainerStyle={styles.list}
+        onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
+      />
+
+      {/* Input */}
+      <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom || 0, 12) }]}>
+        <TouchableOpacity style={styles.cameraBtn}>
+          <Icon name="photo-camera" size={20} color="#111827" />
+        </TouchableOpacity>
+        <TextInput
+          style={styles.input}
+          placeholder="Message.."
+          placeholderTextColor="#9CA3AF"
+          value={input}
+          onChangeText={setInput}
+        />
+        <TouchableOpacity
+          style={styles.sendBtn}
+          onPress={send}
+          disabled={!hasText}
+        >
+          <Text style={[styles.sendText, hasText ? styles.sendTextEnabled : styles.sendTextDisabled]}>SEND</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 },
-  safe: { flex: 1 },
-  // header replaced by SoftBackHeader for consistent spacing
-  messagesCard: {
-    flex: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 12,
-  },
-  listContent: {
-    paddingHorizontal: 6,
-    paddingBottom: 8,
-  },
-  msgRow: {
-    flexDirection: 'row',
-    marginVertical: 6,
-  },
-  rowStart: { justifyContent: 'flex-start' },
-  rowEnd: { justifyContent: 'flex-end' },
-  bubble: {
-    maxWidth: '78%',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 14,
-  },
-  adminBubble: {
-    backgroundColor: '#EEF2FF',
-    borderWidth: 1,
-    borderColor: 'rgba(148,163,184,0.35)'
-  },
-  userBubble: {
-    backgroundColor: colors.accent,
-  },
-  adminText: { color: colors.textPrimary },
-  userText: { color: '#fff' },
-  inputRow: {
+  safe: { flex: 1, backgroundColor: '#F3F4F6' },
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingBottom: 12,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E5E7EB',
   },
-  input: {
-    flex: 1,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: 'rgba(148,163,184,0.25)',
+  headerBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerCenter: { flexDirection: 'row', alignItems: 'center', flex: 1, marginHorizontal: 8 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#60A5FA',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  avatarSmall: {
+    width: 28,
+    height: 28,
     borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    color: colors.textPrimary,
+    backgroundColor: '#E5E7EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
   },
-  sendBtn: {
+  headerTitle: { fontSize: 16, color: '#111827', fontWeight: '600' },
+  list: { paddingHorizontal: 16, paddingVertical: 16 },
+  msgRow: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 12 },
+  rowStart: { justifyContent: 'flex-start' },
+  rowEnd: { justifyContent: 'flex-end', alignSelf: 'flex-end' },
+  // Simple bubbles
+  bubble: { maxWidth: '72%', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 16 },
+  otherBubble: { backgroundColor: '#ffffff', borderTopLeftRadius: 6, borderWidth: 1, borderColor: '#E5E7EB' },
+  meBubble: { backgroundColor: '#93C5FD', borderTopRightRadius: 6 },
+  otherText: { color: '#111827' },
+  meText: { color: '#ffffff' },
+  bubbleText: { fontSize: 15 },
+  inputBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    gap: 10,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#E5E7EB',
+  },
+  cameraBtn: {
     width: 44,
     height: 44,
     borderRadius: 22,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.accent,
   },
+  input: {
+    flex: 1,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 16,
+    color: '#111827',
+  },
+  sendBtn: {
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendText: { fontWeight: '700', letterSpacing: 1, fontSize: 15 },
+  sendTextEnabled: { color: '#10B981' },
+  sendTextDisabled: { color: '#9CA3AF' },
 });
 
 export default ChatScreen;
