@@ -49,12 +49,13 @@ const EditProfileScreen = ({ navigation }) => {
       const currentUser = authService.getCurrentUser();
       const profile = currentUser || (await profileService.getCurrentUserProfile());
       setUser(profile);
+      const primaryEmergencyContact = profile?.emergencyContacts?.find(ec => ec.primary);
       setFormData({
         fullName: profile?.user?.full_name || '',
         email: profile?.user?.email || '',
         phone: profile?.user?.phone || '',
         studentId: profile?.user?.student_id || '',
-        emergencyContact: profile?.rider_profile?.emergency_contact || '',
+        emergencyContact: primaryEmergencyContact?.phone || '',
       });
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -128,20 +129,28 @@ const EditProfileScreen = ({ navigation }) => {
         name: 'avatar.jpg',
       };
       await profileService.updateAvatar(avatarFile);
-      const freshProfile = await profileService.getCurrentUserProfile();
-      if (freshProfile) {
-        setUser(freshProfile);
-        setFormData({
-          fullName: freshProfile.user?.full_name || '',
-          email: freshProfile.user?.email || '',
-          phone: freshProfile.user?.phone || '',
-          studentId: freshProfile.user?.student_id || '',
-          emergencyContact: freshProfile.rider_profile?.emergency_contact || '',
-        });
+      // Refresh profile after avatar update
+      try {
+        const freshProfile = await profileService.getCurrentUserProfile();
+        if (freshProfile) {
+          setUser(freshProfile);
+          const primaryEmergencyContact = freshProfile?.emergencyContacts?.find(ec => ec.primary);
+          setFormData({
+            fullName: freshProfile.user?.full_name || '',
+            email: freshProfile.user?.email || '',
+            phone: freshProfile.user?.phone || '',
+            studentId: freshProfile.user?.student_id || '',
+            emergencyContact: primaryEmergencyContact?.phone || '',
+          });
+        }
+      } catch (refreshError) {
+        console.error('Error refreshing profile after avatar update:', refreshError);
+        // Continue even if refresh fails
       }
       setSelectedAvatar(null);
       Alert.alert('Thành công', 'Ảnh đại diện đã được cập nhật.');
     } catch (error) {
+      console.error('Upload avatar error:', error);
       let errorMessage = 'Không thể cập nhật ảnh đại diện';
       if (error instanceof ApiError) {
         errorMessage = error.message || errorMessage;
@@ -171,8 +180,8 @@ const EditProfileScreen = ({ navigation }) => {
       const payload = {
         fullName: formData.fullName,
         phone: formData.phone,
-        studentId: formData.studentId,
-        emergencyContact: formData.emergencyContact,
+        studentId: formData.studentId || null,
+        emergencyContact: formData.emergencyContact || null,
       };
       await profileService.updateProfile(payload);
       Alert.alert('Thành công', 'Thông tin hồ sơ đã được cập nhật.', [

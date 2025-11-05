@@ -21,6 +21,7 @@ import ConversationsScreen from './src/screens/main/ConversationsScreen.jsx';
 import ChatScreen from './src/screens/main/ChatScreen.jsx';
 import QRPaymentScreen from './src/screens/main/QRPaymentScreen.jsx';
 import ProfileSwitchScreen from './src/screens/main/ProfileSwitchScreen.jsx';
+import AccountVerificationScreen from './src/screens/main/AccountVerificationScreen.jsx';
 
 // Verification Screens
 import StudentVerificationScreen from './src/screens/verification/StudentVerificationScreen.jsx';
@@ -212,6 +213,11 @@ export default function App() {
           <Stack.Screen 
             name="ProfileSwitch" 
             component={ProfileSwitchScreen} 
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="AccountVerification" 
+            component={AccountVerificationScreen} 
             options={{ headerShown: false }}
           />
           <Stack.Screen 

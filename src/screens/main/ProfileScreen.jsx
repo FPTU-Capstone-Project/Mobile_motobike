@@ -88,13 +88,7 @@ const ProfileScreen = ({ navigation }) => {
     { icon: 'swap-horiz', title: 'Chuyển đổi chế độ', onPress: () => navigation.navigate('ProfileSwitch') },
     { icon: 'edit', title: 'Chỉnh sửa thông tin', onPress: () => navigation.navigate('EditProfile') },
     { icon: 'security', title: 'Đổi mật khẩu', onPress: () => navigation.navigate('ChangePassword') },
-    {
-      icon: 'verified',
-      title: 'Xác minh tài khoản',
-      onPress: () => {
-        navigation.navigate('ProfileSwitch');
-      },
-    },
+    { icon: 'verified', title: 'Xác minh tài khoản', onPress: () => navigation.navigate('AccountVerification') },
     { icon: 'help', title: 'Trợ giúp & Hỗ trợ', onPress: () => Alert.alert('Thông báo', 'Chức năng đang phát triển') },
     { icon: 'policy', title: 'Điều khoản sử dụng', onPress: () => Alert.alert('Thông báo', 'Chức năng đang phát triển') },
     { icon: 'info', title: 'Về chúng tôi', onPress: () => Alert.alert('Thông báo', 'Chức năng đang phát triển') },
