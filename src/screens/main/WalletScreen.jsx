@@ -279,8 +279,9 @@ const WalletScreen = ({ navigation }) => {
             <GlassHeader title="Ví của tôi" subtitle="Quản lý giao dịch" />
           </View>
 
-          <Animatable.View animation="fadeInUp" duration={500}>
-            <CleanCard style={styles.cardSpacing} contentStyle={styles.balanceCardContent}>
+          <View style={styles.content}>
+            <Animatable.View animation="fadeInUp" duration={500}>
+              <CleanCard style={styles.card} contentStyle={styles.balanceCardContent}>
               <LinearGradient
                 colors={['#F0F9FF', '#E6F7FF', '#E0F7FA', '#B2EBF2', '#E1BEE7']}
                 start={{ x: 0, y: 0 }}
@@ -319,11 +320,11 @@ const WalletScreen = ({ navigation }) => {
                   </TouchableOpacity>
                 </View>
               </LinearGradient>
-            </CleanCard>
-          </Animatable.View>
+              </CleanCard>
+            </Animatable.View>
 
-          <Animatable.View animation="fadeInUp" duration={500} delay={80}>
-            <CleanCard style={styles.cardSpacing} contentStyle={styles.quickCardContent}>
+            <Animatable.View animation="fadeInUp" duration={500} delay={80}>
+              <CleanCard style={styles.card} contentStyle={styles.quickCardContent}>
               <Text style={styles.sectionTitle}>Nạp nhanh</Text>
               <View style={styles.quickAmountsList}>
                 {quickTopUpAmounts.map((amount) => (
@@ -336,12 +337,12 @@ const WalletScreen = ({ navigation }) => {
                   </TouchableOpacity>
                 ))}
               </View>
-            </CleanCard>
-          </Animatable.View>
+              </CleanCard>
+            </Animatable.View>
 
-          {(walletData?.totalToppedUp > 0 || walletData?.totalSpent > 0) && (
-            <Animatable.View animation="fadeInUp" duration={500} delay={140}>
-              <CleanCard style={styles.cardSpacing} contentStyle={styles.statsCardContent}>
+            {(walletData?.totalToppedUp > 0 || walletData?.totalSpent > 0) && (
+              <Animatable.View animation="fadeInUp" duration={500} delay={140}>
+                <CleanCard style={styles.card} contentStyle={styles.statsCardContent}>
                 <Text style={styles.sectionTitle}>Thống kê</Text>
                 <View style={styles.statsContainer}>
                   <View style={styles.statItem}>
@@ -360,12 +361,12 @@ const WalletScreen = ({ navigation }) => {
                     <Text style={styles.statLabel}>Tổng chi</Text>
                   </View>
                 </View>
-              </CleanCard>
-            </Animatable.View>
-          )}
+                </CleanCard>
+              </Animatable.View>
+            )}
 
-          <Animatable.View animation="fadeInUp" duration={500} delay={200}>
-            <CleanCard style={styles.cardSpacing} contentStyle={styles.transactionCardContent}>
+            <Animatable.View animation="fadeInUp" duration={500} delay={200}>
+              <CleanCard style={styles.card} contentStyle={styles.transactionCardContent}>
               <View style={styles.transactionHeader}>
                 <Text style={styles.sectionTitle}>Lịch sử giao dịch</Text>
                 {loadingTransactions && <ActivityIndicator size="small" color={colors.accent} />}
@@ -403,8 +404,9 @@ const WalletScreen = ({ navigation }) => {
                 })
               )}
 
-            </CleanCard>
-          </Animatable.View>
+              </CleanCard>
+            </Animatable.View>
+          </View>
         </ScrollView>
 
         {renderTopUpModal()}
@@ -498,15 +500,19 @@ const WalletScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   scrollContent: {
-    paddingBottom: 140,
+    paddingBottom: 160,
     paddingTop: 24,
   },
   headerSpacing: {
     marginBottom: 24,
   },
-  cardSpacing: {
-    marginHorizontal: 20,
-    marginBottom: 20,
+  content: {
+    paddingTop: 12,
+    paddingHorizontal: 20,
+    gap: 20,
+  },
+  card: {
+    marginBottom: 12,
   },
   balanceCardContent: {
     padding: 0,

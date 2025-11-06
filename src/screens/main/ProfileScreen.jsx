@@ -125,6 +125,9 @@ const ProfileScreen = ({ navigation }) => {
     );
   }
 
+  // Check if user is verified (both email and phone must be verified)
+  const isVerified = user.user?.email_verified && user.user?.phone_verified;
+
   return (
     <AppBackground>
       <SafeAreaView style={styles.safe}>
@@ -154,17 +157,17 @@ const ProfileScreen = ({ navigation }) => {
                   <Text style={styles.studentId}>MSSV: {user.user?.student_id || 'Chưa cập nhật'}</Text>
                   <View style={styles.verificationStatus}>
                     <Icon
-                      name={authService.isRiderVerified() ? 'verified' : 'pending'}
+                      name={isVerified ? 'verified' : 'pending'}
                       size={16}
-                      color={authService.isRiderVerified() ? '#22C55E' : '#F97316'}
+                      color={isVerified ? '#22C55E' : '#F97316'}
                     />
                     <Text
                       style={[
                         styles.verificationText,
-                        { color: authService.isRiderVerified() ? '#22C55E' : '#F97316' },
+                        { color: isVerified ? '#22C55E' : '#F97316' },
                       ]}
                     >
-                      {authService.isRiderVerified() ? 'Đã xác minh' : 'Chưa xác minh'}
+                      {isVerified ? 'Đã xác minh' : 'Chưa xác minh'}
                     </Text>
                   </View>
                 </View>

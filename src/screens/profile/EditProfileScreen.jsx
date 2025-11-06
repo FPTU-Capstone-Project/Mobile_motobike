@@ -131,17 +131,17 @@ const EditProfileScreen = ({ navigation }) => {
       await profileService.updateAvatar(avatarFile);
       // Refresh profile after avatar update
       try {
-        const freshProfile = await profileService.getCurrentUserProfile();
-        if (freshProfile) {
-          setUser(freshProfile);
+      const freshProfile = await profileService.getCurrentUserProfile();
+      if (freshProfile) {
+        setUser(freshProfile);
           const primaryEmergencyContact = freshProfile?.emergencyContacts?.find(ec => ec.primary);
-          setFormData({
-            fullName: freshProfile.user?.full_name || '',
-            email: freshProfile.user?.email || '',
-            phone: freshProfile.user?.phone || '',
-            studentId: freshProfile.user?.student_id || '',
+        setFormData({
+          fullName: freshProfile.user?.full_name || '',
+          email: freshProfile.user?.email || '',
+          phone: freshProfile.user?.phone || '',
+          studentId: freshProfile.user?.student_id || '',
             emergencyContact: primaryEmergencyContact?.phone || '',
-          });
+        });
         }
       } catch (refreshError) {
         console.error('Error refreshing profile after avatar update:', refreshError);
