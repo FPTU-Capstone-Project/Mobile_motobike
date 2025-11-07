@@ -3,10 +3,19 @@ export const API_CONFIG = {
   // Development - Use your computer's IP address instead of localhost
   // To find your IP: Windows: ipconfig | Mac/Linux: ifconfig
   DEV: {
-    BASE_URL: 'http://192.168.101.143:8080/api/v1', // Updated to current machine IP
-    // Alternative IPs to try if above doesn't work:
-    // BASE_URL: 'http://192.168.2.15:8080/api/v1', // Previous IP
-    // BASE_URL: 'http://172.20.10.2:8080/api/v1', // iOS simulator
+    // IMPORTANT: Backend runs on port 8081 (not 8080)
+    // For Android Emulator: Use 10.0.2.2 to access host machine's localhost
+    // For iOS Simulator: Use localhost or your actual network IP
+    // For Physical Device: Use your computer's network IP (e.g., 192.168.1.9)
+    
+    // Android Emulator (recommended for Android)
+    BASE_URL: 'http://10.0.2.2:8081/api/v1',
+    
+    // Alternative configurations (uncomment if needed):
+    // BASE_URL: 'http://192.168.101.143:8081/api/v1', // Physical device or iOS simulator - replace with your IP
+    // BASE_URL: 'http://localhost:8081/api/v1', // iOS simulator only
+    // BASE_URL: 'http://172.20.10.2:8081/api/v1', // iOS simulator alternative
+    
     TIMEOUT: 10000,
     DEMO_MODE: false, // Disable demo mode to use real backend
   },
