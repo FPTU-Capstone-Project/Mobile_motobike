@@ -17,8 +17,6 @@ import ProfileScreen from './src/screens/main/ProfileScreen.jsx';
 import WalletScreen from './src/screens/main/WalletScreen.jsx';
 import RideHistoryScreen from './src/screens/main/RideHistoryScreen.jsx';
 import RideDetailsScreen from './src/screens/RideDetailsScreen.jsx';
-import ConversationsScreen from './src/screens/main/ConversationsScreen.jsx';
-import ChatScreen from './src/screens/main/ChatScreen.jsx';
 import QRPaymentScreen from './src/screens/main/QRPaymentScreen.jsx';
 import ProfileSwitchScreen from './src/screens/main/ProfileSwitchScreen.jsx';
 import AccountVerificationScreen from './src/screens/main/AccountVerificationScreen.jsx';
@@ -49,8 +47,6 @@ import SOSAlertScreen from './src/screens/driver/SOSAlertScreen.jsx';
 import DriverTabNavigator from './src/navigation/DriverTabNavigator.jsx';
 import GlassTabBar from './src/components/ui/GlassTabBar.jsx';
 
-// Messages
-
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
@@ -72,8 +68,6 @@ function MainTabs() {
             iconName = 'home';
           } else if (route.name === 'Wallet') {
             iconName = 'account-balance-wallet';
-          } else if (route.name === 'Messages') {
-            iconName = 'chat';
           } else if (route.name === 'History') {
             iconName = 'history';
           } else if (route.name === 'Profile') {
@@ -90,7 +84,6 @@ function MainTabs() {
     >
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Wallet" component={WalletScreen} />
-      <Tab.Screen name="Messages" component={ConversationsScreen} />
       <Tab.Screen name="History" component={RideHistoryScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
@@ -153,16 +146,6 @@ export default function App() {
           <Stack.Screen 
             name="Main" 
             component={MainTabs} 
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen 
-            name="Conversations" 
-            component={ConversationsScreen} 
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen 
-            name="ChatRoom" 
-            component={ChatScreen} 
             options={{ headerShown: false }}
           />
           <Stack.Screen 
