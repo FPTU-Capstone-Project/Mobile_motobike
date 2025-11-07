@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   TextInput,
   Alert,
@@ -12,7 +11,9 @@ import {
   Platform,
   KeyboardAvoidingView,
   ScrollView,
+  StatusBar,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Animatable from 'react-native-animatable';
@@ -27,10 +28,16 @@ import ModernButton from '../../components/ModernButton.jsx';
 import AddressInput from '../../components/AddressInput';
 import GoongMap from '../../components/GoongMap.jsx';
 import addressValidation from '../../utils/addressValidation';
+import { SoftBackHeader } from '../../components/ui/GlassHeader.jsx';
+import CleanCard from '../../components/ui/CleanCard.jsx';
+import AppBackground from '../../components/layout/AppBackground.jsx';
+import { colors, gradients, radii, spacing, shadows, typography } from '../../theme/designTokens';
 
 const { width, height } = Dimensions.get('window');
 
 const RideBookingScreen = ({ navigation, route }) => {
+  // Get safe area insets for proper header positioning
+  const insets = useSafeAreaInsets();
   // Location states
   const [currentLocation, setCurrentLocation] = useState(null);
   const [pickupLocation, setPickupLocation] = useState(null);
@@ -439,33 +446,37 @@ const RideBookingScreen = ({ navigation, route }) => {
 
   if (loadingLocation) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4CAF50" />
-          <Text style={styles.loadingText}>Đang lấy vị trí hiện tại...</Text>
-        </View>
-      </SafeAreaView>
+      <AppBackground>
+        <SafeAreaView style={styles.container} edges={['top']}>
+          <SoftBackHeader
+            title="Đặt xe"
+            onBackPress={() => navigation.goBack()}
+            floating={false}
+          />
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.accent} />
+            <Text style={styles.loadingText}>Đang lấy vị trí hiện tại...</Text>
+          </View>
+        </SafeAreaView>
+      </AppBackground>
     );
   }
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-    >
-      <SafeAreaView style={styles.container}>
-        {/* Header with Back Button */}
-        <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Icon name="arrow-back" size={24} color="#333" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Đặt xe</Text>
-          <View style={styles.headerSpacer} />
-        </View>
+    <AppBackground>
+      <KeyboardAvoidingView 
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        <SafeAreaView style={styles.container} edges={['top']}>
+          {/* Header with Back Button */}
+          <SoftBackHeader
+            title="Đặt xe"
+            onBackPress={() => navigation.goBack()}
+            floating={true}
+            topOffset={insets.top + 8}
+          />
 
         {/* Map */}
       {goongService.isMapsConfigured() ? (
@@ -502,7 +513,7 @@ const RideBookingScreen = ({ navigation, route }) => {
       {(isSelectingPickup || isSelectingDropoff) && (
         <View style={styles.selectionOverlay}>
           <View style={styles.crosshair}>
-            <Icon name="my-location" size={30} color="#4CAF50" />
+            <Icon name="my-location" size={30} color={colors.accent} />
           </View>
           <Animatable.View 
             animation="slideInUp" 
@@ -526,20 +537,24 @@ const RideBookingScreen = ({ navigation, route }) => {
 
       {/* Control Buttons */}
       <View style={styles.controlButtons}>
-        <TouchableOpacity
-          style={styles.controlButton}
-          onPress={() => centerMapToLocation(currentLocation)}
-        >
-          <Icon name="my-location" size={24} color="#4CAF50" />
-        </TouchableOpacity>
-        
-        {pickupLocation && dropoffLocation && (
+        <CleanCard style={styles.controlButtonCard}>
           <TouchableOpacity
             style={styles.controlButton}
-            onPress={fitMapToMarkers}
+            onPress={() => centerMapToLocation(currentLocation)}
           >
-            <Icon name="zoom-out-map" size={24} color="#4CAF50" />
+            <Icon name="my-location" size={22} color={colors.accent} />
           </TouchableOpacity>
+        </CleanCard>
+        
+        {pickupLocation && dropoffLocation && (
+          <CleanCard style={styles.controlButtonCard}>
+            <TouchableOpacity
+              style={styles.controlButton}
+              onPress={fitMapToMarkers}
+            >
+              <Icon name="zoom-out-map" size={22} color={colors.accent} />
+            </TouchableOpacity>
+          </CleanCard>
         )}
       </View>
 
@@ -550,74 +565,94 @@ const RideBookingScreen = ({ navigation, route }) => {
       >
         {!showQuote ? (
           <>
-            {/* Location Inputs */}
-            <View style={styles.locationInputs}>
-              <AddressInput
-                value={pickupAddress}
-                onChangeText={setPickupAddress}
-                onLocationSelect={(location) => {
-                  setPickupLocation(location);
-                  setPickupAddress(location.address);
-                }}
-                placeholder="Chọn điểm đón"
-                iconName="radio-button-checked"
-                iconColor="#4CAF50"
-                style={styles.addressInput}
-                isPickupInput={true}
-                currentLocation={currentLocation}
-              />
-              
-              {/* Pickup location selection button */}
-              <TouchableOpacity 
-                style={styles.mapSelectionButton}
-                onPress={() => setIsSelectingPickup(true)}
-              >
-                <Icon name="my-location" size={16} color="#4CAF50" />
-                <Text style={styles.mapSelectionText}>Chọn trên bản đồ</Text>
-              </TouchableOpacity>
+            {/* Location Inputs Card */}
+            <CleanCard style={styles.locationCard}>
+              <View style={styles.locationInputs}>
+                <View style={styles.locationInputRow}>
+                  <View style={styles.locationIconContainer}>
+                    <Icon name="radio-button-checked" size={20} color={colors.accent} />
+                  </View>
+                  <View style={styles.locationInputContent}>
+                    <Text style={styles.locationLabel}>Điểm đón</Text>
+                    <AddressInput
+                      value={pickupAddress}
+                      onChangeText={setPickupAddress}
+                      onLocationSelect={(location) => {
+                        setPickupLocation(location);
+                        setPickupAddress(location.address);
+                      }}
+                      placeholder="Chọn điểm đón"
+                      iconName="radio-button-checked"
+                      iconColor={colors.accent}
+                      style={styles.addressInput}
+                      isPickupInput={true}
+                      currentLocation={currentLocation}
+                    />
+                  </View>
+                </View>
+                
+                {/* Pickup location selection button */}
+                <TouchableOpacity 
+                  style={styles.mapSelectionButton}
+                  onPress={() => setIsSelectingPickup(true)}
+                >
+                  <Icon name="my-location" size={16} color={colors.accent} />
+                  <Text style={styles.mapSelectionText}>Chọn trên bản đồ</Text>
+                </TouchableOpacity>
 
-              <View style={styles.locationDivider}>
-                <View style={styles.dividerLine} />
-                <Icon name="more-vert" size={16} color="#ccc" />
-                <View style={styles.dividerLine} />
+                <View style={styles.locationDivider}>
+                  <View style={styles.dividerLine} />
+                  <Icon name="more-vert" size={16} color={colors.textMuted} />
+                  <View style={styles.dividerLine} />
+                </View>
+
+                <View style={styles.locationInputRow}>
+                  <View style={styles.locationIconContainer}>
+                    <Icon name="location-on" size={20} color="#F44336" />
+                  </View>
+                  <View style={styles.locationInputContent}>
+                    <Text style={styles.locationLabel}>Điểm đến</Text>
+                    <AddressInput
+                      value={dropoffAddress}
+                      onChangeText={setDropoffAddress}
+                      onLocationSelect={(location) => {
+                        setDropoffLocation(location);
+                        setDropoffAddress(location.address);
+                      }}
+                      placeholder="Chọn điểm đến"
+                      iconName="location-on"
+                      iconColor="#F44336"
+                      style={styles.addressInput}
+                    />
+                  </View>
+                </View>
+              
+                {/* Dropoff location selection button */}
+                <TouchableOpacity 
+                  style={[styles.mapSelectionButton, { marginTop: spacing.xs }]}
+                  onPress={() => setIsSelectingDropoff(true)}
+                >
+                  <Icon name="my-location" size={16} color="#F44336" />
+                  <Text style={styles.mapSelectionText}>Chọn trên bản đồ</Text>
+                </TouchableOpacity>
               </View>
-
-              <AddressInput
-                value={dropoffAddress}
-                onChangeText={setDropoffAddress}
-                onLocationSelect={(location) => {
-                  setDropoffLocation(location);
-                  setDropoffAddress(location.address);
-                }}
-                placeholder="Chọn điểm đến"
-                iconName="location-on"
-                iconColor="#F44336"
-                style={styles.addressInput}
-              />
-              
-              {/* Dropoff location selection button */}
-              <TouchableOpacity 
-                style={styles.mapSelectionButton}
-                onPress={() => setIsSelectingDropoff(true)}
-              >
-                <Icon name="my-location" size={16} color="#F44336" />
-                <Text style={styles.mapSelectionText}>Chọn trên bản đồ</Text>
-              </TouchableOpacity>
-            </View>
+            </CleanCard>
 
             {/* Get Quote Button */}
-            <ModernButton
-              title={loading ? "Đang tính giá..." : "Xem giá cước"}
-              onPress={handleGetQuote}
-              disabled={loading || !pickupAddress.trim() || !dropoffAddress.trim()}
-              icon={loading ? null : "calculate"}
-              size="large"
-            />
+            <View style={styles.buttonContainer}>
+              <ModernButton
+                title={loading ? "Đang tính giá..." : "Xem giá cước"}
+                onPress={handleGetQuote}
+                disabled={loading || !pickupAddress.trim() || !dropoffAddress.trim()}
+                icon={loading ? null : "calculate"}
+                size="large"
+              />
+            </View>
           </>
         ) : (
           <>
-            {/* Quote Display */}
-            <View style={styles.quoteContainer}>
+            {/* Quote Display Card */}
+            <CleanCard style={styles.quoteCard}>
               <View style={styles.quoteHeader}>
                 <Text style={styles.quoteTitle}>Chi tiết giá cước</Text>
               </View>
@@ -707,89 +742,69 @@ const RideBookingScreen = ({ navigation, route }) => {
                   Báo giá có hiệu lực đến {quote?.validUntil ? new Date(quote.validUntil).toLocaleTimeString('vi-VN') : ''}
                 </Text>
               </View>
-            </View>
+            </CleanCard>
 
             {/* Book Ride Button */}
-            <ModernButton
-              title={loading ? "Đang đặt xe..." : "Đặt xe ngay"}
-              onPress={handleBookRide}
-              disabled={loading}
-              icon={loading ? null : "directions-car"}
-              size="large"
-            />
+            <View style={styles.buttonContainer}>
+              <ModernButton
+                title={loading ? "Đang đặt xe..." : "Đặt xe ngay"}
+                onPress={handleBookRide}
+                disabled={loading}
+                icon={loading ? null : "directions-car"}
+                size="large"
+              />
+            </View>
           </>
         )}
       </Animatable.View>
-    </SafeAreaView>
-    </KeyboardAvoidingView>
+      </SafeAreaView>
+      </KeyboardAvoidingView>
+    </AppBackground>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  backButton: {
-    padding: 8,
-    borderRadius: 20,
-    backgroundColor: '#f8f9fa',
-  },
-  headerTitle: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginHorizontal: 16,
-  },
-  headerSpacer: {
-    width: 40, // Same width as back button to center title
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: spacing.xl,
   },
   loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: '#666',
+    marginTop: spacing.md,
+    fontSize: typography.body,
+    color: colors.textSecondary,
+    fontFamily: 'Inter_400Regular',
   },
   map: {
     flex: 1,
   },
   mapPlaceholder: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.backgroundMuted,
     justifyContent: 'center',
     alignItems: 'center',
   },
   mapPlaceholderContent: {
     alignItems: 'center',
-    padding: 40,
+    padding: spacing.xl,
   },
   mapPlaceholderTitle: {
-    fontSize: 18,
+    fontSize: typography.subheading,
     fontWeight: '600',
-    color: '#666',
-    marginTop: 15,
-    marginBottom: 10,
+    color: colors.textSecondary,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+    fontFamily: 'Inter_600SemiBold',
   },
   mapPlaceholderText: {
-    fontSize: 14,
-    color: '#999',
+    fontSize: typography.body,
+    color: colors.textMuted,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 22,
+    fontFamily: 'Inter_400Regular',
   },
   selectionOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -807,75 +822,88 @@ const styles = StyleSheet.create({
   selectionPrompt: {
     position: 'absolute',
     bottom: 200,
-    backgroundColor: '#fff',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderRadius: 25,
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: radii.xl,
     flexDirection: 'row',
     alignItems: 'center',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
+    ...shadows.floating,
   },
   selectionText: {
-    fontSize: 16,
+    fontSize: typography.body,
     fontWeight: '600',
-    color: '#333',
-    marginRight: 15,
+    color: colors.textPrimary,
+    marginRight: spacing.md,
+    fontFamily: 'Inter_600SemiBold',
   },
   cancelSelectionButton: {
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 15,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.backgroundMuted,
+    borderRadius: radii.md,
   },
   cancelSelectionText: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: typography.small,
+    color: colors.textSecondary,
     fontWeight: '500',
+    fontFamily: 'Inter_500Medium',
   },
   controlButtons: {
     position: 'absolute',
-    right: 20,
+    right: spacing.lg,
     top: Platform.OS === 'ios' ? 100 : 80,
-    gap: 10,
+    gap: spacing.sm,
+    zIndex: 10,
+  },
+  controlButtonCard: {
+    width: 48,
+    height: 48,
+    padding: 0,
   },
   controlButton: {
-    width: 50,
-    height: 50,
-    backgroundColor: '#fff',
-    borderRadius: 25,
+    width: '100%',
+    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
   },
   bottomPanel: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
-    elevation: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
+    padding: spacing.lg,
+    paddingBottom: Platform.OS === 'ios' ? 40 : spacing.lg,
+    maxHeight: height * 0.6,
+  },
+  locationCard: {
+    marginBottom: spacing.md,
   },
   locationInputs: {
-    marginBottom: 20,
+    gap: spacing.sm,
+  },
+  locationInputRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+  },
+  locationIconContainer: {
+    marginTop: 4,
+  },
+  locationInputContent: {
+    flex: 1,
+  },
+  locationLabel: {
+    fontSize: typography.small,
+    color: colors.textMuted,
+    marginBottom: spacing.xs,
+    fontFamily: 'Inter_500Medium',
   },
   addressInput: {
-    marginBottom: 5,
+    marginBottom: 0,
+  },
+  buttonContainer: {
+    marginTop: spacing.sm,
   },
   locationInputContainer: {
     flexDirection: 'row',
@@ -902,83 +930,87 @@ const styles = StyleSheet.create({
   locationDivider: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingLeft: 25,
-    marginVertical: 5,
+    paddingLeft: 28,
+    marginVertical: spacing.xs,
   },
   dividerLine: {
     width: 1,
     height: 8,
-    backgroundColor: '#ddd',
+    backgroundColor: colors.border,
     marginHorizontal: 2,
   },
-  quoteContainer: {
-    marginBottom: 20,
+  quoteCard: {
+    marginBottom: spacing.md,
   },
   quoteHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: spacing.md,
   },
   quoteTitle: {
-    fontSize: 18,
+    fontSize: typography.subheading,
     fontWeight: '600',
-    color: '#333',
+    color: colors.textPrimary,
+    fontFamily: 'Inter_600SemiBold',
   },
   quoteDetails: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
-    padding: 15,
+    gap: spacing.sm,
   },
   quoteRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: spacing.xs,
   },
   quoteLabel: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: typography.small,
+    color: colors.textSecondary,
+    fontFamily: 'Inter_400Regular',
   },
   quoteValue: {
-    fontSize: 14,
+    fontSize: typography.small,
     fontWeight: '500',
-    color: '#333',
+    color: colors.textPrimary,
+    fontFamily: 'Inter_500Medium',
   },
   quoteDivider: {
     height: 1,
-    backgroundColor: '#ddd',
-    marginVertical: 10,
+    backgroundColor: colors.border,
+    marginVertical: spacing.sm,
   },
   quoteTotalLabel: {
-    fontSize: 16,
+    fontSize: typography.body,
     fontWeight: '600',
-    color: '#333',
+    color: colors.textPrimary,
+    fontFamily: 'Inter_600SemiBold',
   },
   quoteTotalValue: {
-    fontSize: 18,
+    fontSize: typography.subheading,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: colors.accent,
+    fontFamily: 'Inter_700Bold',
   },
-  // New styles for enhanced quote display
+  // Enhanced quote display styles
   routeInfo: {
-    marginBottom: 15,
+    marginBottom: spacing.md,
   },
   routeItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: spacing.xs,
   },
   routeText: {
     flex: 1,
-    marginLeft: 10,
-    fontSize: 14,
-    color: '#666',
+    marginLeft: spacing.sm,
+    fontSize: typography.small,
+    color: colors.textSecondary,
+    fontFamily: 'Inter_400Regular',
   },
   tripDetails: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginBottom: 15,
+    marginBottom: spacing.md,
   },
   tripDetailItem: {
     flexDirection: 'row',
@@ -986,50 +1018,55 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   tripDetailContent: {
-    marginLeft: 8,
+    marginLeft: spacing.xs,
     alignItems: 'center',
   },
   tripDetailLabel: {
-    fontSize: 12,
-    color: '#999',
+    fontSize: typography.small - 1,
+    color: colors.textMuted,
     marginBottom: 2,
+    fontFamily: 'Inter_400Regular',
   },
   tripDetailValue: {
-    fontSize: 14,
+    fontSize: typography.small,
     fontWeight: '600',
-    color: '#333',
+    color: colors.textPrimary,
+    fontFamily: 'Inter_600SemiBold',
   },
   fareBreakdown: {
-    marginBottom: 15,
+    marginBottom: spacing.md,
   },
   fareTitle: {
-    fontSize: 16,
+    fontSize: typography.body,
     fontWeight: '600',
-    color: '#333',
-    marginBottom: 10,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
+    fontFamily: 'Inter_600SemiBold',
   },
   expiryText: {
-    fontSize: 12,
-    color: '#999',
+    fontSize: typography.small - 1,
+    color: colors.textMuted,
     textAlign: 'center',
-    marginTop: 10,
+    marginTop: spacing.sm,
     fontStyle: 'italic',
+    fontFamily: 'Inter_400Regular',
   },
   mapSelectionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    marginBottom: 10,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.backgroundMuted,
+    borderRadius: radii.sm,
+    marginTop: spacing.xs,
     alignSelf: 'flex-start',
   },
   mapSelectionText: {
-    fontSize: 12,
-    color: '#666',
-    marginLeft: 6,
+    fontSize: typography.small - 1,
+    color: colors.textSecondary,
+    marginLeft: spacing.xs,
     fontWeight: '500',
+    fontFamily: 'Inter_500Medium',
   },
 });
 
