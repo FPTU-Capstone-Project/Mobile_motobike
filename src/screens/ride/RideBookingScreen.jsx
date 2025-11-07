@@ -29,7 +29,10 @@ import GoongMap from '../../components/GoongMap.jsx';
 import addressValidation from '../../utils/addressValidation';
 import { SoftBackHeader } from '../../components/ui/GlassHeader.jsx';
 import CleanCard from '../../components/ui/CleanCard.jsx';
-import { colors } from '../../theme/designTokens';
+import LocationInputCard from '../../components/LocationInputCard.jsx';
+import SearchResultsCard from '../../components/SearchResultsCard.jsx';
+import DraggableBottomSheet from '../../components/DraggableBottomSheet.jsx';
+import { colors, spacing, radii } from '../../theme/designTokens';
 
 const { width, height } = Dimensions.get('window');
 
@@ -49,6 +52,11 @@ const RideBookingScreen = ({ navigation, route }) => {
   const [loading, setLoading] = useState(false);
   const [loadingLocation, setLoadingLocation] = useState(true);
   const [routePolyline, setRoutePolyline] = useState(null);
+  
+  // Search results states
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [activeSearchField, setActiveSearchField] = useState(null); // 'pickup' | 'dropoff' | null
 
   // Map ref
   const mapRef = useRef(null);
@@ -512,97 +520,155 @@ const RideBookingScreen = ({ navigation, route }) => {
           </CleanCard>
         </View>
 
-        {/* Bottom Panel - Card Based */}
-        <Animatable.View 
-          animation="slideInUp" 
-          style={styles.bottomPanel}
+        {/* Draggable Bottom Sheet */}
+        <DraggableBottomSheet
+          initialHeight={0.35}
+          minHeight={0.15}
+          maxHeight={0.85}
         >
-          {!showQuote ? (
-            <View style={styles.inputsContainer}>
-              {/* Pickup Location Card */}
-              <Animatable.View animation="fadeInUp" duration={400}>
-                <CleanCard style={styles.locationCard} contentStyle={styles.locationCardContent}>
-                  <View style={styles.locationHeader}>
-                    <View style={[styles.locationIcon, { backgroundColor: '#22C55E20' }]}>
-                      <Icon name="radio-button-checked" size={20} color="#22C55E" />
-                    </View>
-                    <Text style={styles.locationLabel}>Điểm đón</Text>
-                  </View>
-                  
-                  <AddressInput
-                    value={pickupAddress}
-                    onChangeText={setPickupAddress}
-                    onLocationSelect={(location) => {
-                      setPickupLocation(location);
-                      setPickupAddress(location.address);
-                    }}
-                    placeholder="Nhập địa chỉ hoặc chọn trên bản đồ"
-                    iconName="radio-button-checked"
-                    iconColor="#22C55E"
-                    style={styles.addressInput}
-                    isPickupInput={true}
-                    currentLocation={currentLocation}
-                  />
-                  
-                  <TouchableOpacity 
-                    style={styles.mapSelectionButton}
-                    onPress={() => setIsSelectingPickup(true)}
-                  >
-                    <Icon name="my-location" size={16} color="#22C55E" />
-                    <Text style={styles.mapSelectionText}>Chọn trên bản đồ</Text>
-                  </TouchableOpacity>
-                </CleanCard>
-              </Animatable.View>
-
-              {/* Dropoff Location Card */}
-              <Animatable.View animation="fadeInUp" duration={400} delay={60}>
-                <CleanCard style={styles.locationCard} contentStyle={styles.locationCardContent}>
-                  <View style={styles.locationHeader}>
-                    <View style={[styles.locationIcon, { backgroundColor: '#EF444420' }]}>
-                      <Icon name="location-on" size={20} color="#EF4444" />
-                    </View>
-                    <Text style={styles.locationLabel}>Điểm đến</Text>
-                  </View>
-                  
-                  <AddressInput
-                    value={dropoffAddress}
-                    onChangeText={setDropoffAddress}
-                    onLocationSelect={(location) => {
-                      setDropoffLocation(location);
-                      setDropoffAddress(location.address);
-                    }}
-                    placeholder="Nhập địa chỉ hoặc chọn trên bản đồ"
-                    iconName="location-on"
-                    iconColor="#EF4444"
-                    style={styles.addressInput}
-                  />
-                  
-                  <TouchableOpacity 
-                    style={[styles.mapSelectionButton, { borderColor: '#EF4444' }]}
-                    onPress={() => setIsSelectingDropoff(true)}
-                  >
-                    <Icon name="my-location" size={16} color="#EF4444" />
-                    <Text style={[styles.mapSelectionText, { color: '#EF4444' }]}>Chọn trên bản đồ</Text>
-                  </TouchableOpacity>
-                </CleanCard>
-              </Animatable.View>
-
-              {/* Get Quote Button */}
-              <Animatable.View animation="fadeInUp" duration={400} delay={120}>
-                <ModernButton
-                  title={loading ? "Đang tính giá..." : "Xem giá cước"}
-                  onPress={handleGetQuote}
-                  disabled={loading || !pickupAddress.trim() || !dropoffAddress.trim()}
-                  icon={loading ? null : "calculate"}
-                  size="large"
+          <View style={styles.sheetContent}>
+            {!showQuote ? (
+              <View style={styles.inputsContainer}>
+                {/* Pickup Location Card */}
+                <LocationInputCard
+                  label="Điểm đón"
+                  iconName="radio-button-checked"
+                  iconColor="#22C55E"
+                  value={pickupAddress}
+                  onChangeText={setPickupAddress}
+                  onLocationSelect={(location) => {
+                    setPickupLocation(location);
+                    setPickupAddress(location.address);
+                    setActiveSearchField(null);
+                    setSearchResults([]);
+                  }}
+                  placeholder="Nhập địa chỉ hoặc chọn trên bản đồ"
+                  isPickupInput={true}
+                  currentLocation={currentLocation}
+                  onFocus={() => setActiveSearchField('pickup')}
+                  onBlur={() => {
+                    setTimeout(() => {
+                      if (activeSearchField === 'pickup') {
+                        setActiveSearchField(null);
+                        setSearchResults([]);
+                      }
+                    }, 200);
+                  }}
+                  onSearchStart={() => setSearchLoading(true)}
+                  onSearchResults={(results) => {
+                    setSearchResults(results);
+                    setSearchLoading(false);
+                  }}
                 />
-              </Animatable.View>
-            </View>
-          ) : (
-            <View style={styles.quoteContainer}>
-              {/* Quote Display Card */}
-              <Animatable.View animation="fadeInUp" duration={400}>
-                <CleanCard style={styles.quoteCard} contentStyle={styles.quoteCardContent}>
+
+                {/* Dropoff Location Card */}
+                <LocationInputCard
+                  label="Điểm đến"
+                  iconName="location-on"
+                  iconColor="#EF4444"
+                  value={dropoffAddress}
+                  onChangeText={setDropoffAddress}
+                  onLocationSelect={(location) => {
+                    setDropoffLocation(location);
+                    setDropoffAddress(location.address);
+                    setActiveSearchField(null);
+                    setSearchResults([]);
+                  }}
+                  placeholder="Nhập địa chỉ hoặc chọn trên bản đồ"
+                  isPickupInput={false}
+                  onFocus={() => setActiveSearchField('dropoff')}
+                  onBlur={() => {
+                    setTimeout(() => {
+                      if (activeSearchField === 'dropoff') {
+                        setActiveSearchField(null);
+                        setSearchResults([]);
+                      }
+                    }, 200);
+                  }}
+                  onSearchStart={() => setSearchLoading(true)}
+                  onSearchResults={(results) => {
+                    setSearchResults(results);
+                    setSearchLoading(false);
+                  }}
+                />
+
+                {/* Search Results Card */}
+                <SearchResultsCard
+                  suggestions={searchResults}
+                  loading={searchLoading}
+                  visible={activeSearchField !== null && (searchResults.length > 0 || searchLoading)}
+                  onSelectSuggestion={async (suggestion) => {
+                    try {
+                      let locationData = null;
+
+                      if (suggestion.isPOI && suggestion.locationId) {
+                        const displayText = suggestion.structured_formatting?.main_text || suggestion.description;
+                        locationData = {
+                          latitude: suggestion.coordinates.latitude,
+                          longitude: suggestion.coordinates.longitude,
+                          address: displayText,
+                          locationId: suggestion.locationId,
+                          isPOI: true,
+                        };
+                      } else if (suggestion.isCurrentLocation && suggestion.coordinates) {
+                        const displayText = suggestion.structured_formatting?.main_text || suggestion.description;
+                        locationData = {
+                          latitude: suggestion.coordinates.latitude,
+                          longitude: suggestion.coordinates.longitude,
+                          address: displayText,
+                          isCurrentLocation: true,
+                        };
+                      } else {
+                        const placeId = suggestion.place_id || suggestion.placeId;
+                        const placeDetails = await goongService.getPlaceDetails(placeId);
+                        
+                        if (placeDetails && placeDetails.result) {
+                          const location = placeDetails.result.geometry.location;
+                          const displayText = suggestion.structured_formatting?.main_text || suggestion.description;
+                          const fullAddress = placeDetails.result.formatted_address || displayText;
+                          locationData = {
+                            latitude: location.lat,
+                            longitude: location.lng,
+                            address: fullAddress,
+                          };
+                        }
+                      }
+
+                      if (locationData) {
+                        if (activeSearchField === 'pickup') {
+                          setPickupLocation(locationData);
+                          setPickupAddress(locationData.address);
+                        } else if (activeSearchField === 'dropoff') {
+                          setDropoffLocation(locationData);
+                          setDropoffAddress(locationData.address);
+                        }
+                        setActiveSearchField(null);
+                        setSearchResults([]);
+                      }
+                    } catch (error) {
+                      console.error('Error selecting suggestion:', error);
+                    }
+                  }}
+                />
+
+                {/* Get Quote Button */}
+                <Animatable.View animation="fadeInUp" duration={400} delay={120}>
+                  <ModernButton
+                    title={loading ? "Đang tính giá..." : "Xem giá cước"}
+                    onPress={handleGetQuote}
+                    disabled={loading || !pickupAddress.trim() || !dropoffAddress.trim()}
+                    icon={loading ? null : "calculate"}
+                    size="large"
+                    variant="secondary"
+                    style={styles.quoteButton}
+                  />
+                </Animatable.View>
+              </View>
+            ) : (
+              <View style={styles.quoteContainer}>
+                {/* Quote Display Card */}
+                <Animatable.View animation="fadeInUp" duration={400}>
+                  <CleanCard style={styles.quoteCard} contentStyle={styles.quoteCardContent}>
                   <View style={styles.quoteHeader}>
                     <Text style={styles.quoteTitle}>Chi tiết giá cước</Text>
                   </View>
@@ -689,19 +755,20 @@ const RideBookingScreen = ({ navigation, route }) => {
                 </CleanCard>
               </Animatable.View>
 
-              {/* Book Ride Button */}
-              <Animatable.View animation="fadeInUp" duration={400} delay={60}>
-                <ModernButton
-                  title={loading ? "Đang đặt xe..." : "Đặt xe ngay"}
-                  onPress={handleBookRide}
-                  disabled={loading}
-                  icon={loading ? null : "directions-car"}
-                  size="large"
-                />
-              </Animatable.View>
-            </View>
-          )}
-        </Animatable.View>
+                {/* Book Ride Button */}
+                <Animatable.View animation="fadeInUp" duration={400} delay={60}>
+                  <ModernButton
+                    title={loading ? "Đang đặt xe..." : "Đặt xe ngay"}
+                    onPress={handleBookRide}
+                    disabled={loading}
+                    icon={loading ? null : "directions-car"}
+                    size="large"
+                  />
+                </Animatable.View>
+              </View>
+            )}
+          </View>
+        </DraggableBottomSheet>
       </SafeAreaView>
     </KeyboardAvoidingView>
   );
@@ -710,10 +777,12 @@ const RideBookingScreen = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: 'transparent',
   },
   map: {
     ...StyleSheet.absoluteFillObject,
+    zIndex: 0,
+    backgroundColor: 'transparent',
   },
   mapPlaceholder: {
     backgroundColor: colors.backgroundMuted,
@@ -743,7 +812,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    zIndex: 10,
+    zIndex: 5,
   },
   loadingContainer: {
     flex: 1,
@@ -762,7 +831,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.3)',
-    zIndex: 20,
+    zIndex: 15,
   },
   crosshair: {
     position: 'absolute',
@@ -805,7 +874,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 20,
     top: Platform.OS === 'ios' ? 140 : 120,
-    zIndex: 10,
+    zIndex: 5,
   },
   controlButtonCard: {
     marginBottom: 12,
@@ -821,18 +890,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 24,
   },
-  bottomPanel: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'transparent',
-    paddingHorizontal: 20,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
-    paddingTop: 20,
+  sheetContent: {
+    flex: 1,
+    paddingBottom: Platform.OS === 'ios' ? 20 : 10,
   },
   inputsContainer: {
-    gap: 16,
+    gap: 12,
   },
   locationCard: {
     marginBottom: 0,
@@ -861,22 +924,8 @@ const styles = StyleSheet.create({
   addressInput: {
     marginBottom: 0,
   },
-  mapSelectionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    backgroundColor: colors.glassLight,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#22C55E',
-    alignSelf: 'flex-start',
-    gap: 6,
-  },
-  mapSelectionText: {
-    fontSize: 13,
-    fontFamily: 'Inter_500Medium',
-    color: '#22C55E',
+  quoteButton: {
+    marginTop: spacing.xs,
   },
   quoteContainer: {
     gap: 16,
