@@ -38,18 +38,13 @@ const GoongMap = ({
     <script src="https://cdn.jsdelivr.net/npm/@goongmaps/goong-js@1.0.9/dist/goong-js.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/@goongmaps/goong-js@1.0.9/dist/goong-js.css" rel="stylesheet" />
     <style>
-        body { 
-            margin: 0; 
-            padding: 0; 
-            background-color: transparent;
-        }
+        body { margin: 0; padding: 0; }
         #map { 
             position: absolute; 
             top: 0; 
             bottom: 0; 
             width: 100%; 
             height: 100vh;
-            background-color: transparent;
         }
         .marker-popup {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -367,7 +362,7 @@ const GoongMap = ({
       <WebView
         ref={webViewRef}
         source={{ html: htmlContent }}
-        style={[styles.webview, { backgroundColor: 'transparent' }]}
+        style={styles.webview}
         onMessage={handleMessage}
         onLoad={() => {
           // WebView loaded
@@ -382,7 +377,6 @@ const GoongMap = ({
         mixedContentMode="compatibility"
         allowsInlineMediaPlayback={true}
         mediaPlaybackRequiresUserAction={false}
-        opacity={1}
       />
     </View>
   );
@@ -391,11 +385,9 @@ const GoongMap = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'transparent',
   },
   webview: {
     flex: 1,
-    backgroundColor: 'transparent',
   },
   errorContainer: {
     flex: 1,
