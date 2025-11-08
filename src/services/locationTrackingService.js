@@ -588,9 +588,9 @@ class LocationTrackingService {
         return;
       }
 
-      // Only send to server when ride is ONGOING (backend requires it to accept tracking)
+      // IMPORTANT: Only send location updates to server if ride is ONGOING or if simulation is explicitly set to send
       const rideStatus = await this.getRideStatus();
-      if (rideStatus !== 'ONGOING') {
+      if (rideStatus !== 'ONGOING' && !(this.isSimulating && !this.simulationLocalOnly)) {
         console.log(`Ride ${this.currentRideId} status is ${rideStatus}, skipping location send (will retry later)`);
         // Don't clear buffer, keep it for later when ride becomes ONGOING
         return;
@@ -613,6 +613,8 @@ class LocationTrackingService {
           destination: wsDestination,
           body: JSON.stringify(points),
         });
+        console.log(`📍 Sent ${points.length} location points via WebSocket to ${wsDestination}`);
+        console.log(`📍 Sample point:`, points[0]);
         this.locationBuffer = [];
         this.lastSendTime = Date.now();
       } else {
@@ -620,6 +622,7 @@ class LocationTrackingService {
         console.warn('WebSocket not connected, trying REST API fallback...');
         const endpoint = ENDPOINTS.RIDES.TRACK.replace('{rideId}', this.currentRideId);
         const response = await apiService.post(endpoint, points);
+        console.log(`📍 Sent ${points.length} location points via REST API for ride ${this.currentRideId}`);
         this.locationBuffer = [];
         this.lastSendTime = Date.now();
         return response;
