@@ -13,7 +13,6 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/MaterialIcons";
-import DateTimePicker from "@react-native-community/datetimepicker";
 
 import rideService from "../../services/rideService";
 import poiService from "../../services/poiService";
@@ -35,31 +34,9 @@ const CreateSharedRideScreen = ({ navigation }) => {
   const [startAddress, setStartAddress] = useState("");
   const [endAddress, setEndAddress] = useState("");
 
-  const [datePart, setDatePart] = React.useState(() => new Date());     // hôm nay
-const [timePart, setTimePart] = React.useState(() => {
-  const d = new Date();
-  d.setMinutes(d.getMinutes() + (5 - (d.getMinutes() % 5 || 5))); // làm tròn lên 5'
-  d.setSeconds(0); d.setMilliseconds(0);
-  return d;
-});
-
-  const [scheduledTime, setScheduledTime] = React.useState(() => {
-    const d = new Date();
-    d.setMinutes(d.getMinutes() + (5 - (d.getMinutes() % 5 || 5))); // làm tròn lên 5'
-    d.setSeconds(0); d.setMilliseconds(0);
-    return d;
-  })
-
-  // UI state
-  const [showDatePicker, setShowDatePicker] = React.useState(false);
-  const [showTimePicker, setShowTimePicker] = React.useState(false);
-  const [scheduledTimeIsoVN, setScheduledTimeIsoVN] = React.useState('');
-
   useEffect(() => {
     loadVehicles();
     getCurrentLocation();
-    // Initialize scheduled time
-    applySchedule(datePart, timePart);
   }, []);
 
   const getCurrentLocation = async () => {
@@ -116,37 +93,6 @@ const [timePart, setTimePart] = React.useState(() => {
       setLoadingVehicles(false);
     }
   };
-
-  function combineVNDateTime(dPart, tPart) {
-    const y = dPart.getFullYear();
-    const m = dPart.getMonth();      // 0..11
-    const d = dPart.getDate();
-    const hh = tPart.getHours();
-    const mm = tPart.getMinutes();
-    const ss = 0;
-  
-    // Tạo Date object với giờ VN
-    const resultDate = new Date(y, m, d, hh, mm, ss);
-  
-    // Tạo ISO string không có timezone (backend expect format: 2025-10-05T08:00:00)
-    const pad = (n) => String(n).padStart(2, '0');
-    const isoLocal = `${y}-${pad(m + 1)}-${pad(d)}T${pad(hh)}:${pad(mm)}:${pad(ss)}`;
-  
-    return { date: resultDate, isoVN: isoLocal };
-  }
-  
-  // Gom lại và cập nhật 2 state: scheduledTime (Date) & scheduledTimeIsoVN (string)
-  function applySchedule(dPart, tPart) {
-    const { date, isoVN } = combineVNDateTime(dPart, tPart);
-    setScheduledTime(date);
-    setScheduledTimeIsoVN(isoVN);
-  }
-
-  // Helper function to format Date object to backend expected format
-  function formatDateTimeForBackend(date) {
-    const pad = (n) => String(n).padStart(2, '0');
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
-  }
 
   const handleCreateRide = async () => {
 
@@ -225,9 +171,7 @@ const [timePart, setTimePart] = React.useState(() => {
       }
 
       // Prepare request body to match expected format
-      const rideData = {
-        scheduledDepartureTime: scheduledTimeIsoVN || formatDateTimeForBackend(scheduledTime),
-      };
+      const rideData = {};
 
       // Add location data based on whether it's POI or coordinates
       if (processedStartLocation.locationId) {
@@ -274,13 +218,6 @@ const [timePart, setTimePart] = React.useState(() => {
               setEndLocation(null);
               setStartAddress("");
               setEndAddress("");
-              // Reset to default time (5 minutes from now)
-              const defaultTime = new Date();
-              defaultTime.setMinutes(defaultTime.getMinutes() + 5);
-              defaultTime.setSeconds(0);
-              defaultTime.setMilliseconds(0);
-              setTimePart(defaultTime);
-              applySchedule(datePart, defaultTime);
             },
           },
         ]
@@ -417,21 +354,6 @@ const [timePart, setTimePart] = React.useState(() => {
             />
           </View>
 
-          {/* Schedule */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Thời gian khởi hành</Text>
-            <TouchableOpacity
-              style={styles.dateTimeButton}
-              onPress={() => setShowDatePicker(true)}
-            >
-              <Icon name="schedule" size={20} color="#2196F3" />
-              <Text style={styles.dateTimeText}>
-                {scheduledTime.toLocaleString("vi-VN")}
-              </Text>
-              <Icon name="keyboard-arrow-right" size={20} color="#666" />
-            </TouchableOpacity>
-          </View>
-
           {/* Create Button */}
           <TouchableOpacity
             style={[styles.createButton, loading && styles.disabledButton]}
@@ -448,60 +370,6 @@ const [timePart, setTimePart] = React.useState(() => {
             )}
           </TouchableOpacity>
         </ScrollView>
-
-        {/* Date Time Picker */}
-        {showDatePicker && (
-  <DateTimePicker
-    value={datePart}
-    mode="date"
-    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-    // chỉ Android mới có event.type; iOS event có thể undefined
-    onChange={(event, selectedDate) => {
-      // đóng picker trên mọi nền tảng khi user đã chọn hoặc cancel
-      if (Platform.OS === 'android') setShowDatePicker(false);
-      if (event?.type === 'dismissed') {
-        if (Platform.OS === 'ios') setShowDatePicker(false);
-        return;
-      }
-      if (selectedDate) {
-        const next = new Date(selectedDate);
-        next.setHours(0, 0, 0, 0); // chỉ giữ Y-M-D
-        setDatePart(next);
-        // Cập nhật preview ngay (giữ HH:mm cũ)
-        applySchedule(next, timePart);
-        // đóng date picker và mở time picker
-        setShowDatePicker(false);
-        // dùng setTimeout 0 để tránh batch state làm kẹt modal trên iOS
-        setTimeout(() => setShowTimePicker(true), 0);
-      }
-    }}
-    
-    minimumDate={new Date()} // không cho chọn ngày quá khứ
-  />
-)}
-
-{/* Time Picker */}
-{showTimePicker && (
-  <DateTimePicker
-    value={timePart}
-    mode="time"
-    is24Hour={true}
-    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-    onChange={(event, selectedTime) => {
-      if (Platform.OS === 'android') {
-        setShowTimePicker(false);
-        if (event?.type === 'dismissed') return;
-      }
-      if (selectedTime) {
-        // Chỉ lấy HH:mm; giữ nguyên datePart
-        const next = new Date(timePart);
-        next.setHours(selectedTime.getHours(), selectedTime.getMinutes(), 0, 0);
-        setTimePart(next);
-        applySchedule(datePart, next);
-      }
-    }}
-  />
-)}
       </SafeAreaView>
     </KeyboardAvoidingView>
   );

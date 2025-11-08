@@ -41,6 +41,9 @@ import DriverDashboardScreen from './src/screens/driver/DriverDashboardScreen.js
 import DriverEarningsScreen from './src/screens/driver/DriverEarningsScreen.jsx';
 import DriverRatingsScreen from './src/screens/driver/DriverRatingsScreen.jsx';
 import DriverProfileScreen from './src/screens/driver/DriverProfileScreen.jsx';
+import DriverRideTrackingScreen from './src/screens/driver/DriverRideTrackingScreen.jsx';
+import CreateSharedRideScreen from './src/screens/driver/CreateSharedRideScreen.jsx';
+import VehicleManagementScreen from './src/screens/driver/VehicleManagementScreen.jsx';
 import SOSAlertScreen from './src/screens/driver/SOSAlertScreen.jsx';
 
 // Navigation & UI
@@ -236,6 +239,21 @@ export default function App() {
           <Stack.Screen 
             name="RideTracking" 
             component={RideTrackingScreen} 
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="DriverRideTracking" 
+            component={DriverRideTrackingScreen} 
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="CreateSharedRide" 
+            component={CreateSharedRideScreen} 
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="VehicleManagement" 
+            component={VehicleManagementScreen} 
             options={{ headerShown: false }}
           />
         </Stack.Navigator>
