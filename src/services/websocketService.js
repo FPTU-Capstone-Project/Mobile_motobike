@@ -289,13 +289,29 @@ class WebSocketService {
     }
 
     const destination = ENDPOINTS.WEBSOCKET.RIDER_QUEUE;
+    
+    // Check if already subscribed - if so, just update callback
+    const existingSubscription = this.subscriptions.get('rider-matching');
+    if (existingSubscription) {
+      console.log('📡 Updating rider matching callback (already subscribed)');
+      this.messageHandlers.set('rider-matching', callback);
+      return existingSubscription;
+    }
+
     console.log('📡 Subscribing to rider matching:', destination);
 
     const subscription = this.client.subscribe(destination, (message) => {
       try {
         const data = JSON.parse(message.body);
         console.log('📨 Received rider matching update:', data);
-        callback(data);
+        
+        // Use callback from messageHandlers (allows dynamic update)
+        const currentCallback = this.messageHandlers.get('rider-matching');
+        if (currentCallback) {
+          currentCallback(data);
+        } else {
+          callback(data);
+        }
       } catch (error) {
         console.error('❌ Error parsing rider matching message:', error);
       }

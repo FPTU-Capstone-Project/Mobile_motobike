@@ -172,6 +172,25 @@ class RideService {
     }
   }
 
+  // Get my ride requests (authenticated rider) - no need for riderId
+  async getMyRiderRequests(status = null, page = 0, size = 20) {
+    try {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        size: size.toString()
+      });
+      
+      if (status) params.append('status', status);
+
+      const endpoint = `${ENDPOINTS.RIDE_REQUESTS.GET_MY_REQUESTS}?${params.toString()}`;
+      const response = await this.apiService.get(endpoint);
+      return response;
+    } catch (error) {
+      console.error('Get my rider requests error:', error);
+      throw error;
+    }
+  }
+
   async cancelRequest(requestId) {
     try {
       const endpoint = ENDPOINTS.RIDE_REQUESTS.CANCEL.replace('{requestId}', requestId);

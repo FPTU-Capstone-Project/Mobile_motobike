@@ -278,6 +278,10 @@ const DriverRideTrackingScreen = ({ route, navigation }) => {
           return 'Điểm đến';
         };
         
+        // Set rideData state first so startTrackingService can use it
+        setRideData(initialRideData);
+        setLoading(false); // Stop loading indicator immediately
+        
         activeRideService.saveActiveRide({
           rideId: rideId,
           requestId: initialRideData.shared_ride_request_id,
@@ -382,18 +386,25 @@ const DriverRideTrackingScreen = ({ route, navigation }) => {
 
   const startTrackingService = async () => {
     try {
-      if (rideData?.status !== 'ONGOING' && rideData?.status !== 'CONFIRMED') {
+      // Use rideData or fallback to initialRideData
+      const currentStatus = rideData?.status || initialRideData?.status;
+      console.log(`🔍 startTrackingService - Current status: ${currentStatus}`);
+      
+      if (currentStatus !== 'ONGOING' && currentStatus !== 'CONFIRMED' && currentStatus !== 'SCHEDULED') {
+        console.warn(`⚠️ Cannot start tracking - invalid status: ${currentStatus}`);
         Alert.alert('Chưa thể theo dõi', 'Vui lòng bắt đầu chuyến đi trước khi theo dõi GPS.');
         return;
       }
 
+      console.log(`✅ Starting GPS tracking for ride ${rideId}...`);
       const success = await locationTrackingService.startTracking(rideId);
       if (success) {
         setIsTracking(true);
+        console.log('✅ GPS tracking started successfully');
       }
     } catch (error) {
-      console.error('Failed to start tracking:', error);
-      Alert.alert('Lỗi', 'Không thể bắt đầu GPS tracking.');
+      console.error('❌ Failed to start tracking:', error);
+      Alert.alert('Lỗi', 'Không thể bắt đầu GPS tracking: ' + (error?.message || error?.toString()));
     }
   };
 
@@ -412,16 +423,39 @@ const DriverRideTrackingScreen = ({ route, navigation }) => {
       } else if (currentStatus === 'ONGOING') {
         console.log('✅ Ride is already ONGOING, skipping startRide');
       } else {
-        console.warn(`⚠️ Unexpected ride status: ${currentStatus}, attempting to start anyway...`);
+        console.warn(`⚠️ Unexpected ride status: ${currentStatus}, attempting to verify actual status...`);
         try {
-          await rideService.startRide(rideId);
-        } catch (startError) {
-          // If startRide fails, check if it's because ride is already ONGOING
-          const errorMsg = startError?.message || startError?.toString() || '';
-          if (errorMsg.includes('ONGOING') || errorMsg.includes('invalid-state')) {
-            console.log('✅ Ride is already ONGOING (from error message), continuing...');
+          // Reload ride data to get latest status from backend
+          const latestRide = await rideService.getRideById(rideId);
+          console.log(`📋 Latest ride status from backend: ${latestRide.status}`);
+          
+          if (latestRide.status === 'ONGOING') {
+            console.log('✅ Ride is already ONGOING (verified from backend), continuing...');
+            setRideData(latestRide); // Update local state
+          } else if (latestRide.status === 'SCHEDULED') {
+            console.log('🔄 Ride is SCHEDULED, starting ride...');
+            await rideService.startRide(rideId);
+            console.log('✅ Ride started (SCHEDULED -> ONGOING)');
           } else {
-            throw startError; // Re-throw if it's a different error
+            console.log(`⚠️ Status is ${latestRide.status}, attempting to start anyway...`);
+            try {
+              await rideService.startRide(rideId);
+              console.log('✅ Ride started successfully');
+            } catch (startError) {
+              const errorMsg = startError?.message || startError?.toString() || '';
+              if (errorMsg.includes('ONGOING') || errorMsg.includes('invalid-state') || errorMsg.includes('không hợp lệ')) {
+                console.log('✅ Ride is already ONGOING (from error), continuing...');
+              } else {
+                throw startError;
+              }
+            }
+          }
+        } catch (verifyError) {
+          const errorMsg = verifyError?.message || verifyError?.toString() || '';
+          if (errorMsg.includes('ONGOING') || errorMsg.includes('invalid-state') || errorMsg.includes('không hợp lệ')) {
+            console.log('✅ Ride is already ONGOING (from error), continuing...');
+          } else {
+            console.warn('⚠️ Could not verify ride status, continuing anyway:', errorMsg);
           }
         }
       }
@@ -599,6 +633,17 @@ const DriverRideTrackingScreen = ({ route, navigation }) => {
                 setIsTracking(false);
               } catch (stopErr) {
                 console.warn('Không thể tắt GPS tracking sau khi hoàn thành:', stopErr);
+              }
+              
+              // Disconnect WebSocket after ride completion
+              try {
+                if (websocketService.isConnected) {
+                  console.log('🔌 Disconnecting WebSocket after ride completion...');
+                  websocketService.disconnect();
+                  console.log('✅ WebSocket disconnected');
+                }
+              } catch (wsErr) {
+                console.warn('Không thể disconnect WebSocket sau khi hoàn thành:', wsErr);
               }
               
               await activeRideService.clearActiveRide();

@@ -67,7 +67,8 @@ const RiderMatchingScreen = ({ navigation, route }) => {
     // Cleanup on unmount
     return () => {
       console.log('🧹 RiderMatchingScreen unmounting - cleaning up...');
-      websocketService.disconnect();
+      // DON'T disconnect WebSocket - let RideTrackingScreen reuse the connection
+      // websocketService.disconnect();
     };
   }, []);
 

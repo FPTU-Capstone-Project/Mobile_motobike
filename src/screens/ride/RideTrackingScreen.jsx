@@ -3,143 +3,428 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   Alert,
   Dimensions,
   ActivityIndicator,
-  ScrollView,
-  Platform,
+  Animated,
+  Linking,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Animatable from 'react-native-animatable';
 
 import locationService from '../../services/LocationService';
-import { locationTrackingService } from '../../services/locationTrackingService';
 import rideService from '../../services/rideService';
-import goongService from '../../services/goongService';
 import activeRideService from '../../services/activeRideService';
-import ModernButton from '../../components/ModernButton.jsx';
+import websocketService from '../../services/websocketService';
 import GoongMap from '../../components/GoongMap.jsx';
 
 const { width, height } = Dimensions.get('window');
 
 const RideTrackingScreen = ({ navigation, route }) => {
-  const { proposals, quote, rideId, requestId, driverInfo, status } = route.params || {};
+  const { rideId, requestId, driverInfo, status, quote } = route.params || {};
   
   // States
-  const [currentLocation, setCurrentLocation] = useState(null);
-  const [selectedProposal, setSelectedProposal] = useState(null);
-  const [rideStatus, setRideStatus] = useState(status || 'PENDING');
+  const [riderLocation, setRiderLocation] = useState(null);
+  const [driverLocation, setDriverLocation] = useState(null);
+  const [rideStatus, setRideStatus] = useState(status || 'CONFIRMED');
   const [loading, setLoading] = useState(false);
-  const [showProposals, setShowProposals] = useState(true);
+  const [rideData, setRideData] = useState(null);
+  const [mapPolyline, setMapPolyline] = useState([]);
+  const [fullPolyline, setFullPolyline] = useState([]);
+  const [etaMinutes, setEtaMinutes] = useState(null);
+  const [distanceKm, setDistanceKm] = useState(null);
+  const [showBottomSheet, setShowBottomSheet] = useState(true);
 
   // Map ref
   const mapRef = useRef(null);
-  const [etaText, setEtaText] = useState(null);
+  const [markerUpdateKey, setMarkerUpdateKey] = useState(0);
+  const lastRecenterTime = useRef(0);
+  const RECENTER_THROTTLE = 3000; // Recenter every 3 seconds
+
+  // Polyline decoder (Google Encoded Polyline)
+  const decodePolyline = (encoded) => {
+    if (!encoded || typeof encoded !== 'string') {
+      console.warn('⚠️ decodePolyline: Invalid input', encoded);
+      return [];
+    }
+    
+    try {
+      // Handle escaped backslashes
+      const cleanedPolyline = encoded.replace(/\\\\/g, '\\');
+      let index = 0, lat = 0, lng = 0, coordinates = [];
+      
+      while (index < cleanedPolyline.length) {
+        let b, shift = 0, result = 0;
+        do {
+          if (index >= cleanedPolyline.length) break;
+          b = cleanedPolyline.charCodeAt(index++) - 63;
+          result |= (b & 0x1f) << shift;
+          shift += 5;
+        } while (b >= 0x20);
+        const dlat = (result & 1) ? ~(result >> 1) : (result >> 1);
+        lat += dlat;
+        
+        shift = 0; result = 0;
+        do {
+          if (index >= cleanedPolyline.length) break;
+          b = cleanedPolyline.charCodeAt(index++) - 63;
+          result |= (b & 0x1f) << shift;
+          shift += 5;
+        } while (b >= 0x20);
+        const dlng = (result & 1) ? ~(result >> 1) : (result >> 1);
+        lng += dlng;
+        
+        coordinates.push({ latitude: lat / 1e5, longitude: lng / 1e5 });
+      }
+      
+      console.log(`📍 Rider: Decoded ${coordinates.length} points from polyline`);
+      return coordinates;
+    } catch (error) {
+      console.error('❌ Error decoding polyline:', error);
+      return [];
+    }
+  };
+
+  // Helper function to trim polyline from driver location
+  const trimPolylineFromDriverLocation = (fullPolyline, driverLocation) => {
+    if (!fullPolyline || fullPolyline.length === 0 || !driverLocation) return fullPolyline;
+    
+    let closestIndex = 0;
+    let minDistance = Infinity;
+    
+    fullPolyline.forEach((point, index) => {
+      const distance = locationService.calculateDistance(
+        driverLocation.latitude,
+        driverLocation.longitude,
+        point.latitude || point.lat,
+        point.longitude || point.lng
+      );
+      if (distance < minDistance) {
+        minDistance = distance;
+        closestIndex = index;
+      }
+    });
+    
+    return fullPolyline.slice(closestIndex);
+  };
 
   useEffect(() => {
     initializeTracking();
     return () => {
       locationService.stopLocationTracking();
+      websocketService.disconnect();
     };
   }, []);
 
   const initializeTracking = async () => {
     try {
+      // Get rider location
       const location = await locationService.getCurrentLocation();
-      setCurrentLocation(location);
+      setRiderLocation(location);
 
-      // Start location tracking
+      // Start location tracking for rider
       locationService.startLocationTracking((newLocation) => {
-        setCurrentLocation(newLocation);
+        setRiderLocation(newLocation);
       });
 
-      // If we have driverInfo from notification, use it as selectedProposal
+      // Load ride data
+      if (rideId) {
+        await loadRideData();
+      }
+
+      // Connect WebSocket to receive driver location updates
+      await connectToRideTracking();
+
+      // Save active ride
       if (driverInfo && rideId) {
-        setSelectedProposal({
-          driverName: driverInfo.driverName,
-          driverRating: driverInfo.driverRating,
-          vehicleModel: driverInfo.vehicleModel,
-          vehiclePlate: driverInfo.vehiclePlate,
-          estimatedArrival: '5-10',
-          fare: driverInfo.totalFare,
-          rideId: rideId,
-          requestId: requestId
-        });
-        setShowProposals(false);
-        setRideStatus(status || 'CONFIRMED');
-        
-        // Save as active ride
-        console.log('Rider saving active ride with driverInfo:', driverInfo);
-        console.log('Quote data:', quote);
-        
+        console.log('Rider saving active ride:', { rideId, requestId, driverInfo });
         activeRideService.saveActiveRide({
           rideId: rideId,
           requestId: requestId,
-          status: status || 'CONFIRMED',
+          status: rideStatus,
           userType: 'rider',
           driverInfo: driverInfo,
-          pickupLocation: {
-            lat: driverInfo.pickupLat || driverInfo.pickup_lat || quote?.pickup?.latitude,
-            lng: driverInfo.pickupLng || driverInfo.pickup_lng || quote?.pickup?.longitude,
-            name: driverInfo.pickup_location_name || quote?.pickupAddress || 'Điểm đón'
-          },
-          dropoffLocation: {
-            lat: driverInfo.dropoffLat || driverInfo.dropoff_lat || quote?.dropoff?.latitude,
-            lng: driverInfo.dropoffLng || driverInfo.dropoff_lng || quote?.dropoff?.longitude,
-            name: driverInfo.dropoff_location_name || quote?.dropoffAddress || 'Điểm đến'
-          },
-          totalFare: driverInfo.totalFare,
           ...driverInfo
         });
       }
-      // If we have proposals, show them
-      else if (proposals && proposals.length > 0) {
-        setShowProposals(true);
-      }
-
     } catch (error) {
       console.error('Error initializing tracking:', error);
     }
   };
 
-  const handleSelectProposal = (proposal) => {
-    setSelectedProposal(proposal);
-    setShowProposals(false);
-    
-    // Fit map to show pickup, dropoff, and driver location
-    if (mapRef.current) {
-      const coordinates = [
-        quote.pickup,
-        quote.dropoff,
-        proposal.driverLocation
-      ].filter(Boolean);
+  const loadRideData = async () => {
+    try {
+      setLoading(true);
+      const ride = await rideService.getRideById(rideId);
+      setRideData(ride);
+      console.log('📦 Rider loaded ride data:', ride);
       
-      const region = locationService.getRegionForCoordinates(coordinates, 0.02);
-      mapRef.current.animateToRegion(region, 1000);
+      // Update polyline
+      const polylineString = ride?.polyline || ride?.route?.polyline;
+      if (polylineString) {
+        const decoded = decodePolyline(polylineString);
+        console.log(`📍 Rider: Setting polyline with ${decoded.length} points`);
+        setFullPolyline(decoded);
+        setMapPolyline(decoded);
+      }
+      
+      // Update status
+      if (ride?.status) {
+        setRideStatus(ride.status);
+      }
+      
+      // Calculate initial ETA
+      if (ride?.estimated_duration_minutes) {
+        setEtaMinutes(ride.estimated_duration_minutes);
+      }
+      if (ride?.distance_km) {
+        setDistanceKm(ride.distance_km);
+      }
+    } catch (error) {
+      console.error('Failed to load ride data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRideStatusUpdate = (data) => {
+    console.log('📨📨📨 RIDER RECEIVED RIDE STATUS UPDATE 📨📨📨');
+    console.log('📨 Data:', JSON.stringify(data, null, 2));
+    
+    try {
+      const status = data?.status;
+      const phase = data?.phase;
+      const message = data?.message;
+      console.log(`📨 Extracted: status=${status}, phase=${phase}, message=${message}`);
+      
+      if (status === 'PICKUP_COMPLETED' && phase === 'TO_DROPOFF') {
+        console.log('✅ Driver picked up passenger, switching to dropoff phase');
+        setRideStatus('ONGOING');
+        
+        // Show notification to rider
+        Alert.alert(
+          'Đã được đón',
+          message || 'Tài xế đã nhận bạn. Đang di chuyển đến điểm đến.',
+          [{ text: 'OK' }]
+        );
+        
+        // Reload ride data to get updated polyline for dropoff route
+        loadRideData();
+      } else if (status === 'RIDE_COMPLETED' && phase === 'COMPLETED') {
+        console.log('✅ Ride completed, showing rating prompt');
+        setRideStatus('COMPLETED');
+        
+        // Show completion message with rating prompt
+        Alert.alert(
+          'Chuyến đi hoàn thành',
+          message || 'Chuyến đi của bạn đã hoàn thành. Vui lòng đánh giá tài xế.',
+          [
+            {
+              text: 'Đánh giá ngay',
+              onPress: () => {
+                // Navigate to rating screen
+                navigation.replace('RatingScreen', {
+                  rideId: data.rideId,
+                  requestId: data.requestId,
+                  driverId: data.driverId,
+                  driverName: data.driverName,
+                  totalFare: data.totalFare,
+                  actualDistance: data.actualDistance,
+                  actualDuration: data.actualDuration,
+                });
+              },
+            },
+            {
+              text: 'Để sau',
+              onPress: () => {
+                // Navigate back to home
+                navigation.navigate('Home');
+              },
+            },
+          ]
+        );
+        
+        // Clear active ride
+        activeRideService.clearActiveRide();
+      }
+    } catch (error) {
+      console.error('Error handling ride status update:', error);
+    }
+  };
+
+  const connectToRideTracking = async () => {
+    try {
+      if (!rideId) return;
+      
+      console.log(`🔌 Rider connecting to ride tracking for ride ${rideId}...`);
+      
+      // Connect WebSocket if not connected
+      if (!websocketService.isConnected) {
+        console.log('🔌 WebSocket not connected, connecting as rider...');
+        await websocketService.connectAsRider(
+          (data) => {
+            console.log('🔔 ride-matching callback triggered (from connectAsRider)');
+            handleRideStatusUpdate(data);
+          },
+          (notification) => console.log('Notification:', notification)
+        );
+        console.log('✅ Connected as rider and subscribed');
+      } else {
+        // WebSocket already connected, just update the ride-matching callback
+        console.log('🔌 WebSocket already connected, updating ride-matching callback...');
+        
+        // Update callback (subscribeToRiderMatching will update if already subscribed)
+        websocketService.subscribeToRiderMatching((data) => {
+          console.log('🔔 ride-matching callback triggered (updated callback)');
+          handleRideStatusUpdate(data);
+        });
+        console.log('✅ Updated ride-matching callback for RideTrackingScreen');
+      }
+
+      // Subscribe to driver location updates
+      console.log(`📡 Subscribing to /topic/ride.location.${rideId}...`);
+      const subscription = websocketService.client?.subscribe(
+        `/topic/ride.location.${rideId}`,
+        (message) => {
+          try {
+            const locationUpdate = JSON.parse(message.body);
+            console.log(`📍 Rider received driver location update for ride ${rideId}:`, locationUpdate);
+            
+            // locationUpdate could be single point or array of points
+            let latestPoint;
+            if (Array.isArray(locationUpdate)) {
+              latestPoint = locationUpdate[locationUpdate.length - 1];
+            } else {
+              latestPoint = locationUpdate;
+            }
+            
+            if (latestPoint && latestPoint.lat && latestPoint.lng) {
+              const newDriverLocation = {
+                latitude: latestPoint.lat,
+                longitude: latestPoint.lng
+              };
+              setDriverLocation(newDriverLocation);
+              
+              // Update polyline if backend sends new polyline (e.g., phase change)
+              if (latestPoint.polyline && typeof latestPoint.polyline === 'string' && latestPoint.polyline.length > 0) {
+                console.log('📍 Backend sent updated polyline, decoding...');
+                const decodedPolyline = decodePolyline(latestPoint.polyline);
+                if (decodedPolyline.length > 0) {
+                  setFullPolyline(decodedPolyline);
+                  const trimmed = trimPolylineFromDriverLocation(decodedPolyline, newDriverLocation);
+                  setMapPolyline(trimmed);
+                  console.log(`✅ Updated polyline: ${decodedPolyline.length} points, trimmed to ${trimmed.length} points`);
+                }
+              } else if (fullPolyline.length > 0) {
+                // Update trimmed polyline with existing fullPolyline
+                const trimmed = trimPolylineFromDriverLocation(fullPolyline, newDriverLocation);
+                setMapPolyline(trimmed);
+              }
+              
+              // Auto-recenter map (throttled)
+              const now = Date.now();
+              if (now - lastRecenterTime.current > RECENTER_THROTTLE) {
+                lastRecenterTime.current = now;
+                if (mapRef.current && riderLocation) {
+                  try {
+                    const points = [
+                      { latitude: riderLocation.latitude, longitude: riderLocation.longitude },
+                      { latitude: newDriverLocation.latitude, longitude: newDriverLocation.longitude }
+                    ];
+                    mapRef.current.fitToCoordinates(points, { 
+                      edgePadding: { top: 100, right: 100, bottom: 350, left: 100 },
+                      animated: true
+                    });
+                  } catch (e) {
+                    console.warn('Auto-recenter failed:', e);
+                  }
+                }
+              }
+              
+              // Update distance from backend or calculate ETA
+              if (latestPoint.distanceKm !== undefined) {
+                setDistanceKm(latestPoint.distanceKm);
+                // Assume average speed 30 km/h
+                const eta = Math.ceil((latestPoint.distanceKm / 30) * 60);
+                setEtaMinutes(eta);
+              } else if (riderLocation) {
+                // Fallback: calculate from rider location
+                const distance = locationService.calculateDistance(
+                  latestPoint.lat,
+                  latestPoint.lng,
+                  riderLocation.latitude,
+                  riderLocation.longitude
+                );
+                const eta = Math.ceil((distance / 30) * 60);
+                setEtaMinutes(eta);
+                setDistanceKm(distance);
+              }
+            }
+          } catch (error) {
+            console.error('Error processing driver location update:', error);
+          }
+        }
+      );
+
+      if (subscription) {
+        console.log(`✅ Rider subscribed to driver location updates: /topic/ride.location.${rideId}`);
+      } else {
+        console.error(`❌ Failed to subscribe to driver location updates - client not available`);
+      }
+      
+      return () => {
+        if (subscription) {
+          console.log(`🔌 Unsubscribing from /topic/ride.location.${rideId}`);
+          subscription.unsubscribe();
+        }
+      };
+    } catch (error) {
+      console.error('❌ Error connecting to ride tracking:', error);
     }
   };
 
   const recenterMap = () => {
     try {
       if (!mapRef.current) return;
-      const coords = [];
-      if (quote?.pickup) coords.push(quote.pickup);
-      if (quote?.dropoff) coords.push(quote.dropoff);
-      if (selectedProposal?.driverLocation) coords.push(selectedProposal.driverLocation);
-      if (coords.length) {
-        const region = locationService.getRegionForCoordinates(coords, 0.02);
-        mapRef.current.animateToRegion(region, 600);
+      const points = [];
+      
+      // Add rider location
+      if (riderLocation) {
+        points.push({ latitude: riderLocation.latitude, longitude: riderLocation.longitude });
       }
-    } catch {}
+      
+      // Add driver location
+      if (driverLocation) {
+        points.push({ latitude: driverLocation.latitude, longitude: driverLocation.longitude });
+      }
+      
+      // Add pickup/dropoff from ride data or driver info
+      const pickupLat = rideData?.pickup_lat || driverInfo?.pickupLat || quote?.pickup?.latitude;
+      const pickupLng = rideData?.pickup_lng || driverInfo?.pickupLng || quote?.pickup?.longitude;
+      if (pickupLat && pickupLng) {
+        points.push({ latitude: pickupLat, longitude: pickupLng });
+      }
+      
+      const dropoffLat = rideData?.dropoff_lat || driverInfo?.dropoffLat || quote?.dropoff?.latitude;
+      const dropoffLng = rideData?.dropoff_lng || driverInfo?.dropoffLng || quote?.dropoff?.longitude;
+      if (dropoffLat && dropoffLng) {
+        points.push({ latitude: dropoffLat, longitude: dropoffLng });
+      }
+      
+      if (points.length > 0) {
+        mapRef.current.fitToCoordinates(points, { edgePadding: 100 });
+      }
+    } catch (e) {
+      console.error('Recenter map error:', e);
+    }
   };
 
   const handleCancelRide = () => {
     Alert.alert(
-      'Hủy chuyến xe',
-      'Bạn có chắc chắn muốn hủy chuyến xe này?',
+      'Hủy chuyến đi',
+      'Bạn có chắc chắn muốn hủy chuyến đi này không?',
       [
         { text: 'Không', style: 'cancel' },
         {
@@ -148,17 +433,16 @@ const RideTrackingScreen = ({ navigation, route }) => {
           onPress: async () => {
             try {
               setLoading(true);
-              // Cancel the ride request
-              if (selectedProposal?.requestId) {
-                await rideService.cancelRequest(selectedProposal.requestId);
+              if (requestId) {
+                await rideService.cancelRideRequestOfRide(rideId, requestId);
               }
-              
-              Alert.alert('Thành công', 'Đã hủy chuyến xe', [
+              await activeRideService.clearActiveRide();
+              Alert.alert('Thành công', 'Đã hủy chuyến đi', [
                 { text: 'OK', onPress: () => navigation.goBack() }
               ]);
             } catch (error) {
               console.error('Cancel ride error:', error);
-              Alert.alert('Lỗi', 'Không thể hủy chuyến xe. Vui lòng thử lại.');
+              Alert.alert('Lỗi', 'Không thể hủy chuyến đi. Vui lòng thử lại.');
             } finally {
               setLoading(false);
             }
@@ -169,312 +453,286 @@ const RideTrackingScreen = ({ navigation, route }) => {
   };
 
   const handleCallDriver = () => {
-    if (selectedProposal?.driverPhone) {
-      // In a real app, you would use Linking.openURL(`tel:${selectedProposal.driverPhone}`)
-      Alert.alert('Gọi tài xế', `Số điện thoại: ${selectedProposal.driverPhone}`);
+    const phoneNumber = driverInfo?.driverPhone || driverInfo?.driver_phone;
+    if (phoneNumber) {
+      Linking.openURL(`tel:${phoneNumber}`);
+    } else {
+      Alert.alert('Thông báo', 'Không có số điện thoại tài xế');
     }
   };
 
-  const renderProposalCard = (proposal, index) => (
-    <Animatable.View
-      key={proposal.rideId || index}
-      animation="fadeInUp"
-      delay={index * 100}
-      style={styles.proposalCard}
-    >
-      <View style={styles.proposalHeader}>
-        <View style={styles.driverInfo}>
-          <View style={styles.driverAvatar}>
-            <Icon name="person" size={24} color="#4CAF50" />
-          </View>
-          <View style={styles.driverDetails}>
-            <Text style={styles.driverName}>{proposal.driverName}</Text>
-            <View style={styles.ratingContainer}>
-              <Icon name="star" size={16} color="#FFD700" />
-              <Text style={styles.rating}>{proposal.driverRating || '5.0'}</Text>
-              <Text style={styles.ratingCount}>({proposal.ratingCount || '100'})</Text>
-            </View>
-          </View>
-        </View>
-        <View style={styles.proposalPrice}>
-          <Text style={styles.priceAmount}>
-            {rideService.formatCurrency(proposal.fare || quote?.totalFare || 0)}
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.proposalDetails}>
-        <View style={styles.detailRow}>
-          <Icon name="access-time" size={16} color="#666" />
-          <Text style={styles.detailText}>
-            Đón bạn trong {proposal.estimatedArrival || '5-10'} phút
-          </Text>
-        </View>
-        
-        <View style={styles.detailRow}>
-          <Icon name="directions-car" size={16} color="#666" />
-          <Text style={styles.detailText}>
-            {proposal.vehicleInfo || 'Honda Wave - 29A1-12345'}
-          </Text>
-        </View>
-      </View>
-
-      <ModernButton
-        title="Chọn tài xế này"
-        onPress={() => handleSelectProposal(proposal)}
-        size="medium"
-        icon="check"
-      />
-    </Animatable.View>
-  );
-
-  const renderRideStatus = () => {
-    if (!selectedProposal) return null;
-
-    const statusConfig = {
-      'PENDING': {
-        title: 'Đang chờ tài xế xác nhận',
-        subtitle: 'Tài xế sẽ phản hồi trong vài phút',
-        icon: 'hourglass-empty',
-        color: '#FF9800'
-      },
-      'CONFIRMED': {
-        title: 'Tài xế đang đến đón bạn',
-        subtitle: `Dự kiến ${selectedProposal.estimatedArrival || '5-10'} phút`,
-        icon: 'directions-car',
-        color: '#4CAF50'
-      },
-      'ONGOING': {
-        title: 'Đang trong chuyến đi',
-        subtitle: 'Chúc bạn có chuyến đi an toàn',
-        icon: 'navigation',
-        color: '#2196F3'
-      },
-      'COMPLETED': {
-        title: 'Chuyến đi hoàn thành',
-        subtitle: 'Cảm ơn bạn đã sử dụng dịch vụ',
-        icon: 'check-circle',
-        color: '#4CAF50'
-      }
-    };
-
-    const config = statusConfig[rideStatus] || statusConfig['PENDING'];
-
-    return (
-      <Animatable.View animation="slideInUp" style={styles.statusContainer}>
-        <View style={styles.statusHeader}>
-          <View style={[styles.statusIcon, { backgroundColor: config.color + '20' }]}>
-            <Icon name={config.icon} size={24} color={config.color} />
-          </View>
-          <View style={styles.statusInfo}>
-            <Text style={styles.statusTitle}>{config.title}</Text>
-            <Text style={styles.statusSubtitle}>{config.subtitle}</Text>
-          </View>
-        </View>
-
-        <View style={styles.driverCard}>
-          <View style={styles.driverInfo}>
-            <View style={styles.driverAvatar}>
-              <Icon name="person" size={24} color="#4CAF50" />
-            </View>
-            <View style={styles.driverDetails}>
-              <Text style={styles.driverName}>{selectedProposal.driverName}</Text>
-              <Text style={styles.vehicleInfo}>{selectedProposal.vehicleInfo}</Text>
-            </View>
-          </View>
-          
-          <View style={styles.driverActions}>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={handleCallDriver}
-            >
-              <Icon name="phone" size={20} color="#4CAF50" />
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => Alert.alert('Tin nhắn', 'Tính năng nhắn tin đang phát triển')}
-            >
-              <Icon name="message" size={20} color="#4CAF50" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={styles.tripDetails}>
-          <View style={styles.tripRow}>
-            <Icon name="radio-button-checked" size={16} color="#4CAF50" />
-            <Text style={styles.tripText} numberOfLines={1}>
-              {quote?.pickupAddress || 'Điểm đón'}
-            </Text>
-          </View>
-          
-          <View style={styles.tripDivider} />
-          
-          <View style={styles.tripRow}>
-            <Icon name="location-on" size={16} color="#F44336" />
-            <Text style={styles.tripText} numberOfLines={1}>
-              {quote?.dropoffAddress || 'Điểm đến'}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.actionButtons}>
-          <ModernButton
-            title="Hủy chuyến"
-            onPress={handleCancelRide}
-            disabled={loading || rideStatus === 'ONGOING'}
-            variant="outline"
-            size="medium"
-            icon="cancel"
-          />
-          
-          {/* Rider-side simulation controls (for demo/testing) */}
-          <ModernButton
-            title="Giả lập tài xế đến"
-            onPress={() => {
-              try {
-                const start = selectedProposal?.driverLocation || quote?.pickup;
-                const end = quote?.dropoff;
-                if (!start || !end) return;
-                locationTrackingService.startSimulation({
-                  start: { lat: start.latitude, lng: start.longitude },
-                  end: { lat: end.latitude, lng: end.longitude },
-                  speedMps: 8.33,
-                  localOnly: true,
-                });
-                Alert.alert('Giả lập', 'Đang giả lập di chuyển…');
-              } catch {}
-            }}
-            size="medium"
-            icon="play-circle-outline"
-          />
-          <ModernButton
-            title="Dừng giả lập"
-            onPress={() => locationTrackingService.stopSimulation()}
-            size="medium"
-            icon="pause-circle-outline"
-            variant="outline"
-          />
-
-          {rideStatus === 'COMPLETED' && (
-            <ModernButton
-              title="Đánh giá"
-              onPress={() => navigation.navigate('RideRating', { ride: selectedProposal })}
-              size="medium"
-              icon="star"
-            />
-          )}
-        </View>
-      </Animatable.View>
+  const handleSOSAlert = () => {
+    Alert.alert(
+      'SOS - Khẩn cấp',
+      'Bạn có muốn gửi cảnh báo khẩn cấp không?',
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Gửi SOS',
+          style: 'destructive',
+          onPress: () => {
+            // TODO: Implement SOS functionality
+            Alert.alert('SOS', 'Đã gửi cảnh báo khẩn cấp đến hệ thống và liên hệ khẩn cấp của bạn');
+          }
+        }
+      ]
     );
   };
 
+  // Get status config
+  const getStatusConfig = () => {
+    switch (rideStatus) {
+      case 'CONFIRMED':
+      case 'SCHEDULED':
+        return {
+          title: 'Tài xế đang đến đón bạn',
+          subtitle: etaMinutes ? `Còn khoảng ${etaMinutes} phút` : 'Đang tính toán...',
+          icon: 'directions-car',
+          color: '#4CAF50'
+        };
+      case 'ONGOING':
+        return {
+          title: 'Đang trong chuyến đi',
+          subtitle: etaMinutes ? `Còn khoảng ${etaMinutes} phút` : 'Chúc bạn có chuyến đi an toàn',
+          icon: 'navigation',
+          color: '#2196F3'
+        };
+      case 'COMPLETED':
+        return {
+          title: 'Chuyến đi hoàn thành',
+          subtitle: 'Cảm ơn bạn đã sử dụng dịch vụ',
+          icon: 'check-circle',
+          color: '#4CAF50'
+        };
+      default:
+        return {
+          title: 'Đang chờ xác nhận',
+          subtitle: 'Vui lòng đợi...',
+          icon: 'hourglass-empty',
+          color: '#FF9800'
+        };
+    }
+  };
+
+  const statusConfig = getStatusConfig();
+
+  // Build markers array
+  const markers = [];
+  
+  // Rider location marker
+  if (riderLocation) {
+    markers.push({
+      id: 'rider',
+      coordinate: riderLocation,
+      title: 'Vị trí của bạn',
+      description: 'Hành khách',
+      pinColor: '#FF9800',
+      updateKey: markerUpdateKey
+    });
+  }
+  
+  // Driver location marker
+  if (driverLocation) {
+    markers.push({
+      id: 'driver',
+      coordinate: driverLocation,
+      title: `Tài xế ${driverInfo?.driverName || ''}`,
+      description: driverInfo?.vehicleModel || 'Đang di chuyển',
+      pinColor: '#2196F3',
+      icon: 'motorcycle',
+      updateKey: markerUpdateKey
+    });
+  }
+  
+  // Pickup marker (if not ONGOING)
+  if (rideStatus !== 'ONGOING' && rideStatus !== 'COMPLETED') {
+    const pickupLat = rideData?.pickup_lat || driverInfo?.pickupLat || quote?.pickup?.latitude;
+    const pickupLng = rideData?.pickup_lng || driverInfo?.pickupLng || quote?.pickup?.longitude;
+    if (pickupLat && pickupLng) {
+      markers.push({
+        id: 'pickup',
+        coordinate: { latitude: pickupLat, longitude: pickupLng },
+        title: 'Điểm đón',
+        description: rideData?.pickup_location_name || driverInfo?.pickup_location_name || 'Điểm đón',
+        pinColor: '#4CAF50'
+      });
+    }
+  }
+  
+  // Dropoff marker
+  const dropoffLat = rideData?.dropoff_lat || driverInfo?.dropoffLat || quote?.dropoff?.latitude;
+  const dropoffLng = rideData?.dropoff_lng || driverInfo?.dropoffLng || quote?.dropoff?.longitude;
+  if (dropoffLat && dropoffLng) {
+    markers.push({
+      id: 'dropoff',
+      coordinate: { latitude: dropoffLat, longitude: dropoffLng },
+      title: 'Điểm đến',
+      description: rideData?.dropoff_location_name || driverInfo?.dropoff_location_name || 'Điểm đến',
+      pinColor: '#f44336'
+    });
+  }
+
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
+      {/* Compact Top Bar */}
+      <View style={styles.topBar}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Icon name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>
-          {showProposals ? 'Chọn tài xế' : 'Theo dõi chuyến xe'}
-        </Text>
+        <View style={styles.topBarInfo}>
+          <Text style={styles.topBarTitle}>Chuyến đi #{rideId}</Text>
+          <Text style={styles.topBarSubtitle}>{statusConfig.title}</Text>
+        </View>
+        <TouchableOpacity onPress={handleSOSAlert} style={styles.sosBtn}>
+          <Icon name="warning" size={24} color="#F44336" />
+        </TouchableOpacity>
       </View>
 
-      {/* Map */}
-      <GoongMap
-        onRef={(api) => { mapRef.current = api; }}
-        style={styles.map}
-        initialRegion={
-          currentLocation
-            ? locationService.getMapRegion(currentLocation.latitude, currentLocation.longitude)
-            : {
-                latitude: 10.8231,
-                longitude: 106.6297,
-                latitudeDelta: 0.01,
-                longitudeDelta: 0.01,
-              }
-        }
-        showsUserLocation={true}
-        markers={[
-          // Pickup location
-          ...(quote?.pickup ? [{
-            coordinate: quote.pickup,
-            title: "Điểm đón",
-            pinColor: "#4CAF50"
-          }] : driverInfo?.pickupLat && driverInfo?.pickupLng ? [{
-            coordinate: {
-              latitude: driverInfo.pickupLat,
-              longitude: driverInfo.pickupLng
-            },
-            title: "Điểm đón",
-            pinColor: "#4CAF50"
-          }] : []),
-          // Dropoff location  
-          ...(quote?.dropoff ? [{
-            coordinate: quote.dropoff,
-            title: "Điểm đến",
-            pinColor: "#F44336"
-          }] : driverInfo?.dropoffLat && driverInfo?.dropoffLng ? [{
-            coordinate: {
-              latitude: driverInfo.dropoffLat,
-              longitude: driverInfo.dropoffLng
-            },
-            title: "Điểm đến",
-            pinColor: "#F44336"
-          }] : []),
-          // Driver location (if available)
-          ...(selectedProposal?.driverLocation ? [{
-            coordinate: selectedProposal.driverLocation,
-            title: `Tài xế ${selectedProposal.driverName}`,
-            pinColor: "#2196F3"
-          }] : []),
-          // Current user location
-          ...(currentLocation ? [{
-            coordinate: {
-              latitude: currentLocation.latitude,
-              longitude: currentLocation.longitude
-            },
-            title: "Vị trí của bạn",
-            pinColor: "#FF9800"
-          }] : [])
-        ]}
-      />
+      {/* Full-Screen Map */}
+      <View style={styles.mapContainer}>
+        <GoongMap
+          onRef={(api) => { mapRef.current = api; }}
+          style={styles.map}
+          initialRegion={{
+            latitude: riderLocation?.latitude || 10.7769,
+            longitude: riderLocation?.longitude || 106.7009,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+          }}
+          showsUserLocation={false}
+          markers={markers}
+          polyline={mapPolyline}
+        />
 
-      {/* ETA chip */}
-      {etaText && (
-        <View style={styles.etaChip}>
-          <Icon name="schedule" size={16} color="#fff" />
-          <Text style={styles.etaText}>{etaText}</Text>
-        </View>
-      )}
+        {/* ETA Chip */}
+        {etaMinutes && (
+          <View style={styles.etaChip}>
+            <Icon name="schedule" size={16} color="#fff" />
+            <Text style={styles.etaText}>{etaMinutes} phút</Text>
+            {distanceKm && (
+              <>
+                <View style={styles.etaDivider} />
+                <Text style={styles.etaText}>{distanceKm.toFixed(1)} km</Text>
+              </>
+            )}
+          </View>
+        )}
 
-      {/* Recenter FAB */}
-      <TouchableOpacity style={styles.fab} onPress={recenterMap}>
-        <Icon name="my-location" size={22} color="#333" />
-      </TouchableOpacity>
+        {/* GPS Recenter Button */}
+        <TouchableOpacity style={styles.recenterBtn} onPress={recenterMap}>
+          <Icon name="my-location" size={22} color="#333" />
+        </TouchableOpacity>
+      </View>
 
-      {/* Bottom Content */}
-      {showProposals ? (
-        <View style={styles.proposalsContainer}>
-          <Text style={styles.proposalsTitle}>
-            Tìm thấy {proposals?.length || 0} tài xế phù hợp
-          </Text>
-          
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.proposalsList}
-          >
-            {proposals?.map((proposal, index) => renderProposalCard(proposal, index))}
-          </ScrollView>
-        </View>
-      ) : (
-        renderRideStatus()
-      )}
+      {/* Bottom Sheet */}
+      <Animatable.View 
+        animation="slideInUp" 
+        style={[styles.bottomSheet, !showBottomSheet && styles.bottomSheetCollapsed]}
+      >
+        {/* Handle Bar */}
+        <TouchableOpacity 
+          style={styles.handleBar}
+          onPress={() => setShowBottomSheet(!showBottomSheet)}
+        >
+          <View style={styles.handle} />
+        </TouchableOpacity>
+
+        {showBottomSheet && (
+          <>
+            {/* Status Header */}
+            <View style={styles.statusHeader}>
+              <View style={[styles.statusIcon, { backgroundColor: statusConfig.color + '20' }]}>
+                <Icon name={statusConfig.icon} size={28} color={statusConfig.color} />
+              </View>
+              <View style={styles.statusInfo}>
+                <Text style={styles.statusTitle}>{statusConfig.title}</Text>
+                <Text style={styles.statusSubtitle}>{statusConfig.subtitle}</Text>
+              </View>
+            </View>
+
+            {/* Driver Info Card */}
+            <View style={styles.driverCard}>
+              <View style={styles.driverAvatar}>
+                <Icon name="person" size={28} color="#4CAF50" />
+              </View>
+              <View style={styles.driverInfo}>
+                <Text style={styles.driverName}>{driverInfo?.driverName || 'Tài xế'}</Text>
+                <View style={styles.driverRating}>
+                  <Icon name="star" size={16} color="#FFD700" />
+                  <Text style={styles.ratingText}>{driverInfo?.driverRating || '5.0'}</Text>
+                </View>
+                <Text style={styles.vehicleInfo}>
+                  {driverInfo?.vehicleModel || ''} • {driverInfo?.vehiclePlate || ''}
+                </Text>
+              </View>
+              <View style={styles.driverActions}>
+                <TouchableOpacity style={styles.actionBtn} onPress={handleCallDriver}>
+                  <Icon name="phone" size={20} color="#4CAF50" />
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.actionBtn} 
+                  onPress={() => Alert.alert('Tin nhắn', 'Tính năng chat đang phát triển')}
+                >
+                  <Icon name="message" size={20} color="#4CAF50" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Trip Details */}
+            <View style={styles.tripDetails}>
+              <View style={styles.tripRow}>
+                <Icon name="radio-button-checked" size={18} color="#4CAF50" />
+                <Text style={styles.tripText} numberOfLines={1}>
+                  {rideData?.pickup_location_name || driverInfo?.pickup_location_name || quote?.pickupAddress || 'Điểm đón'}
+                </Text>
+              </View>
+              
+              <View style={styles.tripDivider} />
+              
+              <View style={styles.tripRow}>
+                <Icon name="location-on" size={18} color="#F44336" />
+                <Text style={styles.tripText} numberOfLines={1}>
+                  {rideData?.dropoff_location_name || driverInfo?.dropoff_location_name || quote?.dropoffAddress || 'Điểm đến'}
+                </Text>
+              </View>
+            </View>
+
+            {/* Price */}
+            <View style={styles.priceContainer}>
+              <Text style={styles.priceLabel}>Tổng cước</Text>
+              <Text style={styles.priceAmount}>
+                {rideService.formatCurrency(driverInfo?.totalFare || rideData?.total_fare || 0)}
+              </Text>
+            </View>
+
+            {/* Action Buttons */}
+            <View style={styles.actionButtons}>
+              {rideStatus !== 'COMPLETED' && rideStatus !== 'ONGOING' && (
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.cancelButton]}
+                  onPress={handleCancelRide}
+                  disabled={loading}
+                >
+                  <Icon name="cancel" size={20} color="#F44336" />
+                  <Text style={[styles.actionButtonText, styles.cancelButtonText]}>Hủy chuyến</Text>
+                </TouchableOpacity>
+              )}
+              
+              {rideStatus === 'COMPLETED' && (
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.primaryButton]}
+                  onPress={() => {
+                    navigation.navigate('RideRating', { rideId, requestId });
+                  }}
+                >
+                  <Icon name="star" size={20} color="#fff" />
+                  <Text style={[styles.actionButtonText, styles.primaryButtonText]}>Đánh giá</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </>
+        )}
+      </Animatable.View>
 
       {/* Loading Overlay */}
       {loading && (
@@ -492,22 +750,37 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
-  header: {
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: '#e0e0e0',
   },
-  backButton: {
-    marginRight: 15,
+  backBtn: {
+    padding: 8,
   },
-  headerTitle: {
-    fontSize: 18,
+  topBarInfo: {
+    flex: 1,
+    marginLeft: 8,
+  },
+  topBarTitle: {
+    fontSize: 14,
     fontWeight: '600',
     color: '#333',
+  },
+  topBarSubtitle: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+  sosBtn: {
+    padding: 8,
+  },
+  mapContainer: {
+    flex: 1,
   },
   map: {
     flex: 1,
@@ -516,156 +789,85 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 12,
     alignSelf: 'center',
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
   },
   etaText: {
     color: '#fff',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
+    marginLeft: 6,
   },
-  fab: {
+  etaDivider: {
+    width: 1,
+    height: 14,
+    backgroundColor: '#fff',
+    marginHorizontal: 10,
+    opacity: 0.5,
+  },
+  recenterBtn: {
     position: 'absolute',
-    right: 12,
-    bottom: 12,
+    right: 16,
+    bottom: 280,
     width: 44,
     height: 44,
     borderRadius: 22,
     backgroundColor: '#fff',
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 4,
+    elevation: 10,
+    zIndex: 1000,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 3,
   },
-  driverMarker: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#4CAF50',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: '#fff',
-  },
-  proposalsContainer: {
+  bottomSheet: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: '#fff',
-    paddingTop: 20,
-    maxHeight: height * 0.4,
-  },
-  proposalsTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 15,
-    paddingHorizontal: 20,
-  },
-  proposalsList: {
-    paddingHorizontal: 20,
-    gap: 15,
-  },
-  proposalCard: {
-    width: width * 0.8,
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#f0f0f0',
-    elevation: 2,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: height * 0.6,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
+    elevation: 5,
+    paddingBottom: 20,
   },
-  proposalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  bottomSheetCollapsed: {
+    maxHeight: 60,
+  },
+  handleBar: {
     alignItems: 'center',
-    marginBottom: 15,
+    paddingVertical: 12,
   },
-  driverInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  driverAvatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  driverDetails: {
-    flex: 1,
-  },
-  driverName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
-  },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  rating: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#333',
-    marginLeft: 4,
-  },
-  ratingCount: {
-    fontSize: 12,
-    color: '#666',
-    marginLeft: 4,
-  },
-  proposalPrice: {
-    alignItems: 'flex-end',
-  },
-  priceAmount: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#4CAF50',
-  },
-  proposalDetails: {
-    marginBottom: 15,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  detailText: {
-    fontSize: 14,
-    color: '#666',
-    marginLeft: 8,
-  },
-  statusContainer: {
-    backgroundColor: '#fff',
-    padding: 20,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+  handle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#ccc',
+    borderRadius: 2,
   },
   statusHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 20,
     marginBottom: 20,
   },
   statusIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 15,
+    marginRight: 12,
   },
   statusInfo: {
     flex: 1,
@@ -685,19 +887,48 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#f8f9fa',
     borderRadius: 12,
-    padding: 15,
-    marginBottom: 20,
+    padding: 16,
+    marginHorizontal: 20,
+    marginBottom: 16,
+  },
+  driverAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#E8F5E9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  driverInfo: {
+    flex: 1,
+  },
+  driverName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+  },
+  driverRating: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  ratingText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#333',
+    marginLeft: 4,
   },
   vehicleInfo: {
     fontSize: 12,
     color: '#666',
-    marginTop: 2,
   },
   driverActions: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
   },
-  actionButton: {
+  actionBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -710,8 +941,9 @@ const styles = StyleSheet.create({
   tripDetails: {
     backgroundColor: '#f8f9fa',
     borderRadius: 12,
-    padding: 15,
-    marginBottom: 20,
+    padding: 16,
+    marginHorizontal: 20,
+    marginBottom: 16,
   },
   tripRow: {
     flexDirection: 'row',
@@ -725,14 +957,62 @@ const styles = StyleSheet.create({
   },
   tripDivider: {
     height: 20,
-    width: 1,
+    width: 2,
     backgroundColor: '#ddd',
     marginLeft: 8,
     marginVertical: 8,
   },
+  priceContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    marginHorizontal: 20,
+    marginBottom: 16,
+  },
+  priceLabel: {
+    fontSize: 14,
+    color: '#666',
+  },
+  priceAmount: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
   actionButtons: {
     flexDirection: 'row',
-    gap: 15,
+    gap: 12,
+    paddingHorizontal: 20,
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 8,
+  },
+  cancelButton: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#F44336',
+  },
+  primaryButton: {
+    backgroundColor: '#4CAF50',
+  },
+  actionButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  cancelButtonText: {
+    color: '#F44336',
+  },
+  primaryButtonText: {
+    color: '#fff',
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -744,6 +1024,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 16,
     color: '#fff',
+    fontWeight: '500',
   },
 });
 

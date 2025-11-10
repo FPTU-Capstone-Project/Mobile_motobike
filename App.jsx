@@ -34,6 +34,7 @@ import ChangePasswordScreen from './src/screens/profile/ChangePasswordScreen.jsx
 import RideBookingScreen from './src/screens/ride/RideBookingScreen.jsx';
 import RiderMatchingScreen from './src/screens/ride/RiderMatchingScreen.jsx';
 import RideTrackingScreen from './src/screens/ride/RideTrackingScreen.jsx';
+import RatingScreen from './src/screens/ride/RatingScreen.jsx';
 
 // Driver Screens
 import DriverHomeScreen from './src/screens/driver/DriverHomeScreen.jsx';
@@ -239,6 +240,11 @@ export default function App() {
           <Stack.Screen 
             name="RideTracking" 
             component={RideTrackingScreen} 
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="RatingScreen" 
+            component={RatingScreen} 
             options={{ headerShown: false }}
           />
           <Stack.Screen 

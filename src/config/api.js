@@ -193,7 +193,8 @@ export const ENDPOINTS = {
     // Rider endpoints
     BOOK_RIDE: '/ride-requests',
     JOIN_RIDE: '/ride-requests/rides/{rideId}',
-    GET_BY_RIDER: '/ride-requests/rider',
+    GET_MY_REQUESTS: '/ride-requests/rider', // Get authenticated rider's requests (using userId)
+    GET_BY_RIDER: '/ride-requests/rider', // Legacy: Get by riderId (for admin)
     CANCEL: '/ride-requests/{requestId}',
     DETAILS: '/ride-requests/{requestId}',
     
@@ -253,5 +254,12 @@ export const ENDPOINTS = {
     FALLBACK_ENDPOINTS: ['/ws/websocket', '/websocket', '/ws'], // Try multiple endpoints
     DRIVER_QUEUE: '/user/queue/ride-offers',
     RIDER_QUEUE: '/user/queue/ride-matching',
+  },
+
+  // Ratings API
+  RATINGS: {
+    SUBMIT: '/ratings', // POST - Submit rating for a driver
+    RIDER_HISTORY: '/ratings/rider/history', // GET - Get ratings submitted by rider
+    DRIVER_HISTORY: '/ratings/driver/history', // GET - Get ratings received by driver
   },
 };

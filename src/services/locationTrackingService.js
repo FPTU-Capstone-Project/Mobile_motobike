@@ -613,8 +613,6 @@ class LocationTrackingService {
           destination: wsDestination,
           body: JSON.stringify(points),
         });
-        console.log(`📍 Sent ${points.length} location points via WebSocket to ${wsDestination}`);
-        console.log(`📍 Sample point:`, points[0]);
         this.locationBuffer = [];
         this.lastSendTime = Date.now();
       } else {
@@ -622,7 +620,6 @@ class LocationTrackingService {
         console.warn('WebSocket not connected, trying REST API fallback...');
         const endpoint = ENDPOINTS.RIDES.TRACK.replace('{rideId}', this.currentRideId);
         const response = await apiService.post(endpoint, points);
-        console.log(`📍 Sent ${points.length} location points via REST API for ride ${this.currentRideId}`);
         this.locationBuffer = [];
         this.lastSendTime = Date.now();
         return response;
