@@ -35,7 +35,6 @@ const RideDetailsScreen = ({ navigation, route }) => {
           const rideResponse = await rideService.getRideById(rideId);
           const rideDataObj = rideResponse?.data || rideResponse;
           setRideData(rideDataObj);
-          console.log('✅ Loaded ride data:', rideDataObj);
 
           // Load request data if available
           if (requestId) {
@@ -60,17 +59,13 @@ const RideDetailsScreen = ({ navigation, route }) => {
                   req => req.shared_ride_request_id === requestId || 
                          req.shared_ride_request_id === parseInt(requestId)
                 );
-                console.log('✅ Loaded request data from API:', request);
               } catch (reqError) {
-                console.warn('⚠️ Could not load request data:', reqError);
               }
             }
             
             if (request) {
               setRequestData(request);
-              console.log('✅ Set request data:', request);
             } else {
-              console.warn('⚠️ Request data not found for requestId:', requestId);
             }
           }
         } catch (error) {
@@ -91,10 +86,8 @@ const RideDetailsScreen = ({ navigation, route }) => {
           );
           if (rideRating) {
             setRating(rideRating);
-            console.log('✅ Loaded rating:', rideRating);
           }
         } catch (ratingError) {
-          console.warn('⚠️ Could not load rating:', ratingError);
         }
       }
     } catch (error) {
@@ -114,44 +107,61 @@ const RideDetailsScreen = ({ navigation, route }) => {
     let pickupLocation = null;
     let pickupAddress = 'N/A';
     
-    // Priority 1: request.pickup_location (from requestData)
-    if (request?.pickup_location && 
-        typeof request.pickup_location.lat === 'number' && 
-        typeof request.pickup_location.lng === 'number') {
-      pickupLocation = {
-        lat: request.pickup_location.lat,
-        lng: request.pickup_location.lng,
-      };
-      pickupAddress = request.pickup_location.address || 
-                     request.pickup_location.name || 
-                     'N/A';
-    } 
-    // Priority 2: rideInfo.start_location (from rideData)
-    else if (rideInfo?.start_location && 
-             typeof rideInfo.start_location.lat === 'number' && 
-             typeof rideInfo.start_location.lng === 'number') {
-      pickupLocation = {
-        lat: rideInfo.start_location.lat,
-        lng: rideInfo.start_location.lng,
-      };
-      pickupAddress = rideInfo.start_location.address || 
-                     rideInfo.start_location.name || 
-                     ride?.pickupAddress || 
-                     'N/A';
-    } 
-    // Priority 3: ride.raw.pickup_location (from initial ride data)
-    else if (ride?.raw?.pickup_location && 
-             typeof ride.raw.pickup_location.lat === 'number' && 
-             typeof ride.raw.pickup_location.lng === 'number') {
-      pickupLocation = {
-        lat: ride.raw.pickup_location.lat,
-        lng: ride.raw.pickup_location.lng,
-      };
-      pickupAddress = ride.raw.pickup_location.address || 
-                     ride.raw.pickup_location.name || 
-                     ride?.pickupAddress || 
-                     'N/A';
-    }
+      // Priority 1: request.pickup_location (from requestData)
+      if (request?.pickup_location && 
+          typeof request.pickup_location.lat === 'number' && 
+          typeof request.pickup_location.lng === 'number') {
+        pickupLocation = {
+          lat: request.pickup_location.lat,
+          lng: request.pickup_location.lng,
+        };
+        // Prioritize name if address is "N/A"
+        if (request.pickup_location.address && request.pickup_location.address !== 'N/A') {
+          pickupAddress = request.pickup_location.address;
+        } else if (request.pickup_location.name) {
+          pickupAddress = request.pickup_location.name;
+        } else {
+          pickupAddress = 'N/A';
+        }
+      }
+      // Priority 2: rideInfo.start_location (from rideData)
+      else if (rideInfo?.start_location && 
+               typeof rideInfo.start_location.lat === 'number' && 
+               typeof rideInfo.start_location.lng === 'number') {
+        pickupLocation = {
+          lat: rideInfo.start_location.lat,
+          lng: rideInfo.start_location.lng,
+        };
+        // Prioritize name if address is "N/A"
+        if (rideInfo.start_location.address && rideInfo.start_location.address !== 'N/A') {
+          pickupAddress = rideInfo.start_location.address;
+        } else if (rideInfo.start_location.name) {
+          pickupAddress = rideInfo.start_location.name;
+        } else if (ride?.pickupAddress) {
+          pickupAddress = ride.pickupAddress;
+        } else {
+          pickupAddress = 'N/A';
+        }
+      }
+      // Priority 3: ride.raw.pickup_location (from initial ride data)
+      else if (ride?.raw?.pickup_location && 
+               typeof ride.raw.pickup_location.lat === 'number' && 
+               typeof ride.raw.pickup_location.lng === 'number') {
+        pickupLocation = {
+          lat: ride.raw.pickup_location.lat,
+          lng: ride.raw.pickup_location.lng,
+        };
+        // Prioritize name if address is "N/A"
+        if (ride.raw.pickup_location.address && ride.raw.pickup_location.address !== 'N/A') {
+          pickupAddress = ride.raw.pickup_location.address;
+        } else if (ride.raw.pickup_location.name) {
+          pickupAddress = ride.raw.pickup_location.name;
+        } else if (ride?.pickupAddress) {
+          pickupAddress = ride.pickupAddress;
+        } else {
+          pickupAddress = 'N/A';
+        }
+      }
     // Fallback: just address
     else if (ride?.pickupAddress) {
       pickupAddress = ride.pickupAddress;

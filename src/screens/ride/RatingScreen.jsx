@@ -51,7 +51,6 @@ const RatingScreen = ({ navigation, route }) => {
 
     try {
       setSubmitting(true);
-      console.log(`📝 Submitting rating: ${rating} stars for request ${requestId}`);
       
       await ratingService.submitRating(requestId, rating, comment);
       
@@ -495,4 +494,3 @@ const styles = StyleSheet.create({
 });
 
 export default RatingScreen;
-

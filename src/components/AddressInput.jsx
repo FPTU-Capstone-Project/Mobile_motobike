@@ -75,7 +75,6 @@ const AddressInput = ({
             };
           }
         } catch (error) {
-          console.warn('Could not load current location:', error);
         }
       }
 
@@ -124,7 +123,6 @@ const AddressInput = ({
 
   const searchPlacesWithPOI = async (query, poiLocations, currentLocationSuggestion) => {
     if (!goongService.isPlacesConfigured()) {
-      console.log('Goong Places API not configured');
       return;
     }
     
@@ -196,7 +194,7 @@ const AddressInput = ({
       // If it's a POI location, use POI data directly
       if (suggestion.isPOI && suggestion.locationId) {
         const displayText = suggestion.structured_formatting?.main_text || suggestion.description;
-        onChangeText(displayText);
+        // Call onLocationSelect FIRST to set flag before onChangeText
         onLocationSelect({
           latitude: suggestion.coordinates.latitude,
           longitude: suggestion.coordinates.longitude,
@@ -204,6 +202,7 @@ const AddressInput = ({
           locationId: suggestion.locationId,
           isPOI: true,
         });
+        onChangeText(displayText);
         setShowSuggestions(false);
         setSuggestions([]);
         return;
@@ -212,13 +211,14 @@ const AddressInput = ({
       // If it's current location, use coordinates directly
       if (suggestion.isCurrentLocation && suggestion.coordinates) {
         const displayText = suggestion.structured_formatting?.main_text || suggestion.description;
-        onChangeText(displayText);
+        // Call onLocationSelect FIRST to set flag before onChangeText
         onLocationSelect({
           latitude: suggestion.coordinates.latitude,
           longitude: suggestion.coordinates.longitude,
           address: displayText,
           isCurrentLocation: true,
         });
+        onChangeText(displayText);
         setShowSuggestions(false);
         setSuggestions([]);
         return;
@@ -228,37 +228,40 @@ const AddressInput = ({
       const placeId = suggestion.place_id || suggestion.placeId;
       const placeDetails = await goongService.getPlaceDetails(placeId);
       
-      if (placeDetails && placeDetails.result) {
-        const location = placeDetails.result.geometry.location;
-        // Prioritize main_text for display, use formatted_address for coordinates
-        const displayText = suggestion.structured_formatting?.main_text || suggestion.description;
-        const fullAddress = placeDetails.result.formatted_address || displayText;
+      if (placeDetails && placeDetails.geometry && placeDetails.geometry.location) {
+        const location = placeDetails.geometry.location;
+        // Use FULL formatted address from Goong for better accuracy
+        const fullAddress = placeDetails.formattedAddress || suggestion.description;
         
-        onChangeText(displayText);
+        // Call onLocationSelect FIRST to set flag before onChangeText
         onLocationSelect({
-          latitude: location.lat,
-          longitude: location.lng,
-          address: fullAddress, // Use full address for backend
+          latitude: location.latitude,
+          longitude: location.longitude,
+          address: fullAddress,
         });
+        onChangeText(fullAddress);
       } else {
         // Fallback to geocoding if place details fail
-        const displayText = suggestion.structured_formatting?.main_text || suggestion.description;
-        const geocodeResults = await goongService.geocode(displayText);
+        const fullAddress = suggestion.description || suggestion.structured_formatting?.main_text;
+        const geocodeResults = await goongService.geocode(fullAddress);
         if (geocodeResults && geocodeResults.results && geocodeResults.results.length > 0) {
           const location = geocodeResults.results[0].geometry.location;
-          onChangeText(displayText);
+          // Call onLocationSelect FIRST to set flag before onChangeText
           onLocationSelect({
             latitude: location.lat,
             longitude: location.lng,
-            address: displayText,
+            address: fullAddress,
           });
+          onChangeText(fullAddress);
+        } else {
+          console.error('❌ Failed to get coordinates for address:', fullAddress);
         }
       }
       
       setShowSuggestions(false);
       setSuggestions([]);
     } catch (error) {
-      console.error('Get place details error:', error);
+      console.error('❌ Get place details error:', error);
       // Fallback: just set the text with proper display name
       const displayText = suggestion.structured_formatting?.main_text || suggestion.description;
       onChangeText(displayText);
@@ -273,7 +276,9 @@ const AddressInput = ({
         item.isSuggested && styles.suggestedItem,
         item.isValid === false && styles.invalidItem
       ]}
-      onPress={() => handleSuggestionPress(item)}
+      onPress={() => {
+        handleSuggestionPress(item);
+      }}
     >
       <Icon 
         name={
@@ -373,17 +378,20 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 15,
-    paddingHorizontal: 15,
-    backgroundColor: '#f8f9fa',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     marginBottom: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(148,163,184,0.2)',
   },
   textInput: {
     flex: 1,
-    marginLeft: 12,
-    fontSize: 16,
-    color: '#333',
+    marginLeft: 10,
+    fontSize: 15,
+    fontFamily: 'Inter_400Regular',
+    color: '#1e293b',
     paddingVertical: 0,
   },
   loadingIcon: {
@@ -394,114 +402,120 @@ const styles = StyleSheet.create({
     top: '100%',
     left: 0,
     right: 0,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    elevation: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    elevation: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    maxHeight: 200,
-    zIndex: 9999, // Higher z-index to prevent overlap
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    maxHeight: 280,
+    zIndex: 9999,
+    borderWidth: 1,
+    borderColor: 'rgba(148,163,184,0.1)',
+    overflow: 'hidden',
   },
   suggestionsList: {
-    borderRadius: 12,
+    borderRadius: 16,
   },
   suggestionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 15,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: 'rgba(148,163,184,0.08)',
   },
   suggestionIcon: {
-    marginRight: 12,
+    marginRight: 14,
   },
   suggestionContent: {
     flex: 1,
   },
   suggestionMain: {
-    fontSize: 16,
-    color: '#333',
-    fontWeight: '500',
+    fontSize: 15,
+    fontFamily: 'Inter_500Medium',
+    color: '#1e293b',
+    marginBottom: 2,
   },
   suggestionSecondary: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 13,
+    fontFamily: 'Inter_400Regular',
+    color: '#64748b',
     marginTop: 2,
   },
   // New styles for suggested items
   suggestedItem: {
-    backgroundColor: '#FFF8E1',
+    backgroundColor: 'rgba(255,152,0,0.05)',
     borderLeftWidth: 3,
-    borderLeftColor: '#FF9800',
+    borderLeftColor: '#F97316',
   },
   suggestedText: {
-    color: '#E65100',
-    fontWeight: '600',
+    color: '#EA580C',
+    fontFamily: 'Inter_600SemiBold',
   },
   suggestedBadge: {
-    backgroundColor: '#FF9800',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
+    backgroundColor: '#F97316',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
     marginLeft: 8,
   },
   suggestedBadgeText: {
-    fontSize: 10,
+    fontSize: 11,
+    fontFamily: 'Inter_600SemiBold',
     color: '#fff',
-    fontWeight: '600',
   },
   // POI badge styles
   poiBadge: {
-    backgroundColor: '#2196F3',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
     marginLeft: 8,
   },
   poiBadgeText: {
-    fontSize: 10,
+    fontSize: 11,
+    fontFamily: 'Inter_600SemiBold',
     color: '#fff',
-    fontWeight: '600',
   },
   // Current location badge styles
   currentLocationBadge: {
-    backgroundColor: '#4CAF50',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
+    backgroundColor: '#22C55E',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
     marginLeft: 8,
   },
   currentLocationBadgeText: {
-    fontSize: 10,
+    fontSize: 11,
+    fontFamily: 'Inter_600SemiBold',
     color: '#fff',
-    fontWeight: '600',
   },
   // Styles for invalid items
   invalidItem: {
-    backgroundColor: '#FFEBEE',
+    backgroundColor: 'rgba(239,68,68,0.05)',
     borderLeftWidth: 3,
-    borderLeftColor: '#F44336',
+    borderLeftColor: '#EF4444',
   },
   invalidText: {
-    color: '#C62828',
+    color: '#DC2626',
+    fontFamily: 'Inter_500Medium',
   },
   invalidSecondary: {
-    color: '#E57373',
+    color: '#F87171',
   },
   invalidBadge: {
-    backgroundColor: '#F44336',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
     marginLeft: 8,
   },
   invalidBadgeText: {
-    fontSize: 10,
+    fontSize: 11,
+    fontFamily: 'Inter_600SemiBold',
     color: '#fff',
-    fontWeight: '600',
   },
 });
 

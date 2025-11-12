@@ -55,6 +55,10 @@ const RideBookingScreen = ({ navigation, route }) => {
   
   // Fixed initial region to prevent WebView reload
   const initialRegionRef = useRef(null);
+  
+  // Track if user is selecting from dropdown (to prevent clearing location)
+  const isSelectingPickupRef = useRef(false);
+  const isSelectingDropoffRef = useRef(false);
 
   useEffect(() => {
     let mounted = true;
@@ -188,7 +192,6 @@ const RideBookingScreen = ({ navigation, route }) => {
 
     try {
       const { latitude, longitude } = event.nativeEvent.coordinate;
-      console.log('Map pressed:', { latitude, longitude });
 
       const address = await locationService.getAddressFromCoordinates(latitude, longitude);
       const addressText = address?.formattedAddress || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
@@ -232,6 +235,23 @@ const RideBookingScreen = ({ navigation, route }) => {
     const validation = addressValidation.validateAddresses(pickupAddress, dropoffAddress);
     if (!validation.isValid) {
       Alert.alert('Địa chỉ không hợp lệ', validation.message);
+      return;
+    }
+
+    // Validate that user selected location from dropdown
+    if (!pickupLocation) {
+      Alert.alert(
+        'Vui lòng chọn điểm đón', 
+        'Bạn cần chọn địa điểm từ danh sách gợi ý thay vì chỉ nhập text.\n\nNhập địa chỉ rồi chọn một trong các gợi ý hiển thị bên dưới.'
+      );
+      return;
+    }
+
+    if (!dropoffLocation) {
+      Alert.alert(
+        'Vui lòng chọn điểm đến', 
+        'Bạn cần chọn địa điểm từ danh sách gợi ý thay vì chỉ nhập text.\n\nNhập địa chỉ rồi chọn một trong các gợi ý hiển thị bên dưới.'
+      );
       return;
     }
 
@@ -292,6 +312,7 @@ const RideBookingScreen = ({ navigation, route }) => {
     }
 
     if (!pickup || !dropoff) {
+      console.error('❌ Missing location data:', { pickup, dropoff });
       Alert.alert('Lỗi', 'Không thể xác định tọa độ cho địa chỉ đã nhập');
       return;
     }
@@ -531,10 +552,21 @@ const RideBookingScreen = ({ navigation, route }) => {
                   
                   <AddressInput
                     value={pickupAddress}
-                    onChangeText={setPickupAddress}
+                    onChangeText={(text) => {
+                      setPickupAddress(text);
+                      // Clear location ONLY when user manually types (not from dropdown selection)
+                      if (!isSelectingPickupRef.current && pickupLocation && text !== pickupAddress) {
+                        setPickupLocation(null);
+                      }
+                    }}
                     onLocationSelect={(location) => {
+                      isSelectingPickupRef.current = true;
                       setPickupLocation(location);
-                      setPickupAddress(location.address);
+                      // Don't set pickupAddress here - AddressInput already calls onChangeText
+                      // Reset flag after state updates (increased to 200ms for safety)
+                      setTimeout(() => {
+                        isSelectingPickupRef.current = false;
+                      }, 200);
                     }}
                     placeholder="Nhập địa chỉ hoặc chọn trên bản đồ"
                     iconName="radio-button-checked"
@@ -566,10 +598,21 @@ const RideBookingScreen = ({ navigation, route }) => {
                   
                   <AddressInput
                     value={dropoffAddress}
-                    onChangeText={setDropoffAddress}
+                    onChangeText={(text) => {
+                      setDropoffAddress(text);
+                      // Clear location ONLY when user manually types (not from dropdown selection)
+                      if (!isSelectingDropoffRef.current && dropoffLocation && text !== dropoffAddress) {
+                        setDropoffLocation(null);
+                      }
+                    }}
                     onLocationSelect={(location) => {
+                      isSelectingDropoffRef.current = true;
                       setDropoffLocation(location);
-                      setDropoffAddress(location.address);
+                      // Don't set dropoffAddress here - AddressInput already calls onChangeText
+                      // Reset flag after state updates (increased to 200ms for safety)
+                      setTimeout(() => {
+                        isSelectingDropoffRef.current = false;
+                      }, 200);
                     }}
                     placeholder="Nhập địa chỉ hoặc chọn trên bản đồ"
                     iconName="location-on"

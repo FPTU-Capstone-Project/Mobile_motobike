@@ -64,7 +64,6 @@ const CreateSharedRideScreen = ({ navigation }) => {
         setVehicles(formattedVehicles);
       } else {
         setVehicles([]);
-        console.log("No vehicles found for driver");
       }
     } catch (error) {
       console.error("Error loading vehicles:", error);
@@ -85,7 +84,6 @@ const CreateSharedRideScreen = ({ navigation }) => {
           text: "Thêm phương tiện",
           onPress: () => {
             // TODO: Navigate to add vehicle screen
-            console.log("Navigate to add vehicle screen");
           },
         },
       ]);
@@ -115,7 +113,6 @@ const CreateSharedRideScreen = ({ navigation }) => {
 
       // If startLocation is null, try to geocode the address
       if (!processedStartLocation && startAddress.trim()) {
-        console.log("🔍 Geocoding start address:", startAddress);
         try {
           const geocodeResults = await goongService.geocode(
             startAddress.trim()
@@ -131,7 +128,6 @@ const CreateSharedRideScreen = ({ navigation }) => {
               longitude: location.longitude,
               address: startAddress.trim(),
             };
-            console.log("✅ Start location geocoded:", processedStartLocation);
           }
         } catch (error) {
           console.error("❌ Failed to geocode start address:", error);
@@ -140,7 +136,6 @@ const CreateSharedRideScreen = ({ navigation }) => {
 
       // If endLocation is null, try to geocode the address
       if (!processedEndLocation && endAddress.trim()) {
-        console.log("🔍 Geocoding end address:", endAddress);
         try {
           const geocodeResults = await goongService.geocode(endAddress.trim());
           if (
@@ -154,7 +149,6 @@ const CreateSharedRideScreen = ({ navigation }) => {
               longitude: location.longitude,
               address: endAddress.trim(),
             };
-            console.log("✅ End location geocoded:", processedEndLocation);
           }
         } catch (error) {
           console.error("❌ Failed to geocode end address:", error);
@@ -196,7 +190,6 @@ const CreateSharedRideScreen = ({ navigation }) => {
         };
       }
 
-      console.log("Creating shared ride with data:", rideData);
       const result = await rideService.createSharedRide(rideData);
 
       Alert.alert(

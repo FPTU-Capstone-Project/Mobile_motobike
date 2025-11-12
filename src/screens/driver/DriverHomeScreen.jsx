@@ -50,6 +50,43 @@ const DriverHomeScreen = ({ navigation }) => {
     };
   }, []);
 
+  // Track last disconnect time to avoid immediate reconnect after ride completion
+  const lastDisconnectTime = useRef(null);
+  
+  // Update disconnect time when WebSocket disconnects
+  useEffect(() => {
+    if (!websocketService.isConnected) {
+      lastDisconnectTime.current = Date.now();
+    }
+  }, [websocketService.isConnected]);
+
+  // Re-check WebSocket connection when screen focuses
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      // Only reconnect if driver intentionally wants to be online AND WebSocket is disconnected
+      // Don't reconnect immediately after completing a ride (user might want to go offline)
+      if (isOnline && !websocketService.isConnected) {
+        // Don't reconnect if we just disconnected (< 10 seconds ago) - likely post-ride cleanup
+        const timeSinceDisconnect = lastDisconnectTime.current 
+          ? Date.now() - lastDisconnectTime.current 
+          : Infinity;
+        
+        if (timeSinceDisconnect < 10000) {
+          return;
+        }
+        
+        // Give user 3 seconds before auto-reconnecting (in case they just finished a ride)
+        setTimeout(() => {
+          if (isOnline && !websocketService.isConnected) {
+            handleToggleOnline(true);
+          }
+        }, 3000);
+      }
+    });
+
+    return unsubscribe;
+  }, [navigation, isOnline]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -82,7 +119,6 @@ const DriverHomeScreen = ({ navigation }) => {
         await fcmService.initialize();
         await fcmService.registerToken();
       } catch (fcmError) {
-        console.warn('FCM initialization failed, continuing without push notifications:', fcmError);
       }
       
     } catch (error) {
@@ -164,7 +200,6 @@ const DriverHomeScreen = ({ navigation }) => {
 
   const handleTrackingStart = async (trackingSignal) => {
     try {
-      console.log('🎯 Received TRACKING_START signal for ride:', trackingSignal.rideId);
       // Chỉ điều hướng nếu chưa ở màn hình tracking
       navigation.navigate('DriverRideTracking', {
         rideId: trackingSignal.rideId,
@@ -196,7 +231,6 @@ const DriverHomeScreen = ({ navigation }) => {
         );
         
         setConnectionStatus('connected');
-        console.log('✅ Driver is now online and ready for broadcast offers');
         
       } else {
         // Going offline - disconnect WebSocket
@@ -205,7 +239,6 @@ const DriverHomeScreen = ({ navigation }) => {
         websocketService.disconnect();
         
         setConnectionStatus('disconnected');
-        console.log('✅ Driver is now offline');
       }
       
       setIsOnline(value);
