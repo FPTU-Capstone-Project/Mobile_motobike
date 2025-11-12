@@ -9,7 +9,7 @@ export const API_CONFIG = {
     // For Physical Device: Use your computer's network IP (e.g., 192.168.1.9)
     
     // Android Emulator (recommended for Android)
-    BASE_URL: 'http://192.168.2.15:8080/api/v1',
+    BASE_URL: 'http://192.168.101.94:8080/api/v1',
     
     // Alternative configurations (uncomment if needed):
     // BASE_URL: 'http://192.168.101.143:8081/api/v1', // Physical device or iOS simulator - replace with your IP

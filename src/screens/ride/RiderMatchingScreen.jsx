@@ -66,19 +66,16 @@ const RiderMatchingScreen = ({ navigation, route }) => {
 
     // Cleanup on unmount
     return () => {
-      console.log('🧹 RiderMatchingScreen unmounting - cleaning up...');
       // DON'T disconnect WebSocket - let RideTrackingScreen reuse the connection
       // websocketService.disconnect();
     };
   }, []);
 
   const handleRideMatching = (matchingData) => {
-    console.log('📨 Received ride matching update:', matchingData);
     
     try {
       // Check both 'type' field and 'status' field for compatibility
       const updateType = matchingData.type || matchingData.status;
-      console.log('📨 Processing update type:', updateType);
       
       switch (updateType) {
         case 'DRIVER_MATCHED':
@@ -122,7 +119,6 @@ const RiderMatchingScreen = ({ navigation, route }) => {
           break;
           
         default:
-          console.log('Unknown matching update type:', updateType);
           // Fallback: if we have rideId and status, treat as accepted
           if (matchingData.rideId && matchingData.status === 'ACCEPTED') {
             setMatchingStatus('accepted');
@@ -148,7 +144,6 @@ const RiderMatchingScreen = ({ navigation, route }) => {
   };
 
   const handleNotification = (notification) => {
-    console.log('🔔 Received notification:', notification);
     addNotification(notification.message || 'Thông báo mới', 'info');
   };
 
@@ -282,7 +277,6 @@ const RiderMatchingScreen = ({ navigation, route }) => {
             {rideRequest.fare && (
               <View style={styles.fareRow}>
                 {
-                  console.log(rideRequest.fare)
                 }
                 <Icon name="attach-money" size={20} color="#FF9800" />
                 <Text style={styles.fareText}>

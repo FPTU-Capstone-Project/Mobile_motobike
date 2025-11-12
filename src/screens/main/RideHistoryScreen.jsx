@@ -192,8 +192,6 @@ const RideHistoryScreen = ({ navigation }) => {
           };
         });
 
-        console.log(`✅ Loaded ${allCompleted.length} completed rides`);
-        console.log('📋 Transformed completed rides:', JSON.stringify(allCompleted, null, 2));
         setCompletedRides(allCompleted);
       } catch (error) {
         console.error('Error loading completed rides:', error);

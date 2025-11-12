@@ -57,21 +57,17 @@ const RideOfferModal = ({
   const handleAccept = async () => {
     try {
       setAccepting(true);
-      console.log('🚗 Accepting ride with offer:', offer);
-      console.log('🚗 VehicleId:', vehicleId);
 
       let response;
       
       // Check if this is a broadcast request
       if (offer.broadcast === true) {
-        console.log('📡 This is a broadcast request, using acceptBroadcastRequest');
         response = await rideService.acceptBroadcastRequest(
           offer.requestId,
           vehicleId,
           currentLocation
         );
       } else {
-        console.log('📞 This is a regular request, using acceptRideRequest');
         response = await rideService.acceptRideRequest(
           offer.requestId,
           offer.rideId,
@@ -79,18 +75,6 @@ const RideOfferModal = ({
         );
       }
 
-      console.log("✅ Accept ride response:", response);
-      console.log("📦 RAW Accept Response Data:");
-      console.log(JSON.stringify(response, null, 2));
-      console.log("🔍 Response structure check:");
-      console.log("  - response.shared_ride_id:", response.shared_ride_id);
-      console.log("  - response.pickup_lat:", response.pickup_lat);
-      console.log("  - response.pickup_lng:", response.pickup_lng);
-      console.log("  - response.dropoff_lat:", response.dropoff_lat);
-      console.log("  - response.dropoff_lng:", response.dropoff_lng);
-      console.log("  - response.pickup_location_name:", response.pickup_location_name);
-      console.log("  - response.dropoff_location_name:", response.dropoff_location_name);
-      console.log("  - All keys:", Object.keys(response || {}));
 
       Alert.alert(
         "Thành công!",
@@ -101,7 +85,6 @@ const RideOfferModal = ({
             onPress: () => {
               onAccept(); // Close modal
               if (navigation && response.shared_ride_id) {
-                console.log('🚗 Navigating to driver tracking screen for ride:', response.shared_ride_id);
                 navigation.navigate('DriverRideTracking', {
                   rideId: response.shared_ride_id,
                   startTracking: true,
@@ -137,7 +120,6 @@ const RideOfferModal = ({
       // Call backend API to reject the ride request
       await rideService.rejectRideRequest(offer.requestId, reason);
 
-      console.log("Reject ride successful");
       onReject(reason);
     } catch (error) {
       console.error("Reject ride error:", error);
@@ -170,7 +152,6 @@ const RideOfferModal = ({
   };
 
   if (!offer) {
-    console.log("❌ RideOfferModal: No offer data, returning null");
     return null;
   }
 

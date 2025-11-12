@@ -46,7 +46,6 @@ const RideTrackingScreen = ({ navigation, route }) => {
   // Polyline decoder (Google Encoded Polyline)
   const decodePolyline = (encoded) => {
     if (!encoded || typeof encoded !== 'string') {
-      console.warn('⚠️ decodePolyline: Invalid input', encoded);
       return [];
     }
     
@@ -79,7 +78,6 @@ const RideTrackingScreen = ({ navigation, route }) => {
         coordinates.push({ latitude: lat / 1e5, longitude: lng / 1e5 });
       }
       
-      console.log(`📍 Rider: Decoded ${coordinates.length} points from polyline`);
       return coordinates;
     } catch (error) {
       console.error('❌ Error decoding polyline:', error);
@@ -87,13 +85,15 @@ const RideTrackingScreen = ({ navigation, route }) => {
     }
   };
 
-  // Helper function to trim polyline from driver location
+  // Helper function to trim polyline - keep only the REMAINING route (from driver to destination)
+  // Remove the part that driver has already traveled
   const trimPolylineFromDriverLocation = (fullPolyline, driverLocation) => {
     if (!fullPolyline || fullPolyline.length === 0 || !driverLocation) return fullPolyline;
     
     let closestIndex = 0;
     let minDistance = Infinity;
     
+    // Find closest point on polyline to driver's current location
     fullPolyline.forEach((point, index) => {
       const distance = locationService.calculateDistance(
         driverLocation.latitude,
@@ -107,6 +107,8 @@ const RideTrackingScreen = ({ navigation, route }) => {
       }
     });
     
+    // Return remaining route: from driver's position to destination
+    // This removes the already-traveled part (0 to closestIndex)
     return fullPolyline.slice(closestIndex);
   };
 
@@ -124,6 +126,21 @@ const RideTrackingScreen = ({ navigation, route }) => {
       const location = await locationService.getCurrentLocation();
       setRiderLocation(location);
 
+      // Center map to rider location immediately
+      if (location && mapRef.current) {
+        setTimeout(() => {
+          try {
+            mapRef.current.animateToRegion({
+              latitude: location.latitude,
+              longitude: location.longitude,
+              latitudeDelta: 0.01,
+              longitudeDelta: 0.01,
+            }, 1000);
+          } catch (e) {
+          }
+        }, 500);
+      }
+
       // Start location tracking for rider
       locationService.startLocationTracking((newLocation) => {
         setRiderLocation(newLocation);
@@ -139,7 +156,6 @@ const RideTrackingScreen = ({ navigation, route }) => {
 
       // Save active ride
       if (driverInfo && rideId) {
-        console.log('Rider saving active ride:', { rideId, requestId, driverInfo });
         activeRideService.saveActiveRide({
           rideId: rideId,
           requestId: requestId,
@@ -157,17 +173,60 @@ const RideTrackingScreen = ({ navigation, route }) => {
   const loadRideData = async () => {
     try {
       setLoading(true);
-      const ride = await rideService.getRideById(rideId);
+      const rideResponse = await rideService.getRideById(rideId);
+      const ride = rideResponse?.data || rideResponse;
       setRideData(ride);
-      console.log('📦 Rider loaded ride data:', ride);
       
-      // Update polyline
-      const polylineString = ride?.polyline || ride?.route?.polyline;
+      // Update polyline - check multiple possible fields
+      let polylineString = ride?.polyline || 
+                          ride?.route?.polyline || 
+                          ride?.data?.polyline ||
+                          null;
+      
+      
+      // Also check if there's a request-specific polyline
+      if (!polylineString && requestId) {
+        
+        // Check ride_requests array (if already included)
+        if (ride?.ride_requests && Array.isArray(ride.ride_requests)) {
+          const request = ride.ride_requests.find(req => 
+            req.shared_ride_request_id === requestId || 
+            req.shared_ride_request_id === parseInt(requestId)
+          );
+          if (request) {
+            polylineString = request?.polyline || null;
+          }
+        } else {
+          // ride_requests not included, fetch separately
+          try {
+            const requestsResponse = await rideService.getRideRequests(rideId);
+            const requestList = Array.isArray(requestsResponse) 
+              ? requestsResponse 
+              : (requestsResponse?.data || requestsResponse?.content || requestsResponse?.items || []);
+            
+            const request = requestList.find(req => 
+              req.shared_ride_request_id === requestId || 
+              req.shared_ride_request_id === parseInt(requestId)
+            );
+            
+            if (request) {
+              polylineString = request?.polyline || null;
+            } else {
+            }
+          } catch (fetchError) {
+            console.error('  - Failed to fetch ride requests:', fetchError);
+          }
+        }
+      }
+      
       if (polylineString) {
         const decoded = decodePolyline(polylineString);
-        console.log(`📍 Rider: Setting polyline with ${decoded.length} points`);
-        setFullPolyline(decoded);
-        setMapPolyline(decoded);
+        if (decoded && decoded.length > 0) {
+          setFullPolyline(decoded);
+          setMapPolyline(decoded);
+        } else {
+        }
+      } else {
       }
       
       // Update status
@@ -190,17 +249,13 @@ const RideTrackingScreen = ({ navigation, route }) => {
   };
 
   const handleRideStatusUpdate = (data) => {
-    console.log('📨📨📨 RIDER RECEIVED RIDE STATUS UPDATE 📨📨📨');
-    console.log('📨 Data:', JSON.stringify(data, null, 2));
     
     try {
       const status = data?.status;
       const phase = data?.phase;
       const message = data?.message;
-      console.log(`📨 Extracted: status=${status}, phase=${phase}, message=${message}`);
       
       if (status === 'PICKUP_COMPLETED' && phase === 'TO_DROPOFF') {
-        console.log('✅ Driver picked up passenger, switching to dropoff phase');
         setRideStatus('ONGOING');
         
         // Show notification to rider
@@ -213,7 +268,6 @@ const RideTrackingScreen = ({ navigation, route }) => {
         // Reload ride data to get updated polyline for dropoff route
         loadRideData();
       } else if (status === 'RIDE_COMPLETED' && phase === 'COMPLETED') {
-        console.log('✅ Ride completed, showing rating prompt');
         setRideStatus('COMPLETED');
         
         // Show completion message with rating prompt
@@ -258,39 +312,29 @@ const RideTrackingScreen = ({ navigation, route }) => {
     try {
       if (!rideId) return;
       
-      console.log(`🔌 Rider connecting to ride tracking for ride ${rideId}...`);
       
       // Connect WebSocket if not connected
       if (!websocketService.isConnected) {
-        console.log('🔌 WebSocket not connected, connecting as rider...');
         await websocketService.connectAsRider(
           (data) => {
-            console.log('🔔 ride-matching callback triggered (from connectAsRider)');
             handleRideStatusUpdate(data);
           },
-          (notification) => console.log('Notification:', notification)
         );
-        console.log('✅ Connected as rider and subscribed');
       } else {
         // WebSocket already connected, just update the ride-matching callback
-        console.log('🔌 WebSocket already connected, updating ride-matching callback...');
         
         // Update callback (subscribeToRiderMatching will update if already subscribed)
         websocketService.subscribeToRiderMatching((data) => {
-          console.log('🔔 ride-matching callback triggered (updated callback)');
           handleRideStatusUpdate(data);
         });
-        console.log('✅ Updated ride-matching callback for RideTrackingScreen');
       }
 
       // Subscribe to driver location updates
-      console.log(`📡 Subscribing to /topic/ride.location.${rideId}...`);
       const subscription = websocketService.client?.subscribe(
         `/topic/ride.location.${rideId}`,
         (message) => {
           try {
             const locationUpdate = JSON.parse(message.body);
-            console.log(`📍 Rider received driver location update for ride ${rideId}:`, locationUpdate);
             
             // locationUpdate could be single point or array of points
             let latestPoint;
@@ -308,38 +352,68 @@ const RideTrackingScreen = ({ navigation, route }) => {
               setDriverLocation(newDriverLocation);
               
               // Update polyline if backend sends new polyline (e.g., phase change)
-              if (latestPoint.polyline && typeof latestPoint.polyline === 'string' && latestPoint.polyline.length > 0) {
-                console.log('📍 Backend sent updated polyline, decoding...');
+              // IMPORTANT: Ignore empty polyline strings from backend
+              // ALSO: Ignore backend polyline updates if we already have a good polyline
+              // (Backend sends partial polyline updates that cause duplicate/overlapping lines)
+              let shouldTrimExisting = true;
+              
+              if (latestPoint.polyline && typeof latestPoint.polyline === 'string' && latestPoint.polyline.trim().length > 0) {
                 const decodedPolyline = decodePolyline(latestPoint.polyline);
                 if (decodedPolyline.length > 0) {
-                  setFullPolyline(decodedPolyline);
-                  const trimmed = trimPolylineFromDriverLocation(decodedPolyline, newDriverLocation);
-                  setMapPolyline(trimmed);
-                  console.log(`✅ Updated polyline: ${decodedPolyline.length} points, trimmed to ${trimmed.length} points`);
+                  // Only update fullPolyline if:
+                  // 1. We don't have a polyline yet (fullPolyline.length === 0)
+                  // 2. OR new polyline is MUCH longer (>2x) - likely a new phase/route
+                  if (fullPolyline.length === 0) {
+                    setFullPolyline(decodedPolyline);
+                    shouldTrimExisting = false;
+                    
+                    const trimmed = trimPolylineFromDriverLocation(decodedPolyline, newDriverLocation);
+                    if (trimmed.length >= 2) {
+                      setMapPolyline(trimmed);
+                    } else {
+                      setMapPolyline(decodedPolyline);
+                    }
+                  } else if (decodedPolyline.length > fullPolyline.length * 2) {
+                    setFullPolyline(decodedPolyline);
+                    shouldTrimExisting = false;
+                    
+                    const trimmed = trimPolylineFromDriverLocation(decodedPolyline, newDriverLocation);
+                    if (trimmed.length >= 2) {
+                      setMapPolyline(trimmed);
+                    }
+                  } else {
+                    // Ignore backend polyline updates - use our trimmed version instead
+                    // This prevents duplicate/overlapping polylines on the map
+                  }
                 }
-              } else if (fullPolyline.length > 0) {
-                // Update trimmed polyline with existing fullPolyline
-                const trimmed = trimPolylineFromDriverLocation(fullPolyline, newDriverLocation);
-                setMapPolyline(trimmed);
               }
               
-              // Auto-recenter map (throttled)
+              // Always trim existing fullPolyline as driver progresses (unless we just updated it)
+              if (shouldTrimExisting && fullPolyline.length > 0) {
+                const trimmed = trimPolylineFromDriverLocation(fullPolyline, newDriverLocation);
+                if (trimmed.length >= 2) {
+                  setMapPolyline(trimmed);
+                  // Log occasionally to avoid spam
+                  if (trimmed.length % 10 === 0 || trimmed.length < 10) {
+                  }
+                }
+              }
+              
+              // Auto-recenter map to driver location (throttled)
               const now = Date.now();
               if (now - lastRecenterTime.current > RECENTER_THROTTLE) {
                 lastRecenterTime.current = now;
-                if (mapRef.current && riderLocation) {
+                if (mapRef.current && mapRef.current.animateToRegion) {
                   try {
-                    const points = [
-                      { latitude: riderLocation.latitude, longitude: riderLocation.longitude },
-                      { latitude: newDriverLocation.latitude, longitude: newDriverLocation.longitude }
-                    ];
-                    mapRef.current.fitToCoordinates(points, { 
-                      edgePadding: { top: 100, right: 100, bottom: 350, left: 100 },
-                      animated: true
-                    });
+                    mapRef.current.animateToRegion({
+                      latitude: newDriverLocation.latitude,
+                      longitude: newDriverLocation.longitude,
+                      latitudeDelta: 0.01,
+                      longitudeDelta: 0.01,
+                    }, 1000);
                   } catch (e) {
-                    console.warn('Auto-recenter failed:', e);
                   }
+                } else {
                 }
               }
               
@@ -369,14 +443,12 @@ const RideTrackingScreen = ({ navigation, route }) => {
       );
 
       if (subscription) {
-        console.log(`✅ Rider subscribed to driver location updates: /topic/ride.location.${rideId}`);
       } else {
         console.error(`❌ Failed to subscribe to driver location updates - client not available`);
       }
       
       return () => {
         if (subscription) {
-          console.log(`🔌 Unsubscribing from /topic/ride.location.${rideId}`);
           subscription.unsubscribe();
         }
       };
@@ -453,11 +525,27 @@ const RideTrackingScreen = ({ navigation, route }) => {
   };
 
   const handleCallDriver = () => {
-    const phoneNumber = driverInfo?.driverPhone || driverInfo?.driver_phone;
+    // Try to get phone from multiple possible sources
+    const phoneNumber = 
+      driverInfo?.phone ||                    // Direct phone field
+      driverInfo?.driverPhone || 
+      driverInfo?.driver_phone ||
+      rideData?.driver?.phone ||              // From rideData (API response)
+      rideData?.driver?.user?.phone ||        // Nested in user object
+      rideData?.driver_phone ||               // Flat field in ride
+      rideData?.driver_user?.phone;           // Another possible structure
+    
     if (phoneNumber) {
       Linking.openURL(`tel:${phoneNumber}`);
     } else {
-      Alert.alert('Thông báo', 'Không có số điện thoại tài xế');
+      // Debug: log available data structure
+      console.error('❌ Cannot find driver phone number');
+      console.error('driverInfo:', JSON.stringify(driverInfo, null, 2));
+      console.error('rideData.driver:', JSON.stringify(rideData?.driver, null, 2));
+      Alert.alert(
+        'Thông báo', 
+        'Không có số điện thoại tài xế. Vui lòng liên hệ qua tin nhắn hoặc thông báo cho admin.'
+      );
     }
   };
 
@@ -661,9 +749,11 @@ const RideTrackingScreen = ({ navigation, route }) => {
                   <Icon name="star" size={16} color="#FFD700" />
                   <Text style={styles.ratingText}>{driverInfo?.driverRating || '5.0'}</Text>
                 </View>
-                <Text style={styles.vehicleInfo}>
-                  {driverInfo?.vehicleModel || ''} • {driverInfo?.vehiclePlate || ''}
-                </Text>
+                {(driverInfo?.vehicleModel || driverInfo?.vehiclePlate) && (
+                  <Text style={styles.vehicleInfo}>
+                    {driverInfo?.vehicleModel || 'Xe máy'} {driverInfo?.vehiclePlate ? `• ${driverInfo.vehiclePlate}` : ''}
+                  </Text>
+                )}
               </View>
               <View style={styles.driverActions}>
                 <TouchableOpacity style={styles.actionBtn} onPress={handleCallDriver}>
