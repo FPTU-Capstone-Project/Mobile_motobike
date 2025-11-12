@@ -9,6 +9,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   Alert,
+  StatusBar,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import * as Animatable from 'react-native-animatable';
@@ -17,6 +18,10 @@ import { useFocusEffect } from '@react-navigation/native';
 import rideService from '../../services/rideService';
 import authService from '../../services/authService';
 import ratingService from '../../services/ratingService';
+import GlassHeader from '../../components/ui/GlassHeader.jsx';
+import CleanCard from '../../components/ui/CleanCard.jsx';
+import AppBackground from '../../components/layout/AppBackground.jsx';
+import { colors } from '../../theme/designTokens';
 
 const RideHistoryScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
@@ -27,7 +32,7 @@ const RideHistoryScreen = ({ navigation }) => {
   const [ratedRequestIds, setRatedRequestIds] = useState(new Set()); // Track which requests have been rated
   
   const tabs = [
-    { key: 'ongoing', label: 'Đang diễn ra', icon: 'directions-car' },
+    { key: 'ongoing', label: 'Đang diễn ra', icon: 'two-wheeler' },
     { key: 'completed', label: 'Hoàn thành', icon: 'check-circle' },
     { key: 'all', label: 'Tất cả', icon: 'list' },
   ];
@@ -486,38 +491,41 @@ const RideHistoryScreen = ({ navigation }) => {
     
     return (
       <TouchableOpacity
-        key={`${ride.rideId || ride.requestId}-${index}`}
-        style={styles.rideCardSimple}
         onPress={() => handleViewDetails(ride)}
         activeOpacity={0.7}
+        style={styles.rideCardWrapper}
       >
-        {/* Left: Service Icon and Name */}
-        <View style={styles.leftSection}>
-          <View style={styles.serviceIcon}>
-            <Icon name="two-wheeler" size={24} color="#fff" />
-            <View style={styles.clockIcon}>
-              <Icon name="access-time" size={10} color="#fff" />
+        <CleanCard style={styles.rideCard} contentStyle={styles.rideCardContent}>
+          {/* Left: Service Icon and Name */}
+          <View style={styles.leftSection}>
+            <View style={styles.serviceIcon}>
+              <Icon name="two-wheeler" size={24} color="#fff" />
+              {isOngoing && (
+                <View style={styles.clockIcon}>
+                  <Icon name="access-time" size={10} color="#fff" />
+                </View>
+              )}
+            </View>
+            <View style={styles.serviceInfo}>
+              <Text style={styles.serviceName}>Xe máy</Text>
+              {ride.createdAt && (
+                <Text style={styles.dateTimeText}>
+                  {formatDateForList(ride.createdAt)}
+                </Text>
+              )}
             </View>
           </View>
-          <View style={styles.serviceInfo}>
-            <Text style={styles.serviceName}>Xe máy</Text>
-            {ride.createdAt && (
-              <Text style={styles.dateTimeText}>
-                {formatDateForList(ride.createdAt)}
-              </Text>
-            )}
-          </View>
-        </View>
 
-        {/* Right: Price and Arrow */}
-        <View style={styles.rightSection}>
-          <Text style={styles.priceText}>
-            {ride.totalFare !== null && ride.totalFare !== undefined 
-              ? formatCurrency(ride.totalFare) 
-              : 'Chưa có'}
-          </Text>
-          <Icon name="chevron-right" size={24} color="#666" />
-        </View>
+          {/* Right: Price and Arrow */}
+          <View style={styles.rightSection}>
+            <Text style={styles.priceText}>
+              {ride.totalFare !== null && ride.totalFare !== undefined 
+                ? formatCurrency(ride.totalFare) 
+                : 'Chưa có'}
+            </Text>
+            <Icon name="chevron-right" size={24} color={colors.textMuted} />
+          </View>
+        </CleanCard>
       </TouchableOpacity>
     );
   };
@@ -542,7 +550,7 @@ const RideHistoryScreen = ({ navigation }) => {
     if (loading) {
       return (
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#4CAF50" />
+          <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Đang tải...</Text>
         </View>
       );
@@ -550,103 +558,124 @@ const RideHistoryScreen = ({ navigation }) => {
 
     if (displayRides.length === 0) {
       return (
-        <View style={styles.centerContainer}>
-          <Icon name="inbox" size={64} color="#ccc" />
-          <Text style={styles.emptyText}>
-            {selectedTab === 'ongoing' 
-              ? 'Bạn chưa có chuyến đi nào đang diễn ra' 
-              : 'Chưa có lịch sử chuyến đi'}
-          </Text>
-          {selectedTab === 'ongoing' && (
-            <TouchableOpacity
-              style={styles.createRideButton}
-              onPress={() => navigation.navigate('Home')}
-            >
-              <Icon name="add" size={20} color="#fff" />
-              <Text style={styles.createRideButtonText}>Tạo chuyến mới</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        <Animatable.View animation="fadeInUp" duration={480} delay={120}>
+          <CleanCard style={styles.emptyCard} contentStyle={styles.emptyCardContent}>
+            <Icon name="inbox" size={64} color={colors.textMuted} />
+            <Text style={styles.emptyText}>
+              {selectedTab === 'ongoing' 
+                ? 'Bạn chưa có chuyến đi nào đang diễn ra' 
+                : 'Chưa có lịch sử chuyến đi'}
+            </Text>
+            {selectedTab === 'ongoing' && (
+              <TouchableOpacity
+                style={styles.createRideButton}
+                onPress={() => navigation.navigate('Home')}
+                activeOpacity={0.8}
+              >
+                <Icon name="add" size={20} color="#fff" />
+                <Text style={styles.createRideButtonText}>Tạo chuyến mới</Text>
+              </TouchableOpacity>
+            )}
+          </CleanCard>
+        </Animatable.View>
       );
     }
 
     return (
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#4CAF50']} />
-        }
-        contentContainerStyle={styles.scrollContent}
-      >
-        {displayRides.map((ride, index) => renderRideCard(ride, index))}
-      </ScrollView>
+      <View style={styles.ridesContainer}>
+        {displayRides.map((ride, index) => (
+          <Animatable.View
+            key={`${ride.rideId || ride.requestId}-${index}`}
+            animation="fadeInUp"
+            duration={480}
+            delay={120 + index * 60}
+          >
+            {renderRideCard(ride, index)}
+          </Animatable.View>
+        ))}
+      </View>
     );
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Lịch sử chuyến đi</Text>
-        <Text style={styles.headerSubtitle}>
-          {ongoingRides.length} đang diễn ra · {completedRides.length} hoàn thành
-        </Text>
-      </View>
-
-      {/* Tabs */}
-      <View style={styles.tabsContainer}>
-        {tabs.map((tab) => (
-          <TouchableOpacity
-            key={tab.key}
-            style={[styles.tab, selectedTab === tab.key && styles.activeTab]}
-            onPress={() => setSelectedTab(tab.key)}
-          >
-            <Icon
-              name={tab.icon}
-              size={20}
-              color={selectedTab === tab.key ? '#4CAF50' : '#999'}
+    <AppBackground>
+      <StatusBar barStyle="dark-content" />
+      <SafeAreaView style={styles.safe}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />
+          }
+        >
+          <View style={styles.headerSpacing}>
+            <GlassHeader
+              title="Lịch sử chuyến đi"
+              subtitle={`${ongoingRides.length} đang diễn ra | ${completedRides.length} hoàn thành`}
             />
-            <Text style={[styles.tabText, selectedTab === tab.key && styles.activeTabText]}>
-              {tab.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+          </View>
 
-      {/* Content */}
-      {renderContent()}
-    </SafeAreaView>
+          <View style={styles.content}>
+            {/* Tabs */}
+            <Animatable.View animation="fadeInUp" duration={480} delay={60}>
+              <CleanCard style={styles.tabsCard} contentStyle={styles.tabsCardContent}>
+                <View style={styles.tabsContainer}>
+                  {tabs.map((tab) => (
+                    <TouchableOpacity
+                      key={tab.key}
+                      style={[styles.tab, selectedTab === tab.key && styles.activeTab]}
+                      onPress={() => setSelectedTab(tab.key)}
+                      activeOpacity={0.7}
+                    >
+                      <Icon
+                        name={tab.icon}
+                        size={20}
+                        color={selectedTab === tab.key ? colors.primary : colors.textMuted}
+                      />
+                      <Text style={[styles.tabText, selectedTab === tab.key && styles.activeTabText]}>
+                        {tab.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </CleanCard>
+            </Animatable.View>
+
+            {/* Content */}
+            {renderContent()}
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </AppBackground>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  safe: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
   },
-  header: {
-    padding: 20,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+  scrollContent: {
+    paddingBottom: 160,
+    paddingTop: 24,
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#212529',
-    marginBottom: 4,
+  headerSpacing: {
+    marginBottom: 24,
   },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#666',
+  content: {
+    paddingTop: 12,
+    paddingHorizontal: 20,
+    gap: 16,
+  },
+  tabsCard: {
+    marginBottom: 12,
+  },
+  tabsCardContent: {
+    paddingVertical: 8,
+    paddingHorizontal: 8,
   },
   tabsContainer: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    gap: 8,
   },
   tab: {
     flex: 1,
@@ -654,69 +683,85 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: 12,
     gap: 6,
+    backgroundColor: 'rgba(148,163,184,0.08)',
   },
   activeTab: {
-    backgroundColor: '#E8F5E9',
+    backgroundColor: 'rgba(34,197,94,0.15)',
   },
   tabText: {
     fontSize: 14,
-    color: '#999',
-    fontWeight: '500',
+    fontFamily: 'Inter_500Medium',
+    color: colors.textMuted,
   },
   activeTabText: {
-    color: '#4CAF50',
-    fontWeight: '600',
+    color: colors.primary,
+    fontFamily: 'Inter_600SemiBold',
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 40,
+    minHeight: 200,
   },
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#666',
+    fontFamily: 'Inter_400Regular',
+    color: colors.textSecondary,
+  },
+  emptyCard: {
+    marginBottom: 12,
+  },
+  emptyCardContent: {
+    paddingVertical: 40,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    gap: 16,
   },
   emptyText: {
-    marginTop: 16,
     fontSize: 16,
-    color: '#999',
+    fontFamily: 'Inter_400Regular',
+    color: colors.textSecondary,
     textAlign: 'center',
   },
   createRideButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#4CAF50',
+    backgroundColor: colors.primary,
     paddingHorizontal: 24,
     paddingVertical: 12,
-    borderRadius: 8,
-    marginTop: 20,
+    borderRadius: 16,
+    marginTop: 8,
     gap: 8,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   createRideButtonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
   },
-  scrollContent: {
-    padding: 16,
+  ridesContainer: {
+    gap: 12,
   },
-  rideCardSimple: {
+  rideCardWrapper: {
+    marginBottom: 12,
+  },
+  rideCard: {
+    marginBottom: 0,
+  },
+  rideCardContent: {
+    paddingVertical: 16,
+    paddingHorizontal: 18,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
   },
   leftSection: {
     flexDirection: 'row',
@@ -724,23 +769,28 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   serviceIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#00B14F',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 14,
     position: 'relative',
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   clockIcon: {
     position: 'absolute',
     top: -2,
     right: -2,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#00B14F',
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#3B82F6',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
@@ -750,177 +800,25 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   serviceName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#212529',
-    marginBottom: 2,
+    fontSize: 17,
+    fontFamily: 'Inter_700Bold',
+    color: colors.textPrimary,
+    marginBottom: 4,
   },
   dateTimeText: {
     fontSize: 13,
-    color: '#666',
+    fontFamily: 'Inter_400Regular',
+    color: colors.textSecondary,
   },
   rightSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
   priceText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#212529',
-  },
-  rideCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    gap: 6,
-  },
-  dateText: {
-    fontSize: 12,
-    color: '#999',
-  },
-  statusText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  routeContainer: {
-    marginBottom: 12,
-  },
-  routeRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-    marginBottom: 8,
-  },
-  iconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 2,
-  },
-  routeTextContainer: {
-    flex: 1,
-  },
-  routeLabel: {
-    fontSize: 11,
-    color: '#999',
-    marginBottom: 4,
-    textTransform: 'uppercase',
-    fontWeight: '600',
-  },
-  routeText: {
-    fontSize: 15,
-    color: '#212529',
-    fontWeight: '500',
-    lineHeight: 20,
-  },
-  timeText: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 4,
-  },
-  routeDivider: {
-    width: 2,
-    height: 20,
-    backgroundColor: '#e0e0e0',
-    marginLeft: 16,
-    marginVertical: 4,
-  },
-  driverRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    marginBottom: 12,
-    gap: 8,
-  },
-  driverText: {
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '500',
-  },
-  detailsRow: {
-    flexDirection: 'row',
-    gap: 20,
-    marginBottom: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-  },
-  detailItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  detailText: {
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '500',
-  },
-  actionRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  actionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 8,
-    gap: 6,
-  },
-  primaryButton: {
-    backgroundColor: '#4CAF50',
-  },
-  primaryButtonText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  secondaryButton: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#4CAF50',
-  },
-  secondaryButtonText: {
-    color: '#4CAF50',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  ratingButton: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#FFA500',
-  },
-  ratingButtonText: {
-    color: '#FFA500',
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 17,
+    fontFamily: 'Inter_700Bold',
+    color: colors.textPrimary,
   },
 });
 

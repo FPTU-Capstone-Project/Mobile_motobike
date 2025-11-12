@@ -8,12 +8,21 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  StatusBar,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import * as Animatable from 'react-native-animatable';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import rideService from '../services/rideService';
 import ratingService from '../services/ratingService';
+import { SoftBackHeader } from '../components/ui/GlassHeader.jsx';
+import CleanCard from '../components/ui/CleanCard.jsx';
+import AppBackground from '../components/layout/AppBackground.jsx';
+import { colors } from '../theme/designTokens';
 
 const RideDetailsScreen = ({ navigation, route }) => {
+  const insets = useSafeAreaInsets();
   const { ride: initialRide, rideId, requestId } = route.params || {};
   const [ride, setRide] = useState(initialRide || null);
   const [rideData, setRideData] = useState(null);
@@ -365,22 +374,20 @@ const RideDetailsScreen = ({ navigation, route }) => {
   // Early return AFTER all hooks are called
   if (loading || !data) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Icon name="arrow-back" size={24} color="#000" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Chi tiết chuyến đi</Text>
-          <View style={styles.placeholder} />
-        </View>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4CAF50" />
-          <Text style={styles.loadingText}>Đang tải...</Text>
-        </View>
-      </SafeAreaView>
+      <AppBackground>
+        <StatusBar barStyle="dark-content" />
+        <SafeAreaView style={styles.safe}>
+          <SoftBackHeader
+            floating
+            topOffset={insets.top + 12}
+            onBackPress={() => navigation.goBack()}
+          />
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.loadingText}>Đang tải...</Text>
+          </View>
+        </SafeAreaView>
+      </AppBackground>
     );
   }
 
@@ -388,415 +395,436 @@ const RideDetailsScreen = ({ navigation, route }) => {
   const isCompleted = data.status === 'COMPLETED';
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
+    <AppBackground>
+      <StatusBar barStyle="dark-content" />
+      <SafeAreaView style={styles.safe}>
+        <SoftBackHeader
+          floating
+          topOffset={insets.top + 12}
+          onBackPress={() => navigation.goBack()}
+        />
+
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
         >
-          <Icon name="arrow-back" size={24} color="#000" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Chi tiết chuyến đi</Text>
-        <View style={styles.placeholder} />
-      </View>
-
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Status Card */}
-        <View style={styles.statusCard}>
-          <View style={styles.statusHeader}>
-            <View style={styles.statusInfo}>
-              <View style={[styles.statusDot, { backgroundColor: getStatusColor(data.status) }]} />
-              <Text style={[styles.statusText, { color: getStatusColor(data.status) }]}>
-                {getStatusText(data.status)}
-              </Text>
-            </View>
-            {data.rideId && (
-              <Text style={styles.rideId}>ID: #{data.rideId}</Text>
-            )}
-          </View>
-          {data.createdAt && (
-            <Text style={styles.dateText}>{formatDate(data.createdAt)}</Text>
-          )}
-        </View>
-
-        {/* Route Info */}
-        <View style={styles.routeCard}>
-          <Text style={styles.cardTitle}>Lộ trình</Text>
-          
-          <View style={styles.routeContainer}>
-            <View style={styles.routePoint}>
-              <View style={styles.pickupDot} />
-              <View style={styles.locationInfo}>
-                <Text style={styles.locationName}>Điểm đón</Text>
-                <Text style={styles.locationAddress}>{data.pickupAddress}</Text>
-                {data.actualPickupTime && (
-                  <Text style={styles.timeText}>⏰ {formatTime(data.actualPickupTime)}</Text>
-                )}
-              </View>
-            </View>
-            
-            <View style={styles.routeLine} />
-            
-            <View style={styles.routePoint}>
-              <View style={styles.dropoffDot} />
-              <View style={styles.locationInfo}>
-                <Text style={styles.locationName}>Điểm đến</Text>
-                <Text style={styles.locationAddress}>{data.dropoffAddress}</Text>
-                {data.actualDropoffTime && (
-                  <Text style={styles.timeText}>⏰ {formatTime(data.actualDropoffTime)}</Text>
-                )}
-              </View>
-            </View>
+          {/* Header text section */}
+          <View style={styles.headerTextSection}>
+            <Text style={styles.headerTitle}>Chi tiết chuyến đi</Text>
+            <Text style={styles.headerSubtitle}>Thông tin chi tiết về chuyến đi của bạn</Text>
           </View>
 
-          {(data.distance || data.duration) && (
-            <View style={styles.routeStats}>
-              {data.distance && (
-                <View style={styles.statItem}>
-                  <Icon name="straighten" size={16} color="#666" />
-                  <Text style={styles.statText}>
-                    {typeof data.distance === 'number' 
-                      ? `${data.distance.toFixed(2)} km` 
-                      : `${data.distance} km`}
+          {/* Status Card */}
+          <Animatable.View animation="fadeInUp" duration={480} delay={60}>
+            <CleanCard style={styles.card} contentStyle={styles.cardContent}>
+              <View style={styles.statusHeader}>
+                <View style={styles.statusInfo}>
+                  <View style={[styles.statusDot, { backgroundColor: getStatusColor(data.status) }]} />
+                  <Text style={[styles.statusText, { color: getStatusColor(data.status) }]}>
+                    {getStatusText(data.status)}
                   </Text>
                 </View>
-              )}
-              {data.duration && (
-                <View style={styles.statItem}>
-                  <Icon name="schedule" size={16} color="#666" />
-                  <Text style={styles.statText}>
-                    {typeof data.duration === 'number' 
-                      ? `${data.duration} phút` 
-                      : `${data.duration} phút`}
-                  </Text>
-                </View>
-              )}
-            </View>
-          )}
-        </View>
-
-        {/* Driver Info */}
-        {data.driverName && (
-          <View style={styles.driverCard}>
-            <Text style={styles.cardTitle}>Tài xế</Text>
-            <View style={styles.driverInfo}>
-              <View style={styles.driverAvatar}>
-                <Icon name="person" size={24} color="#666" />
-              </View>
-              <View style={styles.driverDetails}>
-                <Text style={styles.driverName}>{data.driverName}</Text>
-                {data.vehiclePlate && (
-                  <Text style={styles.vehicleInfo}>
-                    {data.vehicleModel ? `${data.vehicleModel} • ` : ''}
-                    {data.vehiclePlate}
-                  </Text>
+                {data.rideId && (
+                  <Text style={styles.rideId}>ID: #{data.rideId}</Text>
                 )}
               </View>
-            </View>
-          </View>
-        )}
-
-        {/* Payment Card */}
-        {data.totalFare !== null && (
-          <View style={styles.paymentCard}>
-            <Text style={styles.cardTitle}>Thanh toán</Text>
-            <View style={styles.fareRow}>
-              <Text style={styles.fareLabel}>Tổng cộng:</Text>
-              <Text style={styles.fareValue}>{formatCurrency(data.totalFare)}</Text>
-            </View>
-          </View>
-        )}
-
-        {/* Rating Card */}
-        {isCompleted && data.rating && (
-          <View style={styles.ratingCard}>
-            <Text style={styles.cardTitle}>Đánh giá của bạn</Text>
-            <View style={styles.ratingInfo}>
-              <View style={styles.ratingStars}>
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <Icon
-                    key={star}
-                    name={star <= data.rating.rating_score ? 'star' : 'star-border'}
-                    size={24}
-                    color="#FFA500"
-                  />
-                ))}
-              </View>
-              {data.rating.comment && (
-                <Text style={styles.ratingComment}>{data.rating.comment}</Text>
+              {data.createdAt && (
+                <Text style={styles.dateText}>{formatDate(data.createdAt)}</Text>
               )}
-            </View>
-          </View>
-        )}
+            </CleanCard>
+          </Animatable.View>
 
-        {/* Action Buttons */}
-        <View style={styles.actionsCard}>
-          {isOngoing && (
-            <TouchableOpacity 
-              style={styles.actionButton} 
-              onPress={handleResumeRide}
-            >
-              <Icon name="play-arrow" size={20} color="#4CAF50" />
-              <Text style={[styles.actionButtonText, { color: '#4CAF50' }]}>
-                Tiếp tục theo dõi
-              </Text>
-            </TouchableOpacity>
+          {/* Route Info */}
+          <Animatable.View animation="fadeInUp" duration={480} delay={120}>
+            <CleanCard style={styles.card} contentStyle={styles.cardContent}>
+              <Text style={styles.cardTitle}>Lộ trình</Text>
+              
+              <View style={styles.routeContainer}>
+                <View style={styles.routePoint}>
+                  <View style={styles.pickupDot} />
+                  <View style={styles.locationInfo}>
+                    <Text style={styles.locationName}>Điểm đón</Text>
+                    <Text style={styles.locationAddress}>{data.pickupAddress}</Text>
+                    {data.actualPickupTime && (
+                      <View style={styles.timeRow}>
+                        <Icon name="access-time" size={14} color={colors.textSecondary} />
+                        <Text style={styles.timeText}> {formatTime(data.actualPickupTime)}</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+                
+                <View style={styles.routeLine} />
+                
+                <View style={styles.routePoint}>
+                  <View style={styles.dropoffDot} />
+                  <View style={styles.locationInfo}>
+                    <Text style={styles.locationName}>Điểm đến</Text>
+                    <Text style={styles.locationAddress}>{data.dropoffAddress}</Text>
+                    {data.actualDropoffTime && (
+                      <View style={styles.timeRow}>
+                        <Icon name="access-time" size={14} color={colors.textSecondary} />
+                        <Text style={styles.timeText}> {formatTime(data.actualDropoffTime)}</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              </View>
+
+              {(data.distance || data.duration) && (
+                <View style={styles.routeStats}>
+                  {data.distance && (
+                    <View style={styles.statItem}>
+                      <Icon name="straighten" size={16} color={colors.textSecondary} />
+                      <Text style={styles.statText}>
+                        {typeof data.distance === 'number' 
+                          ? `${data.distance.toFixed(2)} km` 
+                          : `${data.distance} km`}
+                      </Text>
+                    </View>
+                  )}
+                  {data.duration && (
+                    <View style={styles.statItem}>
+                      <Icon name="schedule" size={16} color={colors.textSecondary} />
+                      <Text style={styles.statText}>
+                        {typeof data.duration === 'number' 
+                          ? `${data.duration} phút` 
+                          : `${data.duration} phút`}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )}
+            </CleanCard>
+          </Animatable.View>
+
+          {/* Driver Info */}
+          {data.driverName && (
+            <Animatable.View animation="fadeInUp" duration={480} delay={180}>
+              <CleanCard style={styles.card} contentStyle={styles.cardContent}>
+                <Text style={styles.cardTitle}>Tài xế</Text>
+                <View style={styles.driverInfo}>
+                  <View style={styles.driverAvatar}>
+                    <Icon name="person" size={24} color={colors.textSecondary} />
+                  </View>
+                  <View style={styles.driverDetails}>
+                    <Text style={styles.driverName}>{data.driverName}</Text>
+                    {data.vehiclePlate && (
+                      <Text style={styles.vehicleInfo}>
+                        {data.vehicleModel ? `${data.vehicleModel} • ` : ''}
+                        {data.vehiclePlate}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              </CleanCard>
+            </Animatable.View>
           )}
-          
-          {isCompleted && !data.rating && (
-            <TouchableOpacity 
-              style={styles.actionButton} 
-              onPress={handleRateRide}
-            >
-              <Icon name="star-rate" size={20} color="#FFA500" />
-              <Text style={[styles.actionButtonText, { color: '#FFA500' }]}>
-                Đánh giá chuyến đi
-              </Text>
-            </TouchableOpacity>
+
+          {/* Payment Card */}
+          {data.totalFare !== null && (
+            <Animatable.View animation="fadeInUp" duration={480} delay={240}>
+              <CleanCard style={styles.card} contentStyle={styles.cardContent}>
+                <Text style={styles.cardTitle}>Thanh toán</Text>
+                <View style={styles.fareRow}>
+                  <Text style={styles.fareLabel}>Tổng cộng:</Text>
+                  <Text style={styles.fareValue}>{formatCurrency(data.totalFare)}</Text>
+                </View>
+              </CleanCard>
+            </Animatable.View>
           )}
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+
+          {/* Rating Card */}
+          {isCompleted && data.rating && (
+            <Animatable.View animation="fadeInUp" duration={480} delay={300}>
+              <CleanCard style={styles.card} contentStyle={styles.cardContent}>
+                <Text style={styles.cardTitle}>Đánh giá của bạn</Text>
+                <View style={styles.ratingInfo}>
+                  <View style={styles.ratingStars}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Icon
+                        key={star}
+                        name={star <= data.rating.rating_score ? 'star' : 'star-border'}
+                        size={24}
+                        color="#FFA500"
+                      />
+                    ))}
+                  </View>
+                  {data.rating.comment && (
+                    <Text style={styles.ratingComment}>{data.rating.comment}</Text>
+                  )}
+                </View>
+              </CleanCard>
+            </Animatable.View>
+          )}
+
+          {/* Action Buttons */}
+          {(isOngoing || (isCompleted && !data.rating)) && (
+            <Animatable.View animation="fadeInUp" duration={480} delay={360}>
+              <CleanCard style={styles.card} contentStyle={styles.actionCardContent}>
+                {isOngoing && (
+                  <TouchableOpacity 
+                    style={styles.actionButton} 
+                    onPress={handleResumeRide}
+                    activeOpacity={0.7}
+                  >
+                    <Icon name="play-arrow" size={20} color={colors.primary} />
+                    <Text style={[styles.actionButtonText, { color: colors.primary }]}>
+                      Tiếp tục theo dõi
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                
+                {isCompleted && !data.rating && (
+                  <TouchableOpacity 
+                    style={styles.actionButton} 
+                    onPress={handleRateRide}
+                    activeOpacity={0.7}
+                  >
+                    <Icon name="star-rate" size={20} color="#FFA500" />
+                    <Text style={[styles.actionButtonText, { color: '#FFA500' }]}>
+                      Đánh giá chuyến đi
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </CleanCard>
+            </Animatable.View>
+          )}
+        </ScrollView>
+      </SafeAreaView>
+    </AppBackground>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  safe: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  scrollContent: {
+    paddingTop: 80,
     paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    paddingBottom: 40,
+    gap: 16,
   },
-  backButton: {
-    padding: 5,
+  headerTextSection: {
+    alignItems: 'center',
+    marginBottom: 24,
+    paddingTop: 12,
+    gap: 6,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#000',
+    fontFamily: 'Inter_700Bold',
+    fontSize: 24,
+    color: colors.textPrimary,
   },
-  placeholder: {
-    width: 34,
+  headerSubtitle: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 14,
+    color: colors.textSecondary,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingTop: 100,
   },
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#666',
+    fontFamily: 'Inter_400Regular',
+    color: colors.textSecondary,
   },
-  statusCard: {
-    backgroundColor: '#fff',
-    margin: 20,
-    marginTop: 20,
-    padding: 20,
-    borderRadius: 12,
+  card: {
+    marginBottom: 12,
+  },
+  cardContent: {
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    gap: 16,
   },
   statusHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
   },
   statusInfo: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
   statusDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    marginRight: 8,
   },
   statusText: {
     fontSize: 16,
-    fontWeight: '500',
+    fontFamily: 'Inter_600SemiBold',
   },
   rideId: {
     fontSize: 14,
-    color: '#666',
-    fontWeight: '500',
+    fontFamily: 'Inter_500Medium',
+    color: colors.textSecondary,
   },
   dateText: {
     fontSize: 14,
-    color: '#666',
-  },
-  routeCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 20,
-    marginBottom: 20,
-    padding: 20,
-    borderRadius: 12,
+    fontFamily: 'Inter_400Regular',
+    color: colors.textSecondary,
+    marginTop: 4,
   },
   cardTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#000',
-    marginBottom: 15,
+    fontSize: 18,
+    fontFamily: 'Inter_700Bold',
+    color: colors.textPrimary,
+    marginBottom: 4,
   },
   routeContainer: {
-    marginBottom: 15,
+    marginBottom: 12,
   },
   routePoint: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginVertical: 8,
+    marginVertical: 10,
   },
   pickupDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#4CAF50',
-    marginRight: 12,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: colors.primary,
+    marginRight: 14,
     marginTop: 4,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   dropoffDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#F44336',
-    marginRight: 12,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#EF4444',
+    marginRight: 14,
     marginTop: 4,
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   routeLine: {
     width: 2,
     height: 30,
-    backgroundColor: '#ddd',
-    marginLeft: 5,
+    backgroundColor: 'rgba(148,163,184,0.3)',
+    marginLeft: 6,
     marginVertical: 4,
   },
   locationInfo: {
     flex: 1,
   },
   locationName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
-    marginBottom: 4,
+    fontSize: 12,
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.textMuted,
+    marginBottom: 6,
     textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   locationAddress: {
-    fontSize: 16,
-    color: '#000',
-    fontWeight: '500',
-    lineHeight: 20,
+    fontSize: 15,
+    fontFamily: 'Inter_500Medium',
+    color: colors.textPrimary,
+    lineHeight: 22,
+  },
+  timeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
   },
   timeText: {
     fontSize: 13,
-    color: '#666',
-    marginTop: 4,
+    fontFamily: 'Inter_400Regular',
+    color: colors.textSecondary,
   },
   routeStats: {
     flexDirection: 'row',
-    paddingTop: 15,
+    paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: 'rgba(148,163,184,0.18)',
+    gap: 20,
   },
   statItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 20,
+    gap: 6,
   },
   statText: {
     fontSize: 14,
-    color: '#666',
-    marginLeft: 4,
-  },
-  driverCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 20,
-    marginBottom: 20,
-    padding: 20,
-    borderRadius: 12,
+    fontFamily: 'Inter_500Medium',
+    color: colors.textSecondary,
   },
   driverInfo: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   driverAvatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#f0f0f0',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(148,163,184,0.12)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 15,
+    marginRight: 16,
   },
   driverDetails: {
     flex: 1,
   },
   driverName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#000',
+    fontSize: 17,
+    fontFamily: 'Inter_700Bold',
+    color: colors.textPrimary,
     marginBottom: 4,
   },
   vehicleInfo: {
     fontSize: 14,
-    color: '#666',
-  },
-  paymentCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 20,
-    marginBottom: 20,
-    padding: 20,
-    borderRadius: 12,
+    fontFamily: 'Inter_400Regular',
+    color: colors.textSecondary,
   },
   fareRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 10,
+    paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: 'rgba(148,163,184,0.18)',
   },
   fareLabel: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#000',
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.textPrimary,
   },
   fareValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#4CAF50',
-  },
-  ratingCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 20,
-    marginBottom: 20,
-    padding: 20,
-    borderRadius: 12,
+    fontSize: 20,
+    fontFamily: 'Inter_700Bold',
+    color: colors.primary,
   },
   ratingInfo: {
-    marginTop: 10,
+    marginTop: 8,
   },
   ratingStars: {
     flexDirection: 'row',
-    marginBottom: 10,
+    marginBottom: 12,
+    gap: 4,
   },
   ratingComment: {
     fontSize: 14,
-    color: '#666',
+    fontFamily: 'Inter_400Regular',
+    color: colors.textSecondary,
     lineHeight: 20,
   },
-  actionsCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 20,
-    marginBottom: 20,
-    borderRadius: 12,
-    overflow: 'hidden',
+  actionCardContent: {
+    paddingVertical: 0,
+    paddingHorizontal: 0,
   },
   actionButton: {
     flexDirection: 'row',
@@ -804,13 +832,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 16,
     paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    gap: 10,
   },
   actionButtonText: {
     fontSize: 16,
-    fontWeight: '500',
-    marginLeft: 12,
+    fontFamily: 'Inter_600SemiBold',
   },
 });
 
