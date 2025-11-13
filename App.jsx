@@ -28,6 +28,9 @@ import ProfileSwitchScreen from './src/screens/main/ProfileSwitchScreen.jsx';
 import RideBookingScreen from './src/screens/ride/RideBookingScreen.jsx';
 import RideTrackingScreen from './src/screens/ride/RideTrackingScreen.jsx';
 import RiderMatchingScreen from './src/screens/ride/RiderMatchingScreen.jsx';
+import BrowseRidesScreen from './src/screens/ride/BrowseRidesScreen.jsx';
+import RideRatingScreen from './src/screens/ride/RideRatingScreen.jsx';
+import NotificationsScreen from './src/screens/main/NotificationsScreen.jsx';
 
 // Profile Screens
 import EditProfileScreen from './src/screens/profile/EditProfileScreen.jsx';
@@ -43,6 +46,8 @@ import DriverTestScreen from './src/screens/driver/DriverTestScreen.jsx';
 import CreateSharedRideScreen from './src/screens/driver/CreateSharedRideScreen.jsx';
 import VehicleManagementScreen from './src/screens/driver/VehicleManagementScreen.jsx';
 import DriverRideTrackingScreen from './src/screens/driver/DriverRideTrackingScreen.jsx';
+import DriverRideDetailsScreen from './src/screens/driver/DriverRideDetailsScreen.jsx';
+import DriverCompletionScreen from './src/screens/driver/DriverCompletionScreen.jsx';
 import DriverDashboardScreen from './src/screens/driver/DriverDashboardScreen.jsx';
 import DriverEarningsScreen from './src/screens/driver/DriverEarningsScreen.jsx';
 import DriverRatingsScreen from './src/screens/driver/DriverRatingsScreen.jsx';
@@ -151,15 +156,18 @@ export default function App() {
             {/* Rider / Shared */}
             <Stack.Screen name="Main" component={MainTabs} />
             <Stack.Screen name="RideBooking" component={RideBookingScreen} />
+            <Stack.Screen name="BrowseRides" component={BrowseRidesScreen} />
             <Stack.Screen name="RideTracking" component={RideTrackingScreen} />
             <Stack.Screen name="RiderMatching" component={RiderMatchingScreen} />
             <Stack.Screen name="RideDetails" component={RideDetailsScreen} />
+            <Stack.Screen name="RideRating" component={RideRatingScreen} />
             <Stack.Screen name="QRPayment" component={QRPaymentScreen} />
             <Stack.Screen name="ProfileSwitch" component={ProfileSwitchScreen} />
             <Stack.Screen name="StudentVerification" component={StudentVerificationScreen} />
             <Stack.Screen name="DriverVerification" component={DriverVerificationScreen} />
             <Stack.Screen name="EditProfile" component={EditProfileScreen} />
             <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
+            <Stack.Screen name="Notifications" component={NotificationsScreen} />
 
             {/* Driver */}
             <Stack.Screen name="DriverHome" component={DriverHomeScreen} />
@@ -173,6 +181,8 @@ export default function App() {
             <Stack.Screen name="CreateSharedRide" component={CreateSharedRideScreen} />
             <Stack.Screen name="VehicleManagement" component={VehicleManagementScreen} />
             <Stack.Screen name="DriverRideTracking" component={DriverRideTrackingScreen} />
+            <Stack.Screen name="DriverRideDetails" component={DriverRideDetailsScreen} />
+            <Stack.Screen name="DriverCompletion" component={DriverCompletionScreen} />
           </Stack.Navigator>
         </NavigationContainer>
       </PaperProvider>
