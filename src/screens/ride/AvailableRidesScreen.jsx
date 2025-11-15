@@ -35,10 +35,11 @@ const AvailableRidesScreen = ({ navigation }) => {
       console.log('📋 Available rides response:', response);
       
       if (response?.data) {
-        // Filter only rides that are available for joining
+        // Filter rides that are available for joining (SCHEDULED or ONGOING)
         const availableRides = response.data.filter(ride => 
-          ride.status === 'SCHEDULED' || ride.status === 'PENDING'
+          ride.status === 'SCHEDULED' || ride.status === 'ONGOING' || ride.status === 'PENDING'
         );
+        console.log('✅ Filtered rides:', availableRides.length, 'rides');
         setRides(availableRides);
       } else {
         setRides([]);
@@ -66,10 +67,10 @@ const AvailableRidesScreen = ({ navigation }) => {
       mode: 'join_ride',
       selectedRide: ride,
       fixedDropoff: {
-        lat: ride.end_location?.lat || ride.endLocationLat,
-        lng: ride.end_location?.lng || ride.endLocationLng,
-        locationId: ride.end_location_id || ride.endLocationId,
-        name: ride.end_location_name || ride.endLocationName,
+        lat: ride.end_location?.lat,
+        lng: ride.end_location?.lng,
+        locationId: ride.end_location?.location_id,
+        name: ride.end_location?.name,
         address: ride.end_location?.address,
       }
     });
@@ -116,16 +117,15 @@ const AvailableRidesScreen = ({ navigation }) => {
           </View>
           <View style={styles.driverInfo}>
             <Text style={styles.driverName}>
-              {item.driver_name || item.driverName || 'Tài xế'}
+              {item.driver_name || 'Tài xế'}
             </Text>
             <View style={styles.driverMeta}>
               <Icon name="star" size={14} color="#FBBF24" />
               <Text style={styles.metaText}>
-                {(item.driver_rating || item.driverRating || 4.8).toFixed(1)}
+                {(item.driver_rating || 5.0).toFixed(1)}
               </Text>
               <Text style={styles.metaText}> • </Text>
-              <Icon name="event-seat" size={14} color="#6B7280" />
-              <Text style={styles.metaText}>Còn chỗ</Text>
+              <Text style={styles.metaText}>{item.vehicle_model || 'Xe máy'}</Text>
             </View>
           </View>
         </View>
@@ -135,14 +135,14 @@ const AvailableRidesScreen = ({ navigation }) => {
           <View style={styles.routeRow}>
             <Icon name="trip-origin" size={16} color="#22C55E" />
             <Text style={styles.locationText} numberOfLines={1}>
-              {item.start_location_name || item.startLocationName || 'Điểm đón'}
+              {item.start_location?.name || 'Điểm đón'}
             </Text>
           </View>
           <View style={styles.routeLine} />
           <View style={styles.routeRow}>
             <Icon name="location-on" size={16} color="#EF4444" />
             <Text style={styles.locationText} numberOfLines={1}>
-              {item.end_location_name || item.endLocationName || 'Điểm đến'}
+              {item.end_location?.name || 'Điểm đến'}
             </Text>
           </View>
         </View>
@@ -152,13 +152,13 @@ const AvailableRidesScreen = ({ navigation }) => {
           <View style={styles.detailItem}>
             <Icon name="schedule" size={16} color="#6B7280" />
             <Text style={styles.detailText}>
-              {formatDateTime(item.scheduled_time || item.scheduledTime)}
+              {formatDateTime(item.scheduled_time)}
             </Text>
           </View>
           <View style={styles.priceContainer}>
-            <Text style={styles.priceLabel}>Giá dự kiến</Text>
+            <Text style={styles.priceLabel}>Khoảng cách</Text>
             <Text style={styles.priceText}>
-              {formatCurrency(item.estimated_fare || item.estimatedFare)}
+              {item.estimated_distance ? `${item.estimated_distance.toFixed(1)} km` : 'N/A'}
             </Text>
           </View>
         </View>
