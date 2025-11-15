@@ -35,6 +35,7 @@ import RideBookingScreen from './src/screens/ride/RideBookingScreen.jsx';
 import RiderMatchingScreen from './src/screens/ride/RiderMatchingScreen.jsx';
 import RideTrackingScreen from './src/screens/ride/RideTrackingScreen.jsx';
 import RatingScreen from './src/screens/ride/RatingScreen.jsx';
+// import AvailableRidesScreen from './src/screens/ride/AvailableRidesScreen.jsx';
 
 // Driver Screens
 import DriverHomeScreen from './src/screens/driver/DriverHomeScreen.jsx';
@@ -46,6 +47,7 @@ import DriverRideTrackingScreen from './src/screens/driver/DriverRideTrackingScr
 import CreateSharedRideScreen from './src/screens/driver/CreateSharedRideScreen.jsx';
 import VehicleManagementScreen from './src/screens/driver/VehicleManagementScreen.jsx';
 import SOSAlertScreen from './src/screens/driver/SOSAlertScreen.jsx';
+import AvailableRequestsScreen from './src/screens/driver/AvailableRequestsScreen.jsx';
 
 // Navigation & UI
 import DriverTabNavigator from './src/navigation/DriverTabNavigator.jsx';
@@ -247,6 +249,11 @@ export default function App() {
             component={RatingScreen} 
             options={{ headerShown: false }}
           />
+          {/* <Stack.Screen 
+            name="AvailableRides" 
+            component={AvailableRidesScreen} 
+            options={{ headerShown: false }}
+          /> */}
           <Stack.Screen 
             name="DriverRideTracking" 
             component={DriverRideTrackingScreen} 
@@ -260,6 +267,11 @@ export default function App() {
           <Stack.Screen 
             name="VehicleManagement" 
             component={VehicleManagementScreen} 
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="AvailableRequests" 
+            component={AvailableRequestsScreen} 
             options={{ headerShown: false }}
           />
         </Stack.Navigator>

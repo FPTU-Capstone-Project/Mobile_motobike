@@ -192,9 +192,14 @@ const DriverHomeScreen = ({ navigation }) => {
   };
 
   const handleNotification = (notification) => {
+    // LOG ALL NOTIFICATIONS FOR DEBUG
+    console.log('🔔 [DriverHome] Received notification:', notification);
+    console.log('🔔 [DriverHome] Notification type:', notification.type);
+    console.log('🔔 [DriverHome] Current userType: driver');
+    
     // Show notification as alert or toast
     if (notification.message) {
-      Alert.alert('Thông báo', notification.message);
+      Alert.alert(notification.title || 'Thông báo', notification.message);
     }
   };
 
@@ -430,22 +435,30 @@ const DriverHomeScreen = ({ navigation }) => {
 
         {/* Action Buttons */}
         <View style={styles.actionsContainer}>
-                      <TouchableOpacity 
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => navigation.navigate('AvailableRequests')}
+          >
+            <Icon name="inbox" size={24} color="#9C27B0" />
+            <Text style={styles.actionText}>Yêu cầu chờ</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
             style={styles.actionButton}
             onPress={() => navigation.navigate('RideHistory')}
           >
-              <Icon name="history" size={24} color="#666" />
-              <Text style={styles.actionText}>Lịch sử chuyến đi</Text>
-            </TouchableOpacity>
+            <Icon name="history" size={24} color="#666" />
+            <Text style={styles.actionText}>Lịch sử</Text>
+          </TouchableOpacity>
           
           <TouchableOpacity 
             style={styles.actionButton}
             onPress={() => navigation.navigate('Earnings')}
           >
             <Icon name="trending-up" size={24} color="#666" />
-              <Text style={styles.actionText}>Thu nhập</Text>
-            </TouchableOpacity>
-          </View>
+            <Text style={styles.actionText}>Thu nhập</Text>
+          </TouchableOpacity>
+        </View>
         </View>
 
       {/* Ride Offer Modal */}

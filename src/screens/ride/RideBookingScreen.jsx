@@ -732,7 +732,7 @@ const RideBookingScreen = ({ navigation, route }) => {
                 </CleanCard>
               </Animatable.View>
 
-              {/* Book Ride Button */}
+              {/* Book/Join Ride Button */}
               <Animatable.View animation="fadeInUp" duration={400} delay={60}>
                 <ModernButton
                   title={loading ? "Đang đặt xe..." : "Đặt xe ngay"}

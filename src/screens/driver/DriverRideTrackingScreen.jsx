@@ -18,6 +18,7 @@ import activeRideService from '../../services/activeRideService';
 import rideService from '../../services/rideService';
 import locationService from '../../services/LocationService';
 import websocketService from '../../services/websocketService';
+import goongService from '../../services/goongService';
 import * as Animatable from 'react-native-animatable';
 
 const { width, height } = Dimensions.get('window');
@@ -41,6 +42,8 @@ const DriverRideTrackingScreen = ({ route, navigation }) => {
   const mapRef = useRef(null);
   const driverMarkerRef = useRef(null);
   const [markerUpdateKey, setMarkerUpdateKey] = useState(0);
+  const trackingSubscriptionRef = useRef(null);
+  const [currentPolylineEncoded, setCurrentPolylineEncoded] = useState(null);
 
   // Polyline decoder (Google Encoded Polyline)
   const decodePolyline = (encoded) => {
@@ -116,6 +119,90 @@ const DriverRideTrackingScreen = ({ route, navigation }) => {
     // Return polyline from closest point to end
     return fullPolyline.slice(closestIndex);
   };
+
+  // Update map polyline from encoded string
+  const updateMapPolylineFromEncoded = React.useCallback(
+    (encoded, context = 'tracking') => {
+      if (!encoded || typeof encoded !== 'string') {
+        return;
+      }
+      setCurrentPolylineEncoded((prevEncoded) => {
+        if (prevEncoded === encoded) {
+          return prevEncoded;
+        }
+        try {
+          const decodedPolyline = goongService.decodePolyline(encoded);
+          const formattedPolyline = decodedPolyline.map((point) => ({
+            latitude: point.latitude,
+            longitude: point.longitude,
+          }));
+          setMapPolyline(formattedPolyline);
+          return encoded;
+        } catch (error) {
+          console.error('❌ [DriverTracking] Error decoding polyline:', error);
+          return prevEncoded;
+        }
+      });
+    },
+    []
+  );
+
+  // Apply tracking snapshot
+  const applyTrackingSnapshot = React.useCallback(
+    (snapshot) => {
+      if (!snapshot) {
+        return;
+      }
+      if (snapshot.requestStatus) {
+        const normalizedStatus = snapshot.requestStatus.toUpperCase();
+        setPhase(normalizedStatus === 'ONGOING' ? 'toDropoff' : 'toPickup');
+      }
+      if (
+        snapshot.driverLat !== undefined &&
+        snapshot.driverLat !== null &&
+        snapshot.driverLng !== undefined &&
+        snapshot.driverLng !== null
+      ) {
+        const lat = parseFloat(snapshot.driverLat);
+        const lng = parseFloat(snapshot.driverLng);
+        if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
+          setDriverLocation({ latitude: lat, longitude: lng });
+        }
+      }
+      if (snapshot.polyline) {
+        updateMapPolylineFromEncoded(snapshot.polyline, 'snapshot');
+      }
+      if (snapshot.estimatedArrival) {
+        setEtaText(snapshot.estimatedArrival);
+      }
+    },
+    [updateMapPolylineFromEncoded]
+  );
+
+  // Fetch tracking snapshot
+  const fetchTrackingSnapshot = React.useCallback(async (targetRideId) => {
+    if (!targetRideId) {
+      return null;
+    }
+    try {
+      const response = await rideService.getRideTrackingSnapshot(targetRideId);
+      return response?.data ?? response;
+    } catch (error) {
+      console.error('❌ [DriverTracking] Error fetching tracking snapshot:', error);
+      return null;
+    }
+  }, []);
+
+  // Sync tracking snapshot
+  const syncTrackingSnapshot = React.useCallback(
+    async (targetRideId) => {
+      const data = await fetchTrackingSnapshot(targetRideId);
+      if (data) {
+        applyTrackingSnapshot(data);
+      }
+    },
+    [fetchTrackingSnapshot, applyTrackingSnapshot]
+  );
 
   // Listen to simulation location updates
   useEffect(() => {
@@ -290,9 +377,25 @@ const DriverRideTrackingScreen = ({ route, navigation }) => {
             name: getDropoffName()
           },
           totalFare: initialRideData.total_fare || initialRideData.totalFare,
-          riderName: initialRideData.rider_name,
+          riderName: initialRideData.rider_name || 
+                     initialRideData.riderName || 
+                     initialRideData.rider?.name ||
+                     initialRideData.rider?.full_name ||
+                     initialRideData.rider?.user?.full_name,
+          rider_name: initialRideData.rider_name || 
+                      initialRideData.riderName || 
+                      initialRideData.rider?.name ||
+                      initialRideData.rider?.full_name ||
+                      initialRideData.rider?.user?.full_name,
           ...initialRideData
         });
+        
+        console.log('👤 [DriverTracking] Rider name extracted:', {
+          riderName: initialRideData.rider_name,
+          fromRiderObject: initialRideData.rider?.name,
+          final: initialRideData.rider_name || initialRideData.riderName || initialRideData.rider?.name || 'N/A'
+        });
+        
         // Prepare polyline for current phase
         const toPickupPolyline = initialRideData.polyline_from_driver_to_pickup;
         const ridePolyline = initialRideData.polyline || initialRideData.route?.polyline;
@@ -891,7 +994,14 @@ const DriverRideTrackingScreen = ({ route, navigation }) => {
               
               <View style={styles.infoRow}>
                 <Icon name="person" size={20} color="#666" />
-                <Text style={styles.infoText}>{rideData?.rider_name || 'N/A'}</Text>
+                <Text style={styles.infoText}>
+                  {rideData?.rider_name || 
+                   rideData?.riderName || 
+                   rideData?.rider?.name ||
+                   rideData?.rider?.full_name ||
+                   rideData?.rider?.user?.full_name ||
+                   'Hành khách'}
+                </Text>
                 <TouchableOpacity style={styles.callBtn} onPress={handleCallRider}>
                   <Icon name="phone" size={20} color="#4CAF50" />
                 </TouchableOpacity>

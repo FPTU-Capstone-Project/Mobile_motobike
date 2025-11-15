@@ -10,44 +10,74 @@ class RideService {
 
   async normalizeQuoteFromBE(payload = {}) {
     const fare = payload.fare || {};
-  
-    const safeAmount = (obj) =>
-      (obj && typeof obj.amount === 'number') ? obj.amount : null;
-  
+
+    // Handle both object with .amount property and direct number values
+    const safeAmount = (obj) => {
+      if (obj === null || obj === undefined) return null;
+      if (typeof obj === 'number') return obj;
+      if (typeof obj === 'object' && typeof obj.amount === 'number')
+        return obj.amount;
+      if (typeof obj === 'string') {
+        const parsed = parseFloat(obj);
+        return isNaN(parsed) ? null : parsed;
+      }
+      return null;
+    };
+
+    // Extract quoteId - handle both camelCase and snake_case
+    const quoteId = payload.quoteId || payload.quote_id || null;
+
+    // Handle fare.total in various formats
+    const totalFare =
+      safeAmount(fare.total) ||
+      safeAmount(fare.totalVnd) ||
+      safeAmount(payload.totalFare) ||
+      0;
+
     return {
       // giữ lại thông tin gốc quan trọng
-      quoteId: payload.quoteId ?? null,
-      riderId: payload.riderId ?? null,
-      pricingConfigId: payload.pricingConfigId ?? null,
-      createdAt: payload.createdAt ?? null,
-      expiresAt: payload.expiresAt ?? null,
-  
+      quoteId: quoteId,
+      riderId: payload.riderId ?? payload.rider_id ?? null,
+      pricingConfigId:
+        payload.pricingConfigId ?? payload.pricing_config_id ?? null,
+      createdAt: payload.createdAt ?? payload.created_at ?? null,
+      expiresAt: payload.expiresAt ?? payload.expires_at ?? null,
+
       // quãng đường & thời gian
-      distanceM: (typeof payload.distanceM === 'number') ? payload.distanceM : null,
-      durationS: (typeof payload.durationS === 'number') ? payload.durationS : null,
-  
+      distanceM:
+        typeof payload.distanceM === 'number' ? payload.distanceM : null,
+      durationS:
+        typeof payload.durationS === 'number' ? payload.durationS : null,
+
       // toạ độ nếu cần dùng lại
       pickupLat: payload.pickupLat ?? null,
       pickupLng: payload.pickupLng ?? null,
       dropoffLat: payload.dropoffLat ?? null,
       dropoffLng: payload.dropoffLng ?? null,
-  
+
       // giá cước — đưa về dạng số, KHÔNG còn .amount ở UI
       fare: {
-        total:       safeAmount(fare.total),
-        subtotal:    safeAmount(fare.subtotal),
-        base2Km:     safeAmount(fare.base2KmVnd),
-        after2KmPerKm: safeAmount(fare.after2KmPerKmVnd),
-        discount:    safeAmount(fare.discount),
-        commissionRate: typeof fare.commissionRate === 'number' ? fare.commissionRate : null,
-        pricingVersion: fare.pricingVersion ?? null,
-        distanceMetersEcho: typeof fare.distanceMeters === 'number' ? fare.distanceMeters : null
+        total: totalFare,
+        subtotal:
+          safeAmount(fare.subtotal) || safeAmount(fare.subtotalVnd) || null,
+        base2Km:
+          safeAmount(fare.base2KmVnd) || safeAmount(fare.base2Km) || null,
+        after2KmPerKm:
+          safeAmount(fare.after2KmPerKmVnd) ||
+          safeAmount(fare.after2KmPerKm) ||
+          null,
+        discount: safeAmount(fare.discount) || null,
+        commissionRate:
+          typeof fare.commissionRate === 'number' ? fare.commissionRate : null,
+        pricingVersion: fare.pricingVersion ?? fare.pricing_version ?? null,
+        distanceMetersEcho:
+          typeof fare.distanceMeters === 'number' ? fare.distanceMeters : null,
       },
-  
+
       polyline: payload.polyline ?? null,
-  
+
       // giữ toàn bộ gốc nếu UI cần soi thêm
-      raw: payload
+      raw: payload,
     };
   }
   
@@ -172,7 +202,19 @@ class RideService {
     }
   }
 
-  // Get my ride requests (authenticated rider) - no need for riderId
+  // Get broadcast requests (for drivers to see pending manual requests)
+  async getBroadcastingRequests() {
+    try {
+      const response = await this.apiService.get(
+        ENDPOINTS.RIDE_REQUESTS.BROADCASTING
+      );
+      return response;
+    } catch (error) {
+      console.error('Get broadcasting requests error:', error);
+      throw error;
+    }
+  }
+
   async getMyRiderRequests(status = null, page = 0, size = 20) {
     try {
       const params = new URLSearchParams({
@@ -303,69 +345,72 @@ async acceptBroadcastRequest(requestId, vehicleId, currentLocation = null, start
     }
   }
 
+  // Note: Snapshot API not implemented in backend
+  // All tracking data comes via WebSocket /topic/ride.tracking.{rideId}
+  async getRideTrackingSnapshot(rideId) {
+    console.warn('⚠️ [RideService] Snapshot API not available on backend');
+    return null;
+  }
+
   // Complete ride - will auto-complete all ride requests first
-  async completeRide(rideId) {
+  async completeRide(rideId, rideRequestId = null) {
     try {
       // First, get all ride requests to check their status
-      console.log(`📋 Getting ride requests for ride ${rideId}...`);
-      const requestsResponse = await this.getRideRequests(rideId);
-      console.log('📋 Ride requests response:', JSON.stringify(requestsResponse, null, 2));
+      const requests = await this.getRideRequests(rideId);
+      const requestList = Array.isArray(requests)
+        ? requests
+        : requests?.data || requests?.content || [];
+
+      console.log(`📋 [Complete Ride] Found ${requestList.length} requests for ride ${rideId}`);
       
-      // Extract request list from response (handle pagination)
-      const requestList = Array.isArray(requestsResponse) 
-        ? requestsResponse 
-        : (requestsResponse?.data || requestsResponse?.content || requestsResponse?.items || []);
+      // Complete any ONGOING or CONFIRMED requests first (CONFIRMED also needs to be completed)
+      const activeRequests = requestList.filter(
+        (req) => req.status === 'ONGOING' || req.status === 'CONFIRMED'
+      );
       
-      console.log(`📋 Found ${requestList.length} ride request(s)`);
-      
-      // Complete any ONGOING requests first
-      const ongoingRequests = requestList.filter(req => req.status === 'ONGOING');
-      console.log(`📋 Found ${ongoingRequests.length} ONGOING request(s) to complete`);
-      
-      for (const req of ongoingRequests) {
-        // Try multiple possible field names for rideRequestId
-        const rideRequestId = req.sharedRideRequestId || 
-                            req.shared_ride_request_id || 
-                            req.rideRequestId || 
-                            req.ride_request_id ||
-                            req.id;
+      console.log(`📋 [Complete Ride] ${activeRequests.length} active requests to complete`);
+
+      for (const req of activeRequests) {
+        // Try different possible field names for requestId (both camelCase and snake_case)
+        const reqId = req.shared_ride_request_id || req.sharedRideRequestId || req.rideRequestId || req.requestId || req.id;
         
-        if (!rideRequestId) {
-          console.warn(`⚠️ Skipping request without ID:`, req);
+        console.log(`📋 [Complete Ride] Request data:`, {
+          status: req.status,
+          shared_ride_request_id: req.shared_ride_request_id,
+          sharedRideRequestId: req.sharedRideRequestId,
+          rideRequestId: req.rideRequestId,
+          requestId: req.requestId,
+          id: req.id,
+          finalId: reqId
+        });
+        
+        if (!reqId) {
+          console.error('❌ [Complete Ride] Cannot find requestId in request object:', req);
           continue;
         }
         
-        console.log(`🔄 Completing ride request ${rideRequestId} (status: ${req.status})...`);
         try {
-          await this.completeRideRequestOfRide(rideId, rideRequestId);
-          console.log(`✅ Completed ride request ${rideRequestId}`);
+          await this.completeRideRequestOfRide(rideId, reqId);
+          console.log(`✅ [Complete Ride] Completed request ${reqId}`);
         } catch (err) {
-          console.warn(`⚠️ Failed to complete request ${rideRequestId}:`, err);
-          throw err;
+          console.error(`❌ [Complete Ride] Failed to complete request ${reqId}:`, err);
+          // Don't throw, try to complete other requests
         }
       }
-      
+
       // Now complete the ride
-      console.log(`🔄 Completing ride ${rideId}...`);
-      const endpoint = ENDPOINTS.RIDES.COMPLETE.replace('{rideId}', rideId);
-      // Backend expects body: { "rideId": 123 }
-      try {
-        const response = await this.apiService.post(endpoint, { rideId });
-        console.log(`✅ Successfully completed ride ${rideId}`, response);
-        return response;
-      } catch (completeError) {
-        console.error('❌ Complete ride API error:', completeError);
-        console.error('❌ Error details:', {
-          message: completeError?.message,
-          status: completeError?.status,
-          response: completeError?.response,
-          data: completeError?.data
-        });
-        throw completeError;
+      console.log(`📋 [Complete Ride] All requests completed, now completing ride ${rideId}`);
+      const endpoint = ENDPOINTS.SHARED_RIDES.COMPLETE.replace('{rideId}', rideId);
+      const payload = { rideId };
+      if (rideRequestId !== null && rideRequestId !== undefined) {
+        payload.rideRequestId = rideRequestId;
       }
+      
+      const response = await this.apiService.post(endpoint, payload);
+      console.log(`✅ [Complete Ride] Ride ${rideId} completed successfully`);
+      return response;
     } catch (error) {
-      console.error('❌ Complete ride error:', error);
-      console.error('❌ Full error object:', JSON.stringify(error, null, 2));
+      console.error('❌ [Complete Ride] Error:', error);
       throw error;
     }
   }
@@ -479,6 +524,33 @@ async acceptBroadcastRequest(requestId, vehicleId, currentLocation = null, start
     }
   }
 
+  // Get rides for logged-in driver (no driverId needed)
+  async getMyRides(
+    status = null,
+    page = 0,
+    size = 20,
+    sortBy = 'createdAt',
+    sortDir = 'desc'
+  ) {
+    try {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        size: size.toString(),
+        sortBy: sortBy,
+        sortDir: sortDir,
+      });
+
+      if (status) params.append('status', status);
+
+      const endpoint = `${ENDPOINTS.RIDES.GET_MY_RIDES}?${params.toString()}`;
+      const response = await this.apiService.get(endpoint);
+      return response;
+    } catch (error) {
+      console.error('Get my rides error:', error);
+      throw error;
+    }
+  }
+
 
   async cancelRide(rideId, reason) {
     try {
@@ -556,11 +628,32 @@ async acceptBroadcastRequest(requestId, vehicleId, currentLocation = null, start
 
   async getRequestDetails(requestId) {
     try {
-      const endpoint = ENDPOINTS.RIDE_REQUESTS.DETAILS.replace('{requestId}', requestId);
+      // Validate requestId
+      if (!requestId || requestId === 'undefined' || requestId === 'null' || requestId === '{requestId}') {
+        console.error('❌ Invalid requestId:', requestId);
+        throw new Error('Invalid request ID');
+      }
+      
+      const endpoint = ENDPOINTS.RIDE_REQUESTS.DETAILS.replace(
+        '{requestId}',
+        requestId
+      );
       const response = await this.apiService.get(endpoint);
       return response;
     } catch (error) {
       console.error('Get request details error:', error);
+      
+      // If request not found (404), clear active ride from storage
+      if (error?.message?.includes('not found') || error?.message?.includes('Không tìm thấy')) {
+        console.warn('⚠️ Request not found, clearing from storage');
+        try {
+          const activeRideService = require('./activeRideService').default;
+          await activeRideService.clearActiveRide();
+        } catch (clearError) {
+          console.error('Failed to clear active ride:', clearError);
+        }
+      }
+      
       throw error;
     }
   }

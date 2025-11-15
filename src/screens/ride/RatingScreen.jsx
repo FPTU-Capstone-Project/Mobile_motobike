@@ -29,6 +29,18 @@ const RatingScreen = ({ navigation, route }) => {
     actualDuration,
   } = route.params || {};
 
+  // LOG ALL PARAMS FOR DEBUG
+  console.log('⭐ [RatingScreen] Received params:', {
+    rideId,
+    requestId,
+    driverId,
+    driverName,
+    totalFare,
+    actualDistance,
+    actualDuration,
+    allParams: route.params
+  });
+
   const [rating, setRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);
   const [comment, setComment] = useState('');

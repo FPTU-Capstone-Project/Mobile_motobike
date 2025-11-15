@@ -9,7 +9,7 @@ export const API_CONFIG = {
     // For Physical Device: Use your computer's network IP (e.g., 192.168.1.9)
     
     // Android Emulator (recommended for Android)
-    BASE_URL: 'http://192.168.101.94:8080/api/v1',
+    BASE_URL: 'http://192.168.2.4:8080/api/v1',
     
     // Alternative configurations (uncomment if needed):
     // BASE_URL: 'http://192.168.101.143:8081/api/v1', // Physical device or iOS simulator - replace with your IP
@@ -178,14 +178,19 @@ export const ENDPOINTS = {
     // Driver endpoints
     CREATE: '/rides',
     GET_BY_DRIVER: '/rides/driver',
+    GET_MY_RIDES: '/rides', // Get rides for logged-in driver
     START: '/rides/{rideId}/start',
     COMPLETE: '/rides/{rideId}/complete',
     CANCEL: '/rides/{rideId}',
-    TRACK: '/rides/rides/{rideId}/track', // GPS tracking endpoint
+    TRACK: '/rides/rides/{rideId}/track', // Legacy GPS tracking endpoint
     
     // Rider endpoints
     AVAILABLE: '/rides/available',
     DETAILS: '/rides/{rideId}',
+  },
+
+  RIDE_TRACKING: {
+    SNAPSHOT: '/ride-tracking/{rideId}/snapshot',
   },
 
   // Ride Requests APIs
@@ -193,18 +198,18 @@ export const ENDPOINTS = {
     // Rider endpoints
     BOOK_RIDE: '/ride-requests',
     JOIN_RIDE: '/ride-requests/rides/{rideId}',
-    GET_MY_REQUESTS: '/ride-requests/rider', // Get authenticated rider's requests (using userId)
-    GET_BY_RIDER: '/ride-requests/rider', // Legacy: Get by riderId (for admin)
+    GET_BY_RIDER: '/ride-requests/rider',
     CANCEL: '/ride-requests/{requestId}',
     DETAILS: '/ride-requests/{requestId}',
-    
+
     // Driver endpoints
+    BROADCASTING: '/ride-requests/broadcasting',
     GET_BY_RIDE: '/ride-requests/rides/{rideId}',
     ACCEPT: '/ride-requests/{requestId}/accept',
     ACCEPT_BROADCAST: '/ride-requests/{requestId}/broadcast/accept',
     REJECT: '/ride-requests/{requestId}/reject',
     START_REQUEST: '/rides/start-ride-request', // Start a ride request (CONFIRMED -> ONGOING)
-    COMPLETE_REQUEST: '/rides/complete-ride-request', // Complete a ride request (ONGOING -> COMPLETED)
+    COMPLETE_REQUEST: '/rides/complete-ride-request', // Complete a ride request
   },
 
   // Shared Rides APIs
@@ -214,7 +219,7 @@ export const ENDPOINTS = {
     GET_BY_DRIVER: '/shared-rides/driver',
     UPDATE: '/shared-rides/{rideId}',
     DELETE: '/shared-rides/{rideId}',
-    COMPLETE: '/shared-rides/{rideId}/complete',
+    COMPLETE: '/rides/{rideId}/complete',
     CANCEL: '/shared-rides/{rideId}/cancel',
     START: '/shared-rides/{rideId}/start',
   },
@@ -237,6 +242,11 @@ export const ENDPOINTS = {
     DEACTIVATE: '/fcm/deactivate',
   },
 
+  // Routes API
+  ROUTES: {
+    TEMPLATES: '/routes/templates',
+  },
+
   // Vehicle endpoints
   VEHICLES: {
     CREATE: '/vehicles',
@@ -248,12 +258,23 @@ export const ENDPOINTS = {
     GET_BY_STATUS: '/vehicles/status/{status}',
   },
 
+  // Notifications
+  NOTIFICATIONS: {
+    LIST: '/notifications',
+    DETAIL: '/notifications/{notifId}',
+    MARK_READ: '/notifications/{notifId}/read',
+    MARK_ALL_READ: '/notifications/read-all',
+    DELETE: '/notifications/{notifId}',
+    DELETE_ALL: '/notifications',
+  },
+
   // WebSocket endpoint (not REST)
   WEBSOCKET: {
     ENDPOINT: '/ws-native', // WebSocket endpoint
     FALLBACK_ENDPOINTS: ['/ws/websocket', '/websocket', '/ws'], // Try multiple endpoints
     DRIVER_QUEUE: '/user/queue/ride-offers',
     RIDER_QUEUE: '/user/queue/ride-matching',
+    RIDE_TRACKING: '/topic/ride.tracking.{rideId}', // Real-time tracking updates
   },
 
   // Ratings API
