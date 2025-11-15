@@ -50,6 +50,10 @@ const RideBookingScreen = ({ navigation, route }) => {
   const [loadingLocation, setLoadingLocation] = useState(true);
   const [routePolyline, setRoutePolyline] = useState(null);
 
+  // Join ride mode states
+  const [isJoinRideMode, setIsJoinRideMode] = useState(false);
+  const [selectedRideToJoin, setSelectedRideToJoin] = useState(null);
+
   // Map ref
   const mapRef = useRef(null);
   
@@ -81,7 +85,39 @@ const RideBookingScreen = ({ navigation, route }) => {
   useEffect(() => {
     const handleRouteParams = async () => {
       if (route.params) {
-        const { pickup, dropoff, pickupAddress: pAddress, dropoffAddress: dAddress } = route.params;
+        const { 
+          mode, 
+          selectedRide, 
+          fixedDropoff,
+          pickup, 
+          dropoff, 
+          pickupAddress: pAddress, 
+          dropoffAddress: dAddress 
+        } = route.params;
+        
+        // Check if this is join ride mode
+        if (mode === 'join_ride' && selectedRide) {
+          console.log('🚗 [RideBooking] Join ride mode activated:', {
+            rideId: selectedRide.shared_ride_id,
+            fixedDropoff
+          });
+          
+          setIsJoinRideMode(true);
+          setSelectedRideToJoin(selectedRide);
+          
+          // Set fixed dropoff location
+          if (fixedDropoff) {
+            const dropoffLoc = {
+              latitude: fixedDropoff.lat,
+              longitude: fixedDropoff.lng,
+              locationId: fixedDropoff.locationId,
+              name: fixedDropoff.name,
+              isPOI: !!fixedDropoff.locationId
+            };
+            setDropoffLocation(dropoffLoc);
+            setDropoffAddress(fixedDropoff.name || fixedDropoff.address || 'Điểm đến của tài xế');
+          }
+        }
         
         if (pickup) {
           setPickupLocation(pickup);
@@ -97,7 +133,7 @@ const RideBookingScreen = ({ navigation, route }) => {
           }
         }
         
-        if (dropoff) {
+        if (dropoff && !fixedDropoff) {
           setDropoffLocation(dropoff);
           if (dAddress) {
             setDropoffAddress(dAddress);

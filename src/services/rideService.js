@@ -143,12 +143,38 @@ class RideService {
     }
   }
 
-  async joinRide(rideId, quoteId, desiredPickupTime = null, notes = null) {
+  async joinRide(rideId, pickupLocation = null, dropoffLocation = null, quoteId, desiredPickupTime = null, notes = null) {
     try {
       const endpoint = ENDPOINTS.RIDE_REQUESTS.JOIN_RIDE.replace('{rideId}', rideId);
       const body = {
         quoteId: quoteId
       };
+
+      // Add pickup location if provided (clean format - only lat/lng/locationId)
+      if (pickupLocation) {
+        body.pickup = {
+          latitude: pickupLocation.latitude,
+          longitude: pickupLocation.longitude
+        };
+        
+        // Add locationId if this is a POI
+        if (pickupLocation.locationId || pickupLocation.id) {
+          body.pickup.locationId = pickupLocation.locationId || pickupLocation.id;
+        }
+      }
+
+      // Add dropoff location if provided (clean format - only lat/lng/locationId)
+      if (dropoffLocation) {
+        body.dropoff = {
+          latitude: dropoffLocation.latitude,
+          longitude: dropoffLocation.longitude
+        };
+        
+        // Add locationId if this is a POI
+        if (dropoffLocation.locationId || dropoffLocation.id) {
+          body.dropoff.locationId = dropoffLocation.locationId || dropoffLocation.id;
+        }
+      }
 
       // Add optional fields if provided
       if (desiredPickupTime) {
@@ -157,6 +183,8 @@ class RideService {
       if (notes) {
         body.notes = notes;
       }
+
+      console.log('🚗 [RideService] Join ride request body:', JSON.stringify(body, null, 2));
 
       const response = await this.apiService.post(endpoint, body);
       return response;

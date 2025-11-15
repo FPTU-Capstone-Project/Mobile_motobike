@@ -218,11 +218,18 @@ const HomeScreen = ({ navigation }) => {
                   <Text style={styles.cardTitle}>Đặt xe</Text>
                   <Text style={styles.cardSubtitle}>Chọn hình thức đặt xe phù hợp</Text>
                 </View>
-                <View style={styles.ctaButtonContainer}>
+                <View style={styles.buttonRow}>
                   <ModernButton 
                     title="Đặt xe ngay" 
                     icon="directions-car" 
-                    onPress={handleBookRide}
+                    onPress={handleBookRide} 
+                    style={styles.primaryButton}
+                  />
+                  <ModernButton 
+                    title="Tìm chuyến đi" 
+                    icon="search" 
+                    onPress={() => navigation.navigate('AvailableRides')} 
+                    style={styles.secondaryButton}
                   />
                 </View>
               </CleanCard>
@@ -266,6 +273,10 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   ctaButtonContainer: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  buttonRow: {
     flexDirection: 'row',
     gap: 12,
   },
