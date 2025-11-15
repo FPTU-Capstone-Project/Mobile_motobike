@@ -35,8 +35,6 @@ const HomeScreen = ({ navigation }) => {
   const [user, setUser] = useState(null);
   const [isWebSocketConnected, setIsWebSocketConnected] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [nearbyRides, setNearbyRides] = useState([]);
-  const [loadingRides, setLoadingRides] = useState(false);
   const [currentUserName, setCurrentUserName] = useState('');
 
   useEffect(() => {
@@ -133,18 +131,6 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
-  const loadNearbyRides = async () => {
-    try {
-      setLoadingRides(true);
-      const rides = await rideService.getAvailableRides();
-      setNearbyRides(rides?.data || []);
-    } catch (error) {
-      console.error('Error loading nearby rides:', error);
-      setNearbyRides([]);
-    } finally {
-      setLoadingRides(false);
-    }
-  };
 
   const handleBookRide = async () => {
     const locationPermission = await permissionService.requestLocationPermission(true);
@@ -162,60 +148,7 @@ const HomeScreen = ({ navigation }) => {
     });
   };
 
-  const renderNearbyRides = () => {
-    if (!nearbyRides.length) return null;
 
-    return (
-      <Animatable.View animation="fadeInUp" duration={520} delay={80} useNativeDriver>
-        <CleanCard style={styles.card} contentStyle={styles.cardBody}>
-          <View style={styles.cardHeaderRow}>
-            <Text style={styles.cardTitle}>Chuyến xe gần bạn</Text>
-            <TouchableOpacity onPress={loadNearbyRides}>
-              <Icon name="refresh" size={20} color={colors.primary} />
-            </TouchableOpacity>
-          </View>
-          <Text style={styles.cardSubtitle}>Những chuyến đi chia sẻ đang mở quanh bạn</Text>
-
-          {loadingRides ? (
-            <ActivityIndicator size="small" color={colors.primary} style={styles.loadingIndicator} />
-          ) : (
-            nearbyRides.slice(0, 5).map((ride) => (
-              <TouchableOpacity
-                key={ride.rideId}
-                style={styles.rideRow}
-                activeOpacity={0.88}
-                onPress={() => navigation.navigate('RideDetails', { rideId: ride.rideId })}
-              >
-                <View style={styles.rideDriver}>
-                  <View style={styles.driverAvatar}>
-                    <Icon name="person" size={20} color={colors.primary} />
-                  </View>
-                  <View>
-                    <Text style={styles.driverName}>{ride.driverName || 'Tài xế'}</Text>
-                    <View style={styles.driverMeta}>
-                      <Icon name="star" size={14} color="#FBBF24" />
-                      <Text style={styles.driverMetaText}>
-                        {(ride.driverRating || 4.8).toFixed(1)} • {ride.availableSeats} chỗ trống
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-
-                <View style={styles.rideInfo}>
-                  <Text style={styles.routeText} numberOfLines={1}>
-                    {ride.startLocationName} → {ride.endLocationName}
-                  </Text>
-                  <Text style={styles.rideMeta}>{rideService.formatDateTime(ride.scheduledDepartureTime)}</Text>
-                </View>
-
-                <Text style={styles.ridePrice}>{rideService.formatCurrency(ride.estimatedFare)}</Text>
-              </TouchableOpacity>
-            ))
-          )}
-        </CleanCard>
-      </Animatable.View>
-    );
-  };
 
   const renderUserStats = () => {
     if (!user?.rider_profile) return null;
@@ -283,10 +216,21 @@ const HomeScreen = ({ navigation }) => {
               <CleanCard style={styles.card} contentStyle={[styles.cardBody, styles.ctaCard]}>
                 <View style={styles.ctaTextContainer}>
                   <Text style={styles.cardTitle}>Đặt xe</Text>
-                  <Text style={styles.cardSubtitle}>Bấm để chuyển đến trang đặt xe</Text>
+                  <Text style={styles.cardSubtitle}>Chọn hình thức đặt xe phù hợp</Text>
                 </View>
-                <View style={styles.ctaButtonContainer}>
-                <ModernButton title="Đặt xe ngay" icon="directions-car" onPress={handleBookRide} />
+                <View style={styles.buttonRow}>
+                  <ModernButton 
+                    title="Đặt xe ngay" 
+                    icon="directions-car" 
+                    onPress={handleBookRide} 
+                    style={styles.primaryButton}
+                  />
+                  <ModernButton 
+                    title="Tìm chuyến đi" 
+                    icon="search" 
+                    onPress={() => navigation.navigate('AvailableRides')} 
+                    style={styles.secondaryButton}
+                  />
                 </View>
               </CleanCard>
             </Animatable.View>
@@ -296,7 +240,6 @@ const HomeScreen = ({ navigation }) => {
               <ActiveRideCard navigation={navigation} />
             </Animatable.View>
 
-            {renderNearbyRides()}
             {renderUserStats()}
           </View>
         </ScrollView>
@@ -322,19 +265,26 @@ const styles = StyleSheet.create({
   card: { marginBottom: 12 },
   cardBody: { padding: 20, gap: 18 },
   ctaCard: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'space-between',
-    gap: 12,
+    flexDirection: 'column', 
+    alignItems: 'stretch', 
+    gap: 16,
   },
   ctaTextContainer: { 
-    flex: 1, 
-    flexShrink: 1,
     gap: 6,
-    marginRight: 12,
   },
   ctaButtonContainer: {
-    flexShrink: 0,
+    flexDirection: 'row',
+    gap: 12,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  primaryButton: {
+    flex: 1,
+  },
+  secondaryButton: {
+    flex: 1,
   },
   cardTitle: { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.textPrimary },
   cardSubtitle: { fontSize: 14, color: colors.textSecondary, marginTop: -8 },

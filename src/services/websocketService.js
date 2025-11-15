@@ -20,6 +20,12 @@ class WebSocketService {
     this.CONNECTION_TIMEOUT_MS = 30000;
   }
 
+  generateSubscriptionKey(prefix) {
+    return `${prefix}-${Date.now().toString(36)}-${Math.random()
+      .toString(36)
+      .slice(2, 8)}`;
+  }
+
   // Initialize WebSocket connection
   async connect() {
     // Prevent multiple concurrent connections
@@ -246,7 +252,7 @@ class WebSocketService {
   }
 
   // Subscribe to driver ride offers
-  subscribeToDriverOffers(callback) {
+  subscribeToDriverOffers(callback, key) {
     if (!this.isConnected || !this.client) {
       throw new Error('WebSocket not connected');
     }
@@ -260,71 +266,61 @@ class WebSocketService {
         console.log('🎯 [WebSocket] Message body:', message.body);
         
         const data = JSON.parse(message.body);
-        console.log('📨 Received driver offer:', data);
-        console.log('📨 Offer data type:', typeof data);
-        console.log('📨 Offer data keys:', Object.keys(data));
+        console.log('📨 [WebSocket] Received driver offer:', JSON.stringify(data, null, 2));
+        console.log('📨 [WebSocket] Offer data type:', typeof data);
+        console.log('📨 [WebSocket] Offer data keys:', Object.keys(data));
+        console.log('📨 [WebSocket] totalFare:', data.totalFare, 'Type:', typeof data.totalFare);
+        console.log('📨 [WebSocket] proposalRank:', data.proposalRank, 'rideId:', data.rideId);
         
         if (callback) {
-          console.log('📨 Calling driver offer callback');
+          console.log('📨 [WebSocket] Calling driver offer callback');
           callback(data);
         } else {
-          console.log('⚠️ No callback provided for driver offer');
+          console.log('⚠️ [WebSocket] No callback provided for driver offer');
         }
       } catch (error) {
-        console.error('❌ Error parsing driver offer message:', error);
-        console.error('❌ Raw message:', message);
+        console.error('❌ [WebSocket] Error parsing driver offer message:', error);
+        console.error('❌ [WebSocket] Raw message:', message);
       }
     });
 
-    this.subscriptions.set('driver-offers', subscription);
-    this.messageHandlers.set('driver-offers', callback);
+    const subscriptionKey = key || this.generateSubscriptionKey('driver-offers');
+    this.subscriptions.set(subscriptionKey, subscription);
+    this.messageHandlers.set(subscriptionKey, callback);
 
-    return subscription;
+    return subscriptionKey;
   }
 
   // Subscribe to rider matching updates
-  subscribeToRiderMatching(callback) {
+  subscribeToRiderMatching(callback, key) {
     if (!this.isConnected || !this.client) {
       throw new Error('WebSocket not connected');
     }
 
     const destination = ENDPOINTS.WEBSOCKET.RIDER_QUEUE;
-    
-    // Check if already subscribed - if so, just update callback
-    const existingSubscription = this.subscriptions.get('rider-matching');
-    if (existingSubscription) {
-      console.log('📡 Updating rider matching callback (already subscribed)');
-      this.messageHandlers.set('rider-matching', callback);
-      return existingSubscription;
-    }
-
     console.log('📡 Subscribing to rider matching:', destination);
 
     const subscription = this.client.subscribe(destination, (message) => {
       try {
         const data = JSON.parse(message.body);
-        console.log('📨 Received rider matching update:', data);
-        
-        // Use callback from messageHandlers (allows dynamic update)
-        const currentCallback = this.messageHandlers.get('rider-matching');
-        if (currentCallback) {
-          currentCallback(data);
-        } else {
-          callback(data);
-        }
+        console.log('📨 [WebSocket] Received rider matching update:', JSON.stringify(data, null, 2));
+        console.log('📨 [WebSocket] Status:', data.status, 'RequestId:', data.requestId, 'RideId:', data.rideId);
+        callback(data);
       } catch (error) {
-        console.error('❌ Error parsing rider matching message:', error);
+        console.error('❌ [WebSocket] Error parsing rider matching message:', error);
+        console.error('❌ [WebSocket] Raw message body:', message.body);
       }
     });
 
-    this.subscriptions.set('rider-matching', subscription);
-    this.messageHandlers.set('rider-matching', callback);
+    const subscriptionKey = key || this.generateSubscriptionKey('rider-matching');
+    this.subscriptions.set(subscriptionKey, subscription);
+    this.messageHandlers.set(subscriptionKey, callback);
 
-    return subscription;
+    return subscriptionKey;
   }
 
   // Subscribe to general notifications
-  subscribeToNotifications(callback) {
+  subscribeToNotifications(callback, key) {
     if (!this.isConnected || !this.client) {
       throw new Error('WebSocket not connected');
     }
@@ -342,15 +338,70 @@ class WebSocketService {
       }
     });
 
-    this.subscriptions.set('notifications', subscription);
-    this.messageHandlers.set('notifications', callback);
+    const subscriptionKey = key || this.generateSubscriptionKey('notifications');
+    this.subscriptions.set(subscriptionKey, subscription);
+    this.messageHandlers.set(subscriptionKey, callback);
 
-    return subscription;
+    return subscriptionKey;
+  }
+
+  // Subscribe to ride tracking updates
+  subscribeToRideTracking(rideId, callback) {
+    if (!this.isConnected || !this.client) {
+      throw new Error('WebSocket not connected');
+    }
+
+    const destination = ENDPOINTS.WEBSOCKET.RIDE_TRACKING.replace('{rideId}', rideId);
+    console.log('📡 Subscribing to ride tracking:', destination);
+
+    const subscription = this.client.subscribe(destination, (message) => {
+      try {
+        const data = JSON.parse(message.body);
+        if (callback) {
+          callback(data);
+        }
+      } catch (error) {
+        console.error('❌ [WebSocket] Error parsing ride tracking message:', error);
+        console.error('❌ [WebSocket] Raw message body:', message.body);
+      }
+    });
+
+    const subscriptionKey = `ride-tracking-${rideId}`;
+    this.subscriptions.set(subscriptionKey, subscription);
+    this.messageHandlers.set(subscriptionKey, callback);
+
+    return subscriptionKey;
+  }
+
+  // Unsubscribe from ride tracking
+  unsubscribeFromRideTracking(rideId) {
+    const subscriptionKey = `ride-tracking-${rideId}`;
+    const subscription = this.subscriptions.get(subscriptionKey);
+    if (subscription) {
+      try {
+        subscription.unsubscribe();
+        this.subscriptions.delete(subscriptionKey);
+        this.messageHandlers.delete(subscriptionKey);
+        console.log(`✅ Unsubscribed from ride tracking for ride ${rideId}`);
+      } catch (error) {
+        console.error(`❌ Error unsubscribing from ride tracking:`, error);
+      }
+    }
   }
 
   // Connect as rider
   async connectAsRider(onRideMatching, onNotification) {
     try {
+      // If already connected, just update subscriptions (no need to reconnect)
+      if (this.isConnected && this.client) {
+        console.log('🔄 Already connected, updating rider subscriptions...');
+        this.subscribeToRiderMatching(onRideMatching);
+        this.subscribeToNotifications(onNotification);
+        console.log('✅ Rider subscriptions updated');
+        return true;
+      }
+
+      // Not connected yet, establish new connection
       await this.connect();
 
       // Subscribe to rider-specific queues
@@ -368,6 +419,16 @@ class WebSocketService {
   // Connect as driver
   async connectAsDriver(onRideOffer, onNotification) {
     try {
+      // If already connected, just update subscriptions (no need to reconnect)
+      if (this.isConnected && this.client) {
+        console.log('🔄 Already connected, updating driver subscriptions...');
+        this.subscribeToDriverOffers(onRideOffer);
+        this.subscribeToNotifications(onNotification);
+        console.log('✅ Driver subscriptions updated');
+        return true;
+      }
+
+      // Not connected yet, establish new connection
       await this.connect();
 
       // Subscribe to driver-specific queues

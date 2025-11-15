@@ -50,7 +50,6 @@ const RideHistoryScreen = ({ navigation }) => {
       // Get current user to extract userId (thử dùng userId thay cho riderId)
       const currentUser = authService.getCurrentUser();
       if (!currentUser) {
-        console.warn('⚠️ No current user found');
         setOngoingRides([]);
         setCompletedRides([]);
         return;
@@ -59,13 +58,10 @@ const RideHistoryScreen = ({ navigation }) => {
       // Extract userId from user data
       const userId = currentUser?.user?.user_id || currentUser?.user_id;
       if (!userId) {
-        console.warn('⚠️ No user ID found in user data:', currentUser);
         setOngoingRides([]);
         setCompletedRides([]);
         return;
       }
-
-      console.log('📋 Loading rides for user ID (trying as riderId):', userId);
 
       // Load ratings to check which requests have been rated
       try {
@@ -73,7 +69,6 @@ const RideHistoryScreen = ({ navigation }) => {
         const ratings = ratingsResponse?.data || [];
         const ratedIds = new Set(ratings.map(rating => rating.shared_ride_request_id || rating.requestId));
         setRatedRequestIds(ratedIds);
-        console.log(`✅ Loaded ${ratings.length} ratings, ${ratedIds.size} unique request IDs`);
       } catch (ratingError) {
         console.warn('⚠️ Could not load ratings (will assume no ratings):', ratingError);
         setRatedRequestIds(new Set());
@@ -83,19 +78,13 @@ const RideHistoryScreen = ({ navigation }) => {
       try {
         const ongoingResponse = await rideService.getRiderRequests(userId, 'ONGOING', 0, 50);
         const confirmedResponse = await rideService.getRiderRequests(userId, 'CONFIRMED', 0, 50);
-        
-        console.log('📦 ONGOING Response:', JSON.stringify(ongoingResponse, null, 2));
-        console.log('📦 CONFIRMED Response:', JSON.stringify(confirmedResponse, null, 2));
+
         
         const ongoingData = ongoingResponse?.data || [];
         const confirmedData = confirmedResponse?.data || [];
         
-        console.log('📦 ONGOING Data:', JSON.stringify(ongoingData, null, 2));
-        console.log('📦 CONFIRMED Data:', JSON.stringify(confirmedData, null, 2));
-        
         // Combine and transform to ride cards format
         const allOngoing = [...ongoingData, ...confirmedData].map(request => {
-          console.log('📋 Processing ongoing request:', JSON.stringify(request, null, 2));
           
           // Get pickup address - prioritize address, then name
           const pickupAddr = request.pickup_location?.address || 
@@ -138,8 +127,6 @@ const RideHistoryScreen = ({ navigation }) => {
           };
         });
 
-        console.log(`✅ Loaded ${allOngoing.length} ongoing rides from API`);
-        console.log('📋 Transformed ongoing rides:', JSON.stringify(allOngoing, null, 2));
         setOngoingRides(allOngoing);
       } catch (error) {
         console.error('Error loading ongoing rides:', error);
@@ -151,11 +138,7 @@ const RideHistoryScreen = ({ navigation }) => {
         const completedResponse = await rideService.getRiderRequests(userId, 'COMPLETED', 0, 50);
         const completedData = completedResponse?.data || [];
         
-        console.log('📦 COMPLETED Response:', JSON.stringify(completedResponse, null, 2));
-        console.log('📦 COMPLETED Data:', JSON.stringify(completedData, null, 2));
-        
         const allCompleted = completedData.map(request => {
-          console.log('📋 Processing completed request:', JSON.stringify(request, null, 2));
           
           // Get pickup address - prioritize address, then name
           const pickupAddr = request.pickup_location?.address || 
