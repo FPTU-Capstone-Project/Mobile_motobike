@@ -407,8 +407,6 @@ class WebSocketService {
     const subscription = this.client.subscribe(destination, (message) => {
       try {
         const data = JSON.parse(message.body);
-        console.log('📨 [WebSocket] Received ride tracking update:', JSON.stringify(data, null, 2));
-        console.log('📨 [WebSocket] RideId:', data.rideId, 'CurrentLat:', data.currentLat, 'CurrentLng:', data.currentLng);
         if (callback) {
           callback(data);
         }
