@@ -35,7 +35,7 @@ import RideBookingScreen from './src/screens/ride/RideBookingScreen.jsx';
 import RiderMatchingScreen from './src/screens/ride/RiderMatchingScreen.jsx';
 import RideTrackingScreen from './src/screens/ride/RideTrackingScreen.jsx';
 import RatingScreen from './src/screens/ride/RatingScreen.jsx';
-// import AvailableRidesScreen from './src/screens/ride/AvailableRidesScreen.jsx';
+import AvailableRidesScreen from './src/screens/ride/AvailableRidesScreen.jsx';
 
 // Driver Screens
 import DriverHomeScreen from './src/screens/driver/DriverHomeScreen.jsx';
@@ -249,11 +249,11 @@ export default function App() {
             component={RatingScreen} 
             options={{ headerShown: false }}
           />
-          {/* <Stack.Screen 
+          <Stack.Screen 
             name="AvailableRides" 
             component={AvailableRidesScreen} 
             options={{ headerShown: false }}
-          /> */}
+          />
           <Stack.Screen 
             name="DriverRideTracking" 
             component={DriverRideTrackingScreen} 
