@@ -199,7 +199,6 @@ const ActiveRideCard = ({ navigation }) => {
       return;
     }
 
-    const screenName = activeRide.userType === 'driver' ? 'DriverRideTracking' : 'RideTracking';
     const params = {
       rideId: activeRide.rideId,
       requestId: activeRide.requestId,
@@ -209,7 +208,15 @@ const ActiveRideCard = ({ navigation }) => {
       startTracking: false
     };
 
-    navigation.navigate(screenName, params);
+    if (activeRide.userType === 'driver') {
+      navigation.navigate('DriverMain', {
+        screen: 'DriverRideTracking',
+        params,
+      });
+      return;
+    }
+
+    navigation.navigate('RideTracking', params);
   };
 
   const handleViewDetails = () => {
@@ -217,7 +224,10 @@ const ActiveRideCard = ({ navigation }) => {
     
     if (activeRide.userType === 'driver') {
       // Navigate to driver ride details
-      navigation.navigate('DriverRideDetails', { rideId: activeRide.rideId });
+      navigation.navigate('DriverMain', {
+        screen: 'DriverRideDetails',
+        params: { rideId: activeRide.rideId },
+      });
     } else {
       // Validate requestId before navigating
       if (!activeRide.requestId || activeRide.requestId === 'undefined' || activeRide.requestId === 'null' || activeRide.requestId === '{requestId}') {

@@ -41,7 +41,6 @@ import StudentVerificationScreen from './src/screens/verification/StudentVerific
 import DriverVerificationScreen from './src/screens/verification/DriverVerificationScreen.jsx';
 
 // Driver Screens
-import DriverHomeScreen from './src/screens/driver/DriverHomeScreen.jsx';
 import DriverTestScreen from './src/screens/driver/DriverTestScreen.jsx';
 import CreateSharedRideScreen from './src/screens/driver/CreateSharedRideScreen.jsx';
 import VehicleManagementScreen from './src/screens/driver/VehicleManagementScreen.jsx';
@@ -60,6 +59,26 @@ import GlassTabBar from './src/components/ui/GlassTabBar.jsx';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
+const DriverStack = createNativeStackNavigator();
+
+function DriverMainStack() {
+  return (
+    <DriverStack.Navigator screenOptions={{ headerShown: false }}>
+      <DriverStack.Screen name="DriverTabs" component={DriverTabNavigator} />
+      <DriverStack.Screen name="DriverRideTracking" component={DriverRideTrackingScreen} />
+      <DriverStack.Screen name="DriverRideDetails" component={DriverRideDetailsScreen} />
+      <DriverStack.Screen name="DriverCompletion" component={DriverCompletionScreen} />
+      <DriverStack.Screen name="CreateSharedRide" component={CreateSharedRideScreen} />
+      <DriverStack.Screen name="VehicleManagement" component={VehicleManagementScreen} />
+      <DriverStack.Screen name="DriverDashboard" component={DriverDashboardScreen} />
+      <DriverStack.Screen name="DriverEarnings" component={DriverEarningsScreen} />
+      <DriverStack.Screen name="DriverRatings" component={DriverRatingsScreen} />
+      <DriverStack.Screen name="DriverProfile" component={DriverProfileScreen} />
+      <DriverStack.Screen name="SOSAlert" component={SOSAlertScreen} />
+      <DriverStack.Screen name="DriverTest" component={DriverTestScreen} />
+    </DriverStack.Navigator>
+  );
+}
 
 function MainTabs() {
   return (
@@ -170,19 +189,7 @@ export default function App() {
             <Stack.Screen name="Notifications" component={NotificationsScreen} />
 
             {/* Driver */}
-            <Stack.Screen name="DriverHome" component={DriverHomeScreen} />
-            <Stack.Screen name="DriverMain" component={DriverTabNavigator} />
-            <Stack.Screen name="DriverDashboard" component={DriverDashboardScreen} />
-            <Stack.Screen name="DriverEarnings" component={DriverEarningsScreen} />
-            <Stack.Screen name="DriverRatings" component={DriverRatingsScreen} />
-            <Stack.Screen name="DriverProfile" component={DriverProfileScreen} />
-            <Stack.Screen name="SOSAlert" component={SOSAlertScreen} />
-            <Stack.Screen name="DriverTest" component={DriverTestScreen} />
-            <Stack.Screen name="CreateSharedRide" component={CreateSharedRideScreen} />
-            <Stack.Screen name="VehicleManagement" component={VehicleManagementScreen} />
-            <Stack.Screen name="DriverRideTracking" component={DriverRideTrackingScreen} />
-            <Stack.Screen name="DriverRideDetails" component={DriverRideDetailsScreen} />
-            <Stack.Screen name="DriverCompletion" component={DriverCompletionScreen} />
+            <Stack.Screen name="DriverMain" component={DriverMainStack} />
           </Stack.Navigator>
         </NavigationContainer>
       </PaperProvider>

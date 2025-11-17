@@ -18,8 +18,6 @@ import rideService from '../../services/rideService';
 import locationService from '../../services/LocationService';
 import websocketService from '../../services/websocketService';
 import goongService from '../../services/goongService';
-import apiService from '../../services/api';
-import { ENDPOINTS } from '../../config/api';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Animatable from 'react-native-animatable';
 
@@ -475,7 +473,9 @@ const trackingSubscriptionRef = useRef(null);
         }).catch(e => console.error('Failed to get location:', e));
         
         // Subscribe to real-time tracking updates
-        setupTrackingSubscription();
+        setupTrackingSubscription().catch(err =>
+          console.error('❌ [DriverTracking] Failed to initialize tracking subscription:', err)
+        );
       } else {
         loadRideData();
       }
@@ -492,7 +492,7 @@ const trackingSubscriptionRef = useRef(null);
         trackingSubscriptionRef.current = null;
       }
     };
-  }, [rideId, startTracking, initialRideData]);
+  }, [rideId, startTracking, initialRideData, setupTrackingSubscription]);
 
   useFocusEffect(
     useCallback(() => {
@@ -516,13 +516,29 @@ const trackingSubscriptionRef = useRef(null);
     }, [rideId, fetchTrackingSnapshot, applyTrackingSnapshot])
   );
   
-  const setupTrackingSubscription = () => {
-    if (!rideId || !websocketService.isConnected) {
-      console.warn('⚠️ [DriverTracking] Cannot subscribe - WebSocket not connected or rideId missing');
+  const setupTrackingSubscription = useCallback(async () => {
+    if (!rideId) {
+      console.warn('⚠️ [DriverTracking] Cannot subscribe - rideId missing');
       return;
+    }
+
+    if (!websocketService.isConnected) {
+      try {
+        console.log('🔌 [DriverTracking] WebSocket not connected. Attempting to connect...');
+        await websocketService.connect();
+        console.log('✅ [DriverTracking] WebSocket reconnected for tracking subscription');
+      } catch (error) {
+        console.error('❌ [DriverTracking] Failed to connect WebSocket for tracking:', error);
+        Alert.alert('Lỗi', 'Không thể kết nối realtime tracking. Vui lòng thử lại.');
+        return;
+      }
     }
     
     try {
+      if (trackingSubscriptionRef.current) {
+        websocketService.unsubscribeFromRideTracking(rideId);
+      }
+
       const handleTrackingUpdate = (data) => {
         console.log('📍 [DriverTracking] Real-time tracking update:', JSON.stringify(data, null, 2));
         
@@ -544,7 +560,7 @@ const trackingSubscriptionRef = useRef(null);
     } catch (error) {
       console.error('❌ [DriverTracking] Error subscribing to tracking topic:', error);
     }
-  };
+  }, [rideId, updateMapPolylineFromEncoded]);
 
   // Update phase when rideData changes (especially request status)
   useEffect(() => {
@@ -903,38 +919,26 @@ const trackingSubscriptionRef = useRef(null);
         }
       ];
 
-      // Send coordinates to tracking endpoint
-      const wsDestination = `/app/ride.track.${rideId}`;
-      if (websocketService.isConnected && websocketService.client) {
-        try {
-          websocketService.client.publish({
-            destination: wsDestination,
-            body: JSON.stringify(coordinates),
-          });
-          console.log('✅ [Simulation] Sent 2 coordinates via WebSocket');
-        } catch (wsError) {
-          console.error('❌ [Simulation] WebSocket publish error:', wsError);
-          // Fallback to REST API
-          try {
-            const endpoint = ENDPOINTS.RIDES.TRACK.replace('{rideId}', rideId);
-            await apiService.post(endpoint, coordinates);
-            console.log('✅ [Simulation] Sent 2 coordinates via REST API');
-          } catch (apiError) {
-            console.error('❌ [Simulation] REST API error:', apiError);
-            throw apiError;
-          }
+      const sendCoordinatesViaWebSocket = async () => {
+        const wsDestination = `/app/ride.track.${rideId}`;
+
+        if (!websocketService.isConnected || !websocketService.client) {
+          console.warn('🔌 [Simulation] WebSocket not connected. Attempting to reconnect before sending coordinates...');
+          await websocketService.connect();
         }
-      } else {
-        // Use REST API if WebSocket not available
-        try {
-          const endpoint = ENDPOINTS.RIDES.TRACK.replace('{rideId}', rideId);
-          await apiService.post(endpoint, coordinates);
-          console.log('✅ [Simulation] Sent 2 coordinates via REST API');
-        } catch (apiError) {
-          console.error('❌ [Simulation] REST API error:', apiError);
-          throw apiError;
+
+        if (!websocketService.isConnected || !websocketService.client) {
+          throw new Error('Không thể kết nối realtime tracking để gửi tọa độ.');
         }
-      }
+
+        websocketService.client.publish({
+          destination: wsDestination,
+          body: JSON.stringify(coordinates),
+        });
+        console.log('✅ [Simulation] Sent 2 coordinates via WebSocket');
+      };
+
+      await sendCoordinatesViaWebSocket();
 
       // Update driver location to final pickup location
       setDriverLocation(finalPickupLocation);

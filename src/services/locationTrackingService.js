@@ -255,28 +255,13 @@ class LocationTrackingService {
           };
 
           // Send via WebSocket immediately
-          const wsDestination = `/app/ride.track.${this.currentRideId}`;
-          if (websocketService.isConnected && websocketService.client) {
-            try {
-              websocketService.client.publish({
-                destination: wsDestination,
-                body: JSON.stringify([point]), // Send single point immediately
-              });
+          this.sendPointsOverWebSocket([point], `simulation ${currentIndex + 1}/${points.length}`)
+            .then(() => {
               console.log(`✅ [LocationTracking] Sent simulation point ${currentIndex + 1}/${points.length} via WebSocket`);
-            } catch (wsError) {
-              console.error('❌ [LocationTracking] WebSocket publish error:', wsError);
-            }
-          } else {
-            // Fallback to REST API (fire and forget)
-            const endpoint = ENDPOINTS.RIDES.TRACK.replace('{rideId}', this.currentRideId);
-            apiService.post(endpoint, [point])
-              .then(() => {
-                console.log(`✅ [LocationTracking] Sent simulation point ${currentIndex + 1}/${points.length} via REST API`);
-              })
-              .catch((apiError) => {
-                console.error('❌ [LocationTracking] REST API error:', apiError);
-              });
-          }
+            })
+            .catch((wsError) => {
+              console.error('❌ [LocationTracking] Failed to send simulation point via WebSocket:', wsError);
+            });
         }
 
         currentIndex++;
@@ -630,37 +615,46 @@ class LocationTrackingService {
         timestamp: loc.timestamp // ISO string - backend will parse to ZonedDateTime
       }));
 
-      // Send via WebSocket to /app/ride.track.{rideId} (backend will broadcast to /topic/ride.tracking.{rideId})
-      const wsDestination = `/app/ride.track.${this.currentRideId}`;
-      
-      if (websocketService.isConnected && websocketService.client) {
-        try {
-          websocketService.client.publish({
-            destination: wsDestination,
-            body: JSON.stringify(points),
-          });
-          console.log(`✅ [LocationTracking] Sent ${points.length} location points via WebSocket to ${wsDestination}`);
-          console.log(`✅ [LocationTracking] Points:`, JSON.stringify(points, null, 2));
-          this.locationBuffer = [];
-          this.lastSendTime = Date.now();
-        } catch (wsError) {
-          console.error('❌ [LocationTracking] WebSocket publish error:', wsError);
-          // Fallback to REST API
-          throw new Error('WebSocket publish failed');
-        }
-      } else {
-        // Fallback: try REST API if WebSocket not available
-        console.warn('⚠️ [LocationTracking] WebSocket not connected, trying REST API fallback...');
-        const endpoint = ENDPOINTS.RIDES.TRACK.replace('{rideId}', this.currentRideId);
-        const response = await apiService.post(endpoint, points);
-        console.log(`✅ [LocationTracking] Sent ${points.length} location points via REST API for ride ${this.currentRideId}`);
-        this.locationBuffer = [];
-        this.lastSendTime = Date.now();
-        return response;
-      }
+      await this.sendPointsOverWebSocket(points, `batch (${points.length})`);
+      console.log(`✅ [LocationTracking] Points:`, JSON.stringify(points, null, 2));
+      this.locationBuffer = [];
+      this.lastSendTime = Date.now();
     } catch (error) {
       console.error('Failed to send location batch:', error);
       // Giữ nguyên buffer để retry lần sau
+      throw error;
+    }
+  }
+
+  async ensureWebSocketConnection() {
+    if (websocketService.isConnected && websocketService.client) {
+      return;
+    }
+
+    console.warn('🔌 [LocationTracking] WebSocket not connected. Attempting to connect...');
+    await websocketService.connect();
+
+    if (!websocketService.isConnected || !websocketService.client) {
+      throw new Error('Không thể kết nối tới máy chủ realtime để gửi tọa độ');
+    }
+  }
+
+  async sendPointsOverWebSocket(points, context = 'tracking') {
+    if (!this.currentRideId) {
+      throw new Error('Chưa có rideId để gửi tọa độ');
+    }
+
+    await this.ensureWebSocketConnection();
+
+    const wsDestination = `/app/ride.track.${this.currentRideId}`;
+    try {
+      websocketService.client.publish({
+        destination: wsDestination,
+        body: JSON.stringify(points),
+      });
+      console.log(`✅ [LocationTracking] Sent ${points.length} location points via WebSocket (${context}) to ${wsDestination}`);
+    } catch (error) {
+      console.error('❌ [LocationTracking] WebSocket publish error:', error);
       throw error;
     }
   }

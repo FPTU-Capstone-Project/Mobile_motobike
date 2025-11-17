@@ -529,18 +529,6 @@ class RideService {
     }
   }
 
-  // GPS tracking API
-  async trackRide(rideId, locationPoints) {
-    try {
-      const endpoint = ENDPOINTS.RIDES.TRACK.replace("{rideId}", rideId);
-      const response = await this.apiService.post(endpoint, locationPoints);
-      return response;
-    } catch (error) {
-      console.error("Track ride error:", error);
-      throw error;
-    }
-  }
-
   async createRide(
     vehicleId,
     startLocationId,

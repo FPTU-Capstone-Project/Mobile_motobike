@@ -200,23 +200,7 @@ const LoginScreen = ({ navigation, route }) => {
 
               <GlassButton title={loading ? '...' : 'Đăng nhập'} onPress={handleLogin} style={styles.signInButton} />
 
-              <View style={styles.dividerRow}>
-                <View style={styles.divider} />
-                <Text style={styles.dividerText}>Hoặc tiếp tục với</Text>
-                <View style={styles.divider} />
-              </View>
-
-              <View style={styles.socialRow}>
-                <TouchableOpacity style={styles.socialBtn} onPress={handleLoginGoogle} activeOpacity={0.9}>
-                  <FontAwesome name="google" size={18} color="#DB4437" style={styles.socialIcon} />
-                  <Text style={styles.socialText}>Google</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.socialBtn} onPress={handleLoginFacebook} activeOpacity={0.9}>
-                  <FontAwesome name="facebook" size={18} color="#1877F2" style={styles.socialIcon} />
-                  <Text style={styles.socialText}>Facebook</Text>
-                </TouchableOpacity>
-              </View>
+            
             </CleanCard>
 
           <View style={styles.footer}>
