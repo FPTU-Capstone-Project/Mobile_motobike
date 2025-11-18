@@ -25,8 +25,10 @@ import goongService from '../../services/goongService';
 import activeRideService from '../../services/activeRideService';
 import websocketService from '../../services/websocketService';
 import fcmService from '../../services/fcmService';
+import sosService from '../../services/sosService';
 import ModernButton from '../../components/ModernButton.jsx';
 import GoongMap from '../../components/GoongMap.jsx';
+import SOSButton from '../../components/SOSButton.jsx';
 
 const { width, height } = Dimensions.get('window');
 
@@ -57,6 +59,102 @@ const RideTrackingScreen = ({ navigation, route }) => {
   const sheetHeight = sheetHeightRef.current; // Start at 120px (collapsed)
   const panResponder = useRef(null);
   const mapFittedRef = useRef(false);
+
+  const normalizeLocation = useCallback((...candidates) => {
+    for (const item of candidates) {
+      if (!item) continue;
+      const lat = item.latitude ?? item.lat;
+      const lng = item.longitude ?? item.lng;
+      if (typeof lat === 'number' && typeof lng === 'number') {
+        return {
+          name: item.name || item.address || item.label || null,
+          latitude: lat,
+          longitude: lng,
+        };
+      }
+    }
+    return null;
+  }, []);
+
+  const buildRiderSosSnapshot = useCallback(() => {
+    const driverProfile = {
+      id:
+        driverInfo?.driverId ||
+        selectedProposal?.driverId ||
+        requestDetails?.driver_id ||
+        null,
+      name:
+        driverInfo?.driverName ||
+        selectedProposal?.driverName ||
+        requestDetails?.driver_name ||
+        null,
+      phone:
+        driverInfo?.driverPhone ||
+        selectedProposal?.driverPhone ||
+        requestDetails?.driver_phone ||
+        null,
+      vehicle: driverInfo?.vehicle || selectedProposal?.vehicle || null,
+    };
+
+    const pickup = normalizeLocation(
+      quote?.pickup,
+      driverInfo?.pickupLocation,
+      requestDetails?.pickup_location,
+      selectedProposal?.pickupLocation
+    );
+    const dropoff = normalizeLocation(
+      quote?.dropoff,
+      driverInfo?.dropoffLocation,
+      requestDetails?.dropoff_location,
+      selectedProposal?.dropoffLocation
+    );
+
+    return {
+      role: 'rider',
+      rideId: effectiveRideId,
+      requestId,
+      status: rideStatus,
+      eta: etaText,
+      driver: driverProfile,
+      pickup,
+      dropoff,
+      driverLocation: driverLocation
+        ? { latitude: driverLocation.latitude, longitude: driverLocation.longitude }
+        : null,
+      route: currentPolylineEncoded ? { polyline: currentPolylineEncoded } : null,
+      timestamp: new Date().toISOString(),
+    };
+  }, [
+    driverInfo,
+    selectedProposal,
+    requestDetails,
+    quote,
+    normalizeLocation,
+    effectiveRideId,
+    requestId,
+    rideStatus,
+    etaText,
+    driverLocation,
+    currentPolylineEncoded,
+  ]);
+
+  const handleTriggerSOS = useCallback(async () => {
+    const rideSnapshot = buildRiderSosSnapshot();
+    try {
+      await sosService.triggerAlert({
+        rideId: effectiveRideId,
+        rideSnapshot,
+        role: 'rider',
+      });
+      Alert.alert(
+        'Đã gửi SOS',
+        'MSSUS đã nhận được tín hiệu cầu cứu của bạn và đang thông báo cho quản trị viên cùng liên hệ khẩn cấp.'
+      );
+    } catch (error) {
+      console.error('Failed to trigger SOS:', error);
+      Alert.alert('Lỗi', error?.message || 'Không thể gửi SOS. Vui lòng thử lại.');
+    }
+  }, [buildRiderSosSnapshot, effectiveRideId]);
 
   const updatePolylineFromEncoded = useCallback(
     (encoded, context = "tracking") => {
@@ -1494,6 +1592,14 @@ const RideTrackingScreen = ({ navigation, route }) => {
         <Icon name="my-location" size={22} color="#333" />
       </TouchableOpacity>
 
+      <SOSButton
+        onTrigger={handleTriggerSOS}
+        disabled={loading}
+        size={60}
+        showCaption={false}
+        style={styles.sosButton}
+      />
+
       {/* Bottom Content */}
       {showProposals ? (
         <View style={styles.proposalsContainer}>
@@ -1606,6 +1712,12 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 3,
+  },
+  sosButton: {
+    position: 'absolute',
+    right: 16,
+    top: 100,
+    zIndex: 1100,
   },
   driverMarker: {
     width: 40,

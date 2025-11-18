@@ -18,6 +18,8 @@ import rideService from '../../services/rideService';
 import locationService from '../../services/LocationService';
 import websocketService from '../../services/websocketService';
 import goongService from '../../services/goongService';
+import sosService from '../../services/sosService';
+import SOSButton from '../../components/SOSButton.jsx';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Animatable from 'react-native-animatable';
 
@@ -44,6 +46,85 @@ const mapRef = useRef(null);
 const driverMarkerRef = useRef(null);
 const [markerUpdateKey, setMarkerUpdateKey] = useState(0);
 const trackingSubscriptionRef = useRef(null);
+
+  const getRideLocation = useCallback(
+    (type) => {
+      const data = rideData || initialRideData || {};
+      const location =
+        type === 'pickup'
+          ? data.start_location || data.pickup_location
+          : data.end_location || data.dropoff_location;
+      const fallbackLat =
+        type === 'pickup' ? data.pickup_lat : data.dropoff_lat;
+      const fallbackLng =
+        type === 'pickup' ? data.pickup_lng : data.dropoff_lng;
+
+      const lat = location?.lat ?? location?.latitude ?? fallbackLat;
+      const lng = location?.lng ?? location?.longitude ?? fallbackLng;
+
+      if (typeof lat === 'number' && typeof lng === 'number') {
+        return {
+          name: location?.name || location?.address || null,
+          latitude: lat,
+          longitude: lng,
+        };
+      }
+      return null;
+    },
+    [rideData, initialRideData]
+  );
+
+  const buildDriverSosSnapshot = useCallback(() => {
+    const data = rideData || initialRideData || {};
+    return {
+      role: 'driver',
+      rideId,
+      status: data.status || phase || status || null,
+      phase,
+      simulationPhase,
+      eta: etaText,
+      rider: {
+        name: data.rider_name || data.rider?.name || null,
+        phone: data.rider_phone || data.rider?.phone || null,
+      },
+      pickup: getRideLocation('pickup'),
+      dropoff: getRideLocation('dropoff'),
+      driverLocation: driverLocation
+        ? { latitude: driverLocation.latitude, longitude: driverLocation.longitude }
+        : null,
+      route: currentPolylineEncoded ? { polyline: currentPolylineEncoded } : null,
+      timestamp: new Date().toISOString(),
+      vehicle: data.vehicle || data.driver_vehicle || null,
+    };
+  }, [
+    rideData,
+    initialRideData,
+    rideId,
+    phase,
+    status,
+    simulationPhase,
+    etaText,
+    driverLocation,
+    currentPolylineEncoded,
+    getRideLocation,
+  ]);
+
+  const handleTriggerDriverSOS = useCallback(async () => {
+    try {
+      await sosService.triggerAlert({
+        rideId,
+        rideSnapshot: buildDriverSosSnapshot(),
+        role: 'driver',
+      });
+      Alert.alert(
+        'Đã gửi SOS',
+        'Hệ thống đã ghi nhận tình huống khẩn cấp và đang thông báo cho quản trị viên cùng liên hệ khẩn cấp.'
+      );
+    } catch (error) {
+      console.error('Driver SOS trigger failed:', error);
+      Alert.alert('Lỗi', error?.message || 'Không thể gửi SOS. Vui lòng thử lại.');
+    }
+  }, [rideId, buildDriverSosSnapshot]);
 
   const updateMapPolylineFromEncoded = useCallback(
     (encoded, context = "tracking") => {
@@ -1216,6 +1297,14 @@ const trackingSubscriptionRef = useRef(null);
             </TouchableOpacity>
           )}
         </View>
+
+        <SOSButton
+          onTrigger={handleTriggerDriverSOS}
+          disabled={loading}
+          size={60}
+          showCaption={false}
+          style={styles.sosButton}
+        />
       </View>
 
       {/* Bottom Sheet */}
@@ -1402,6 +1491,12 @@ const styles = StyleSheet.create({
     bottom: 280,
     zIndex: 1000,
     elevation: 10,
+  },
+  sosButton: {
+    position: 'absolute',
+    right: 16,
+    top: 110,
+    zIndex: 1200,
   },
   simBtn: {
     flexDirection: 'row',

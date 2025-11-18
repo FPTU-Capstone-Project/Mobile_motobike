@@ -243,6 +243,12 @@ export const ENDPOINTS = {
     DELETE_ALL: "/notifications",
   },
 
+  // SOS Alerts
+  SOS: {
+    TRIGGER: "/sos/alerts",
+    MY_ALERTS: "/sos/alerts/me",
+  },
+
   // Vehicle endpoints
   VEHICLES: {
     CREATE: "/vehicles",
