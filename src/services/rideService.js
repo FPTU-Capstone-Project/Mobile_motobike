@@ -606,6 +606,29 @@ class RideService {
     }
   }
 
+  async getMyCompletedRides(
+    page = 0,
+    size = 20,
+    sortBy = "completedAt",
+    sortDir = "desc"
+  ) {
+    try {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        size: size.toString(),
+        sortBy: sortBy,
+        sortDir: sortDir,
+      });
+
+      const endpoint = `${ENDPOINTS.RIDES.MY_COMPLETED_RIDES}?${params.toString()}`;
+      const response = await this.apiService.get(endpoint);
+      return response;
+    } catch (error) {
+      console.error("Get my completed rides error:", error);
+      throw error;
+    }
+  }
+
   async getRideRequests(rideId, status = null, page = 0, size = 20) {
     try {
       const params = new URLSearchParams({

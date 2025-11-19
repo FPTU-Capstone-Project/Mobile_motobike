@@ -120,6 +120,13 @@ const DriverProfileScreen = ({ navigation }) => {
 
   const menuSections = [
     {
+      title: 'Chuyến đi',
+      items: [
+        { icon: 'history', title: 'Lịch sử chuyến đi', onPress: () => navigation.navigate('DriverRideHistory') },
+        { icon: 'star', title: 'Đánh giá của tôi', onPress: () => navigation.navigate('DriverRatings') }
+      ]
+    },
+    {
       title: 'Tài khoản',
       items: [
         { icon: 'edit', title: 'Chỉnh sửa thông tin', onPress: handleEditProfile },

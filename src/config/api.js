@@ -3,7 +3,7 @@ export const API_CONFIG = {
   // Development - Use your computer's IP address instead of localhost
   // To find your IP: Windows: ipconfig | Mac/Linux: ifconfig
   DEV: {
-    BASE_URL: "http://192.168.1.158:8080/api/v1", // Android emulator
+    BASE_URL: "http://192.168.2.4:8080/api/v1", // Android emulator
     // Alternative IPs to try:
     // BASE_URL: 'http://192.168.1.XXX:8081/api/v1', // Replace XXX with your IP
     // BASE_URL: 'http://172.20.10.2:8081/api/v1', // iOS simulator
@@ -177,6 +177,7 @@ export const ENDPOINTS = {
     CREATE: "/rides",
     GET_BY_DRIVER: "/rides/driver",
     GET_MY_RIDES: "/rides", // Get rides for logged-in driver
+    MY_COMPLETED_RIDES: "/rides/my-completed-rides", // Get completed rides for logged-in driver
     START: "/rides/{rideId}/start",
     COMPLETE: "/rides/{rideId}/complete",
     CANCEL: "/rides/{rideId}",

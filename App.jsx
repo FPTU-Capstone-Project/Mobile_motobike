@@ -52,6 +52,7 @@ import DriverDashboardScreen from './src/screens/driver/DriverDashboardScreen.js
 import DriverEarningsScreen from './src/screens/driver/DriverEarningsScreen.jsx';
 import DriverRatingsScreen from './src/screens/driver/DriverRatingsScreen.jsx';
 import DriverProfileScreen from './src/screens/driver/DriverProfileScreen.jsx';
+import DriverRideHistoryScreen from './src/screens/driver/DriverRideHistoryScreen.jsx';
 import SOSAlertScreen from './src/screens/driver/SOSAlertScreen.jsx';
 
 // Navigation & UI
@@ -75,6 +76,7 @@ function DriverMainStack() {
       <DriverStack.Screen name="DriverEarnings" component={DriverEarningsScreen} />
       <DriverStack.Screen name="DriverRatings" component={DriverRatingsScreen} />
       <DriverStack.Screen name="DriverProfile" component={DriverProfileScreen} />
+      <DriverStack.Screen name="DriverRideHistory" component={DriverRideHistoryScreen} />
       <DriverStack.Screen name="SOSAlert" component={SOSAlertScreen} />
       <DriverStack.Screen name="DriverTest" component={DriverTestScreen} />
     </DriverStack.Navigator>
